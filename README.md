@@ -4,7 +4,7 @@ glassvr is a way to use XR/AR glasses from xreal, viture etc, with 6dof in steam
 the glasses are running like monitors, so you dont need the fancy ones with 6dof or even 3dof builtin, these features requires special software to be used that varies from manufacturer to manufacturer,
 that also means that the screens are mirroring for both eye, not idle for vr but usable,
 
-steamvr isn't designed for a "headset" like this but i found some workarounds...
+steamvr isn't designed for a "headset" like this but i found some workarounds
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
@@ -14,7 +14,7 @@ note: with something like the vive ultimate tracker you could skip needing base 
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
-- a way to attach you controller/tracker to you head, alignment isn't critical since you can ajust position and rotaion offsets in the "settings.json" later
+- a way to attach you'r controller/tracker to you head, alignment isn't critical since you can adjust position and rotation offsets later
 - steamvr watchman dongles, while not required, needed if you want to use your controllers wirelessly, one dongle per device
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
@@ -26,10 +26,36 @@ here is a cool video that explains what are dongles: https://www.youtube.com/wat
 4. in "glassvrserver" folder, click on main.exe to launch the server
 
 you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation
+(dont panic if you can't move or resize the view window, i'll explain that in the troubleshooting section)
+
+now you need to change some settings in the "settings.json"
+
+"controller/tracker":
+ set to "controller" to track a controller
+ set to "tracker" to track a tracker
+
+"index": 1
+ which controller/tracker to track
+
+IMPORTANT DO NOT SKIP
+"offsets":
+ "position x" and "position z" vs "global position x" and "global position z"
+  the non globals scale with rotation, while the globals dont
+  the screens are mirroring the left eye and not the center view, that means that you'r controllers will feel off
+
+		
+        "position y": 0.0,
+
+        "rotation yaw": 0.0,
+        "rotation pitch": 0.0,
+        "rotation roll": 0.0
+    }
+}
 
 # Troubleshooting
 
 C:\Program Files (x86)\Steam\config\steamvr.vrsettings
+
  "steamvr" : {
     "activateMultipleDrivers" : true
  }
