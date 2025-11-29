@@ -22,16 +22,29 @@ here is a cool video that explains what are dongles: https://www.youtube.com/wat
 # Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
 2. put the "glassvedriver" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
-3. open steamvr
-4. in "glassvrserver" folder, click on main.exe to launch the server
+3. make sure that you'r glasses are connected, set as the primary display and resolution is set to 1920x1080(even if you glasses support resolutions higher)
+4. open steamvr
+5. in "glassvrserver" folder, click on main.exe to launch the server
 
 you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation
-(dont panic if you can't move or resize the view window, i'll explain that in the troubleshooting section)
-
-fullscreen -> set Prop_DisplayDebugMode_Bool to false
-fullscreen = lag
 
 now you need to change some settings in the "settings.json"
+
+{
+
+    "controller/tracker": "controller",
+    "index": 1,
+    "ipd": -0.2,
+    "head to eye dist": -0.14,
+    "offsets": {
+        "position x": 0,
+        "position y": 0.0,
+        "position z": 0.0,
+        "rotation yaw": -3.25,
+        "rotation pitch": 0.89,
+        "rotation roll": -2.0
+    }
+}
 
 - "controller/tracker": set to "controller" to track a controller, set to "tracker" to track a tracker
 
