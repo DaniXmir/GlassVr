@@ -191,7 +191,7 @@ void CSampleDeviceDriver::DebugRequest(const char* pchRequest, char* pchResponse
 
 void CSampleDeviceDriver::GetWindowBounds(int32_t* pnX, int32_t* pnY, uint32_t* pnWidth, uint32_t* pnHeight)
 {
-    //fixes a stupid black bar at the buttom,
+    //fixes a stupid black bar at the buttom
     float offset = 0.022;
 
     *pnX = m_nWindowX * 1;
