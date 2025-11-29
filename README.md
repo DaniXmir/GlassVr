@@ -14,8 +14,22 @@ note: with something like the vive ultimate tracker you could skip needing base 
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
+- a way to attach you controller/tracker to you head, alignment isn't critical since you can ajust position and rotaion offsets in the "settings.json" later
 - steamvr watchman dongles, while not required, needed if you want to use your controllers wirelessly, one dongle per device
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
 
 # Setup
+1. download the .rar in the Releases tab and extract it, you will see 2 folders
+2. put the "glassvedriver" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
+3. open steamvr
+4. in "glassvrserver" folder, click on main.exe to launch the server
+
+you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation
+
+# Troubleshooting
+
+C:\Program Files (x86)\Steam\config\steamvr.vrsettings
+ "steamvr" : {
+    "activateMultipleDrivers" : true
+ }
