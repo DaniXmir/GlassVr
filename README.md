@@ -38,17 +38,18 @@ now you need to change some settings in the "settings.json"
 	    "index": 1,
 
 		#distance between eyes, if you don't use controllers like for sim games dont change,
-		else hold you controllers at arm lenght and increment/decrement until they feel centered
+		else hold you'r controllers at arm lenght and increment/decrement until they feel centered
 	    "ipd": 0.0,
 
 		#distance from the center of you'r tracker to you'r eyes
 	    "head to eye dist": 0.0,
 
-		#DO NOT USE "position x" and "position z", the rest are self explanatory
+		#DO NOT USE "position x" and "position z", use "ipd" and "head to eye dist" instead, the rest are self explanatory
 	    "offsets": {
 	        "position x": 0.0,
 	        "position y": 0.0,
 	        "position z": 0.0,
+			
 	        "rotation yaw": 0.0,
 	        "rotation pitch": 0.0,
 	        "rotation roll": 0.0
@@ -56,12 +57,13 @@ now you need to change some settings in the "settings.json"
 	}
 	
 # Troubleshooting
+1. if you controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
+and add "activateMultipleDrivers" : true
 
-C:\Program Files (x86)\Steam\config\steamvr.vrsettings
-
- "steamvr" : {
-    "activateMultipleDrivers" : true
- }
+		 "steamvr" : {
+			"activateMultipleDrivers" : true
+		 }
+2. a
 
 credit
 code used from https://github.com/r57zone/OpenVR-driver-for-DIY by r57zone
