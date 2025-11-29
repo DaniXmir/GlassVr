@@ -59,3 +59,7 @@ C:\Program Files (x86)\Steam\config\steamvr.vrsettings
  "steamvr" : {
     "activateMultipleDrivers" : true
  }
+
+credit
+
+//code used from https://github.com/r57zone/OpenVR-driver-for-DIY by r57zone
