@@ -30,32 +30,30 @@ you should see a window called "Headset Window" and it should be copying one of 
 
 now you need to change some settings in the "settings.json"
 
-{
+	{
+		#set to "controller" to track a controller, set to "tracker" to track a tracker
+	    "controller/tracker": "controller",
 
-    "controller/tracker": "controller",
-    "index": 1,
-    "ipd": -0.2,
-    "head to eye dist": -0.14,
-    "offsets": {
-        "position x": 0,
-        "position y": 0.0,
-        "position z": 0.0,
-        "rotation yaw": -3.25,
-        "rotation pitch": 0.89,
-        "rotation roll": -2.0
-    }
-}
+		#which controller/tracker to track
+	    "index": 1,
 
-- "controller/tracker": set to "controller" to track a controller, set to "tracker" to track a tracker
+		#distance between eyes, increment/decrement until you'r contollers feel centered, set it to something like -0.2
+	    "ipd": -0.2,
 
-- "index": which controller/tracker to track
+		#distance from the center of you'r tracker to you'r eyes, set it to something like -0.14
+	    "head to eye dist": -0.14,
 
-- "ipd": distance between eyes, increment/decrement until you'r contollers feel centered, set it to something like -0.2
+		#DO NOT USE "position x" and "position z", the rest are self explanatory
+	    "offsets": {
+	        "position x": 0,
+	        "position y": 0.0,
+	        "position z": 0.0,
+	        "rotation yaw": -3.25,
+	        "rotation pitch": 0.89,
+	        "rotation roll": -2.0
+	    }
+	}
 	
-- "head to eye dist": distance from the center of you'r tracker to you'r eyes, set it to something like -0.14
-
-- "offsets": dont use "position x" and "position z", the rest are self explanatory
-
 # Troubleshooting
 
 C:\Program Files (x86)\Steam\config\steamvr.vrsettings
