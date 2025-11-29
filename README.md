@@ -44,7 +44,7 @@ now you need to change some settings in the "settings.json"
 		#distance from the center of you'r tracker to you'r eyes
 	    "head to eye dist": 0.0,
 
-		#DO NOT USE "position x" and "position z", use "ipd" and "head to eye dist" instead, the rest are self explanatory
+		#DO NOT USE "position x" and "position z", use "ipd" and "head to eye dist" instead
 	    "offsets": {
 	        "position x": 0.0,
 	        "position y": 0.0,
