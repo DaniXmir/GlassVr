@@ -1,0 +1,104 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="samples\driver_sample\basics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="samples\driver_sample\csamplecontrollerdriver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="samples\driver_sample\csampledevicedriver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="samples\driver_sample\cserverdriver_sample.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="samples\driver_sample\cwatchdogdriver_sample.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="samples\driver_sample\driverlog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\openvr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\openvr_capi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\openvr_driver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="samples\driver_sample\default.vrsettings" />
+    <None Include="headers\openvr_api.cs" />
+    <None Include="headers\openvr_api.json" />
+    <None Include="x64\Release\HmdVr.tlog\CL.command.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\Cl.items.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\CL.read.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\CL.write.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\HmdVr.lastbuildstate" />
+    <None Include="x64\Release\HmdVr.tlog\link.command.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\link.read.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\link.secondary.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\link.write.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\unsuccessfulbuild" />
+    <None Include="x64\Release\driver_fakehmd.dll.recipe" />
+    <None Include="x64\Release\driver_fakehmd.iobj" />
+    <None Include="x64\Release\driver_fakehmd.ipdb" />
+    <None Include="x64\Release\HmdVr.dll.recipe" />
+    <None Include="x64\Release\HmdVr.iobj" />
+    <None Include="x64\Release\HmdVr.ipdb" />
+    <None Include="x64\Release\vc143.pdb" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="samples\driver_sample\csamplecontrollerdriver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\csampledevicedriver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\cserverdriver_sample.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\cwatchdogdriver_sample.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\driver_sample.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\driverlog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\basics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="samples\driver_sample\CMakeLists.txt" />
+    <Text Include="x64\Release\HmdVr.log" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="x64\Release\basics.obj" />
+    <Object Include="x64\Release\csamplecontrollerdriver.obj" />
+    <Object Include="x64\Release\csampledevicedriver.obj" />
+    <Object Include="x64\Release\cserverdriver_sample.obj" />
+    <Object Include="x64\Release\cwatchdogdriver_sample.obj" />
+    <Object Include="x64\Release\driver_sample.obj" />
+    <Object Include="x64\Release\driverlog.obj" />
+  </ItemGroup>
+</Project>

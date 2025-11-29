@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{b1dd4b41-57e4-4608-b6ae-14f122705c77}</ProjectGuid>
+    <RootNamespace>HmdVr</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>driver_glassvr</TargetName>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <ExecutablePath>$(ExecutablePath)</ExecutablePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_WINDOWS;HTTP_CLIENT_EXPORTS;CURL_STATICLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)headers;$(ProjectDir)headers\curl-8.17.0\include;$(ProjectDir)headers\curl-8.17.0\include\curl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="headers\openvr.h" />
+    <ClInclude Include="headers\openvr_capi.h" />
+    <ClInclude Include="headers\openvr_driver.h" />
+    <ClInclude Include="samples\driver_sample\basics.h" />
+    <ClInclude Include="samples\driver_sample\csamplecontrollerdriver.h" />
+    <ClInclude Include="samples\driver_sample\csampledevicedriver.h" />
+    <ClInclude Include="samples\driver_sample\cserverdriver_sample.h" />
+    <ClInclude Include="samples\driver_sample\cwatchdogdriver_sample.h" />
+    <ClInclude Include="samples\driver_sample\driverlog.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="headers\openvr_api.cs" />
+    <None Include="headers\openvr_api.json" />
+    <None Include="samples\driver_sample\default.vrsettings" />
+    <None Include="x64\Release\driver_fakehmd.dll.recipe" />
+    <None Include="x64\Release\driver_fakehmd.iobj" />
+    <None Include="x64\Release\driver_fakehmd.ipdb" />
+    <None Include="x64\Release\HmdVr.dll.recipe" />
+    <None Include="x64\Release\HmdVr.iobj" />
+    <None Include="x64\Release\HmdVr.ipdb" />
+    <None Include="x64\Release\HmdVr.tlog\CL.command.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\Cl.items.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\CL.read.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\CL.write.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\HmdVr.lastbuildstate" />
+    <None Include="x64\Release\HmdVr.tlog\link.command.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\link.read.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\link.secondary.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\link.write.1.tlog" />
+    <None Include="x64\Release\HmdVr.tlog\unsuccessfulbuild" />
+    <None Include="x64\Release\vc143.pdb" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="samples\driver_sample\basics.cpp" />
+    <ClCompile Include="samples\driver_sample\csamplecontrollerdriver.cpp" />
+    <ClCompile Include="samples\driver_sample\csampledevicedriver.cpp" />
+    <ClCompile Include="samples\driver_sample\cserverdriver_sample.cpp" />
+    <ClCompile Include="samples\driver_sample\cwatchdogdriver_sample.cpp" />
+    <ClCompile Include="samples\driver_sample\driverlog.cpp" />
+    <ClCompile Include="samples\driver_sample\driver_sample.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="samples\driver_sample\CMakeLists.txt" />
+    <Text Include="x64\Release\HmdVr.log" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="x64\Release\basics.obj" />
+    <Object Include="x64\Release\csamplecontrollerdriver.obj" />
+    <Object Include="x64\Release\csampledevicedriver.obj" />
+    <Object Include="x64\Release\cserverdriver_sample.obj" />
+    <Object Include="x64\Release\cwatchdogdriver_sample.obj" />
+    <Object Include="x64\Release\driverlog.obj" />
+    <Object Include="x64\Release\driver_sample.obj" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

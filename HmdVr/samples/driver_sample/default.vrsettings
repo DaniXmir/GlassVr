@@ -1,0 +1,15 @@
+{
+    "driver_sample": {
+        "enable": true,
+        "id": "Sample Driver",
+        "renderWidth": 1080,
+        "renderHeight": 1920,
+        "secondsFromVsyncToPhotons": 0.008,
+        "displayFrequency": 120.0,
+        "serialNumber": "Sample 4711",
+        "windowHeight": 1080,
+        "windowWidth": 1920,
+        "windowX": 0,
+        "windowY": 0
+    }
+}
