@@ -7,3 +7,8 @@ that also means that the screens are mirroring for both eye, not idle for vr but
 steamvr isn't designed for a "headset" like this but i found some workarounds...
 
 # Requirements
+- glasses that can act like monitors
+- base station
+- controller or tracker
+
+# Optinal Hardware
