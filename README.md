@@ -37,20 +37,20 @@ now you need to change some settings in the "settings.json"
 		#which controller/tracker to track
 	    "index": 1,
 
-		#distance between eyes, increment/decrement until you'r contollers feel centered, set it to something like -0.2
-	    "ipd": -0.2,
+		#distance between eyes, if you don't use controllers like for sim games like ets2 or flightsims, dont change, else hold you controllers at arm lenght and increment/decrement until they feel centered
+	    "ipd": 0.0,
 
-		#distance from the center of you'r tracker to you'r eyes, set it to something like -0.14
-	    "head to eye dist": -0.14,
+		#distance from the center of you'r tracker to you'r eyes
+	    "head to eye dist": 0.0,
 
 		#DO NOT USE "position x" and "position z", the rest are self explanatory
 	    "offsets": {
-	        "position x": 0,
+	        "position x": 0.0,
 	        "position y": 0.0,
 	        "position z": 0.0,
-	        "rotation yaw": -3.25,
-	        "rotation pitch": 0.89,
-	        "rotation roll": -2.0
+	        "rotation yaw": 0.0,
+	        "rotation pitch": 0.0,
+	        "rotation roll": 0.0
 	    }
 	}
 	
