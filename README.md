@@ -37,7 +37,7 @@ now you need to change some settings in the "settings.json"
 		#which controller/tracker to track
 	    "index": 1,
 
-		#distance between eyes, if you don't use controllers like for sim games like ets2 or flightsims, dont change,
+		#distance between eyes, if you don't use controllers like for sim games dont change,
 		else hold you controllers at arm lenght and increment/decrement until they feel centered
 	    "ipd": 0.0,
 
