@@ -7,9 +7,9 @@ that also means that the screens are mirroring for both eye, not idle for vr but
 steamvr isn't designed for a "headset" like this but i found some workarounds...
 
 # Requirements
-- glasses that can act like monitors, for your eyes ofcourse
+- glasses that can act like monitors, for you'r eyes ofcourse
 - base station and 1 vr controller(vive, index etc) or 1 vr tracker(vive, Tundra etc), to track your head                                               
-note: with something like the vive ultimate tracker you could skip needing base stations, but then you wont be able to track you controllers for you hands
+note: with something like the vive ultimate tracker you could skip needing base stations, but then you wont be able to track you'r controllers for you hands
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
