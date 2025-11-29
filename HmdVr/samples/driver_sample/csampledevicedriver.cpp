@@ -1,4 +1,6 @@
-﻿#include "csampledevicedriver.h"
+﻿//code used from https://github.com/r57zone/OpenVR-driver-for-DIY by r57zone
+
+#include "csampledevicedriver.h"
 
 #include "basics.h"
 
@@ -281,9 +283,7 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
             g_lastAttemptTick = currentTick;
 
             TryConnectSharedMemory();
-
         }
-
     }
 
     if (pSharedData != NULL) {
