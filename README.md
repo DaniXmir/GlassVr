@@ -28,6 +28,8 @@ here is a cool video that explains what are dongles: https://www.youtube.com/wat
 you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation
 (dont panic if you can't move or resize the view window, i'll explain that in the troubleshooting section)
 
+fullscreen -> set Prop_DisplayDebugMode_Bool to false
+
 now you need to change some settings in the "settings.json"
 
 - "controller/tracker":
