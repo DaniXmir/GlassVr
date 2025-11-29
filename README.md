@@ -8,9 +8,9 @@ steamvr isn't designed for a "headset" like this but i found some workarounds
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
-- base stations and 1 vr controller(vive, index etc) or 1 vr tracker(vive, Tundra etc), to track your head
+- base stations and 1 vr controller(vive, index etc) or 1 vr tracker(vive, Tundra etc), to track you'r head
 
-note: with something like the vive ultimate tracker you could skip needing base stations, but then you wont be able to track you'r controllers for you hands
+note: with something like the vive ultimate tracker you could skip needing base stations, but then you wont be able to track you'r controllers for you'r hands
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
