@@ -30,21 +30,21 @@ you should see a window called "Headset Window" and it should be copying one of 
 
 now you need to change some settings in the "settings.json"
 
-"controller/tracker":
+- "controller/tracker":
 	set to "controller" to track a controller
 	set to "tracker" to track a tracker
 
-"index":
+- "index":
 	which controller/tracker to track
 
-"ipd":
+- "ipd":
 	distance between eyes, increment/decrement until you'r contollers feel centered, set it to something like -0.2
 	
 	
-"head to eye dist": -0.14
+- "head to eye dist": -0.14
 	a
 
-"offsets":
+- "offsets":
 	dont use "position x" and "position z"
 
 
