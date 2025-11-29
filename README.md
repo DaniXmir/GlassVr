@@ -4,13 +4,14 @@ glassvr is a way to use XR/AR glasses from xreal, viture etc, with 6dof in steam
 the glasses are running like monitors, so you dont need the fancy ones with 6dof or even 3dof builtin, these features requires special software to be used that varies from manufacturer to manufacturer,
 that also means that the screens are mirroring for both eye, not good for vr but usable,
 
-steamvr isn't designed for a "headset" like this but i found some workarounds
+while steamvr isn't really designed for a "headset" like this, and this is no replacment for a real headset, its always cool to see a device get more functionality then let it collect dust
+really the problem here isn't the FOV, it that the screen are mirrored, if https://academy.viture.com/xr_glasses/immersive_3d_windows https://academy.viture.com/xr_glasses/immersive_3d_windows https://academy.viture.com/xr_glasses/immersive_3d_windows ???
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
 - base stations and 1 vr controller(vive, index etc) or 1 vr tracker(vive, Tundra etc), to track you'r head
 
-note: with something like the vive ultimate tracker you could skip needing base stations, but then you wont be able to track you'r controllers for you'r hands
+note: with something like the vive ultimate tracker you could skip needing base stations, but then you won't be able to track you'r controllers for you'r hands
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
