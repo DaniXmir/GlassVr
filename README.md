@@ -31,26 +31,22 @@ you should see a window called "Headset Window" and it should be copying one of 
 now you need to change some settings in the "settings.json"
 
 "controller/tracker":
- set to "controller" to track a controller
- set to "tracker" to track a tracker
+	set to "controller" to track a controller
+	set to "tracker" to track a tracker
 
-"index": 1
- which controller/tracker to track
+"index":
+	which controller/tracker to track
 
-IMPORTANT DO NOT SKIP
+"ipd":
+	distance between eyes, increment/decrement until you'r contollers feel centered, set it to something like -0.2
+	
+	
+"head to eye dist": -0.14
+	a
+
 "offsets":
- "position x" and "position z" vs "global position x" and "global position z"
-  the non globals scale with rotation, while the globals dont
-  the screens are mirroring the left eye and not the center view, that means that you'r controllers will feel off
+	dont use "position x" and "position z"
 
-		
-        "position y": 0.0,
-
-        "rotation yaw": 0.0,
-        "rotation pitch": 0.0,
-        "rotation roll": 0.0
-    }
-}
 
 # Troubleshooting
 
