@@ -5,7 +5,7 @@ the glasses are running like monitors, so you dont need the fancy ones with 6dof
 that also means that the screens are mirroring for both eye, not good for vr but usable,
 
 while steamvr isn't really designed for a "headset" like this, and this is no replacment for a real headset, its always cool to see a device get more functionality then let it collect dust
-really the problem here isn't the FOV, it that the screen are mirrored, if https://academy.viture.com/xr_glasses/immersive_3d_windows https://academy.viture.com/xr_glasses/immersive_3d_windows https://academy.viture.com/xr_glasses/immersive_3d_windows ???
+hold the button for "3D mode" res will be set to 3840x1080@60
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
