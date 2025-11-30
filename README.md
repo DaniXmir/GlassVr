@@ -30,7 +30,7 @@ default/wide is the FOV,
 
 monoscopic/stereoscopic,
  - monoscopic: screen will mirror each other
- - stereoscopic: each screen renders its own image to give you the illusion of 3d
+ - stereoscopic: each screen renders its own image to give you the illusion of 3d(won't be used if "ipd" is set to 0.0)
 
 not every glasses out there support stereoscopic 3D, here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
@@ -101,7 +101,7 @@ now you need to change some settings in the "settings.json"
 	}
 
 # disabling the driver
-delete or move "glassvedriver" from C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
+delete or move "glassvedriver {mode} {resolutio} {fov}" from C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
 (renaming won't work)
 
 # Troubleshooting
