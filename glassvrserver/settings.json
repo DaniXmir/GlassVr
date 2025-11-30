@@ -1,0 +1,18 @@
+{
+    "controller/tracker": "controller",
+    "index": 1,
+
+    "offsets": {
+        "position x": -0.05,
+        "global position x": 0.0,
+        
+        "position y": 0.0,
+
+        "position z": 0.0,
+        "global position z": 0.0,
+
+        "rotation yaw": 0.0,
+        "rotation pitch": 0.0,
+        "rotation roll": 0.0
+    }
+}
