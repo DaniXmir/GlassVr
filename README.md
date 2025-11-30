@@ -1,8 +1,12 @@
 # GlassVr
-glassvr is an openvr driver/server that let you use XR/AR glasses with 6dof and even stereoscopic 3D in steamvr,
+glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even stereoscopic 3D in steamvr,
 while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it
 
 i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
+
+there are 2 thing you will need to download, 
+1. server: copies one of you'r controller/tracker position and rotation and applies it to the glasses
+2. driver: tells steamvr what to display in you'r glasses
 
 there are 4 different driver you can choose from,
 <table border="1">
