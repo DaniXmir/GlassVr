@@ -33,7 +33,7 @@ monoscopic/stereoscopic,
  - stereoscopic: each screen renders its own image to give you the illusion of 3d
 
 not every glasses out there support stereoscopic 3D, here is how to enable it on the viture pro xr
-hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least 90hz in that mode
+hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
 
 i recommend monoscopic wide if you'r glasses cant do more then 3840x1080@90+
