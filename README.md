@@ -53,7 +53,7 @@ note: with something like the vive ultimate tracker you could skip needing base 
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
 
-the full setup should look something like this
+the full setup should look something like this(glasses, 2 base stations, 3 controllers or 2 controllers and a tracker, 2 dongles, tracker mount)
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_085109.jpg width="512">
 
 # Mounting the controller/tracker
