@@ -24,9 +24,21 @@ there 4 different driver you can choose,
   </tr>
 </table>
 
+default/wide is the FOV,
+	default: is more 1:1 with reality but very narrow since the fov of the glasses is so small
+	wide: i recommend this one since you can see more
+
+monoscopic/stereoscopic,
+	monoscopic: screen will mirror each other
+	stereoscopic: each screen renders its own image to give you the illusion of 3d
+
 not every glasses out there support stereoscopic 3D, here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/viture%20tutorial.webp width="512">
+
+i recommend monoscopic wide if you'r glasses cant do more then 3840x1080@90+
+and stereoscopic wide if they can,
+the default fov is unusable
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
