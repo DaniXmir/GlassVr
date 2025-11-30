@@ -53,7 +53,7 @@ note: with something like the vive ultimate tracker you could skip needing base 
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
 
-the full setup should look something like this(glasses, 2 base stations, 3 controllers or 2 controllers and a tracker, 2 dongles, tracker mount)
+the full setup should look something like this (glasses, 2 base stations, 3 controllers or 2 controllers and a tracker, 2 dongles, tracker mount)
 
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_085109.jpg width="512">
 
@@ -63,7 +63,7 @@ now as to how to mount it, that up to you, the most basic setup i could find is 
 if you end up 3D printing something, please share it online so other could use it
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="512">
 
-# Setup
+# PC Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
 2. put the "glassvedriver" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
 3. make sure that you'r glasses are connected, set as the primary display and resolution is set to 1920x1080(even if you'r glasses support resolutions higher)
