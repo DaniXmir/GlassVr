@@ -53,6 +53,9 @@ note: with something like the vive ultimate tracker you could skip needing base 
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
 
+the full setup should look something like this
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_085109.jpg width="512">
+
 # Mounting the controller/tracker
 mount it as close to the center of you'r head,
 now as to how to mount it, that up to you, the most basic setup i could find is a hat and a shoe laces,
