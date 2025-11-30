@@ -44,13 +44,12 @@ now you need to change some settings in the "settings.json"
 	    "index": 1,
 
 		#distance between eyes
-		else hold you'r controllers at arm lenght and increment/decrement until they feel centered
 	    "ipd": 0.0,
 
 		#distance from the center of you'r head to you'r eyes
 	    "head to eye dist": 0.0,
 
-		#DO NOT USE "position x" and "position z", use "ipd" and "head to eye dist" instead
+		#DO NOT USE "position x" and "position z"
 	    "offsets": {
 	        "position x": 0.0,
 	        "position y": 0.0,
