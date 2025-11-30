@@ -25,6 +25,7 @@ here is a cool video that explains what are dongles: https://www.youtube.com/wat
 mount it as close to the center of you'r head,
 now as to how to mount it, that up to you, the most basic setup i could find is a hat and a shoe laces,
 if you end up 3D printing something, please share it online so other could use it
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg>
 
 # Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
