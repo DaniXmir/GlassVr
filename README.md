@@ -6,7 +6,7 @@ i only tested the driver on my vitrue pro xr but it should work no problem on ot
 
 i dont know if every glasses out there support stereoscopic 3D but mine do, here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least 90hz in that mode
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/viture%20tutorial.webp>
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/viture%20tutorial.webp width="128">
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
@@ -25,7 +25,7 @@ here is a cool video that explains what are dongles: https://www.youtube.com/wat
 mount it as close to the center of you'r head,
 now as to how to mount it, that up to you, the most basic setup i could find is a hat and a shoe laces,
 if you end up 3D printing something, please share it online so other could use it
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg>
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="128">
 
 # Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
