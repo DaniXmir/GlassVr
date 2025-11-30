@@ -1,11 +1,11 @@
 # GlassVr
-glassvr is a way to use XR/AR glasses from xreal, viture etc, with 6dof in steamvr
+glassvr is a driver to use XR/AR glasses from xreal, viture etc, with 6dof and even stereoscopic 3D in steamvr,
+while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it
 
-the glasses are running like monitors, so you dont need the fancy ones with 6dof or even 3dof builtin, these features requires special software to be used that varies from manufacturer to manufacturer,
-that also means that the screens are mirroring for both eye, not good for vr but usable,
+i only tested the driver on my vitrue pro xr but it should work no problem on other glasses
 
-while steamvr isn't really designed for a "headset" like this, and this is no replacment for a real headset, its always cool to see a device get more functionality then let it collect dust
-hold the button for "3D mode" res will be set to 3840x1080@60
+i dont know if every glasses out there support stereoscopic 3D but mine do, here is how to enable it on the viture pro xr
+hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least 90hz in that mode
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
@@ -19,6 +19,11 @@ note: with something like the vive ultimate tracker you could skip needing base 
 - steamvr watchman dongles, while not required, needed if you want to use your controllers wirelessly, one dongle per device
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
+
+# Mounting the controller/tracker
+mount it as close to the center of you'r head,
+now as to how to mount it, that up to you, the most basic setup i could find is a hat and a shoe laces,
+if you end up 3D printing something, please share it online so other could use it
 
 # Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
@@ -38,11 +43,11 @@ now you need to change some settings in the "settings.json"
 		#which controller/tracker to track
 	    "index": 1,
 
-		#distance between eyes, if you don't use controllers like for sim games dont change,
+		#distance between eyes
 		else hold you'r controllers at arm lenght and increment/decrement until they feel centered
 	    "ipd": 0.0,
 
-		#distance from the center of you'r tracker to you'r eyes
+		#distance from the center of you'r head to you'r eyes
 	    "head to eye dist": 0.0,
 
 		#DO NOT USE "position x" and "position z", use "ipd" and "head to eye dist" instead
