@@ -63,7 +63,7 @@ private:
     int32_t m_nRenderHeight;
     float m_flSecondsFromVsyncToPhotons;
     float m_flDisplayFrequency;
-    float m_flIPD;
+    float m_flIPD = 0;
 };
 
 #endif // CSAMPLEDEVICEDRIVER_H
