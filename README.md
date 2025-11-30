@@ -44,7 +44,7 @@ the default fov is unusable
 - glasses that can act like monitors, for you'r eyes ofcourse
 - base stations and 1 vr controller(vive, index etc) or 1 vr tracker(vive, Tundra etc), to track you'r head
 
-note: with something like the vive ultimate tracker you could skip needing base stations, but then you won't be able to track you'r controllers for you'r hands
+note: with SLAM based trackers like the vive ultimate tracker you could skip needing base stations, but then you won't be able to track you'r controllers for you'r hands, good for game that dont need controllers like racing/flight sims
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
