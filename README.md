@@ -7,19 +7,19 @@ i only tested the driver on my vitrue pro xr but it should work no problem on ot
 there are 4 different driver you can choose from,
 <table border="1">
   <tr>
-    <td>monoscopic</td>
+    <td>mono</td>
     <td>default</td>
   </tr>
   <tr>
-    <td>monoscopic</td>
+    <td>mono</td>
     <td>wide</td>
   </tr>
   <tr>
-    <td>stereoscopic</td>
+    <td>stereo</td>
     <td>default</td>
   </tr>
   <tr>
-    <td>stereoscopic</td>
+    <td>stereo</td>
     <td>wide</td>
   </tr>
 </table>
@@ -67,7 +67,7 @@ if you end up 3D printing something, please share it online so other could use i
 # PC Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
 2. put the "glassvedriver" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
-3. make sure that you'r glasses are connected, set as the primary display and resolution is set to 1920x1080(even if you'r glasses support resolutions higher)
+3. make sure that you'r glasses are connected, set as the primary display and resolution is set to 1920x1080(for now the driver only supports 1920x1080)
 4. connect you'r controllers and open steamvr
 5. in "glassvrserver" folder, click on "main.exe" to launch the server
 
