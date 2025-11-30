@@ -2,7 +2,6 @@
 #https://www.reddit.com/r/gamedev/comments/6u7p6s/using_openvr_is_there_any_way_to_get_tracked_hmd/
 
 import openvr as vr
-import sys
 import time
 import threading
 import numpy as np
@@ -16,20 +15,20 @@ tracker_arr = []
 
 def get_default_settings():
     return {
-        "controller/tracker": "controller",
-        "index": 1,
-        "offsets": {
-            "position x": 0.0,
-            "global position x": 0.0,
+    "controller/tracker": "controller",
+    "index": 1,
 
-            "position y": 0.0,
+    "ipd": 0.0,
+    "head to eye dist" : 0.0,
+    
+    "offsets": {
+        "position x": 0,
+        "position y": 0.0,
+        "position z": 0.0,
 
-            "position z": 0.0,
-            "global position z": 0.0,
-
-            "rotation yaw": 0.0,
-            "rotation pitch": 0.0,
-            "rotation roll": 0.0
+        "rotation yaw": 0.0,
+        "rotation pitch": 0.0,
+        "rotation roll": 0.0
         }
     }
     
@@ -131,9 +130,9 @@ class values:
             settings = self.get_settings()
             
             data = {
-                "position x": 0.0 + settings['offsets']['global position x'],
+                "position x": 0.0 + settings['offsets']['position x'],
                 "position y": 0.0 + settings['offsets']['position y'],
-                "position z": 0.0 + settings['offsets']['global position z'],
+                "position z": 0.0 + settings['offsets']['position z'],
                 "rotation w": 1.0,
                 "rotation x": 0.0 + settings['offsets']['rotation yaw'],
                 "rotation y": 0.0 + settings['offsets']['rotation pitch'],
@@ -153,7 +152,7 @@ class values:
                 if not self.vr_system:
                     return data
                 
-                #keep the first argument as 2!, do not change it
+                #keep the first argument as 2, do not change it
                 poses = self.vr_system.getDeviceToAbsoluteTrackingPose(
                     2, 0.0, vr.k_unMaxTrackedDeviceCount
                 )
@@ -166,31 +165,19 @@ class values:
                 if pose.bDeviceIsConnected and pose.bPoseIsValid:
                     m = pose.mDeviceToAbsoluteTracking
                     
-                    pos_x_world = m[0][3]
-                    pos_y_world = m[1][3]
-                    pos_z_world = m[2][3]
-
                     rotation_matrix = np.array([
                         [m[0][0], m[0][1], m[0][2]],
                         [m[1][0], m[1][1], m[1][2]],
                         [m[2][0], m[2][1], m[2][2]]
                     ])
                     
-                    offset_x_local = settings['offsets']['position x']
-                    offset_y_world = settings['offsets']['position y']
-                    offset_z_local = settings['offsets']['position z']
-                    
-                    local_offset_vector = np.array([
-                        offset_x_local, 
-                        0.0,
-                        offset_z_local
-                    ])
+                    pos_x_world = m[0][3]
+                    pos_y_world = m[1][3]
+                    pos_z_world = m[2][3]
 
-                    world_offset_xz = rotation_matrix @ local_offset_vector
-                    
-                    data["position x"] = pos_x_world + world_offset_xz[0] + settings['offsets']['global position x']
-                    data["position y"] = pos_y_world + offset_y_world
-                    data["position z"] = pos_z_world + world_offset_xz[2] + settings['offsets']['global position z']
+                    data["position x"] = pos_x_world + settings['offsets']['position x']
+                    data["position y"] = pos_y_world + settings['offsets']['position y']
+                    data["position z"] = pos_z_world + settings['offsets']['position z']
 
                     device_rotation = R.from_matrix(rotation_matrix)
 
