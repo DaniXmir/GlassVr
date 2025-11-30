@@ -4,7 +4,7 @@ while steamvr isn't really designed for a "headset" like this, they work surpris
 
 i only tested the driver on my vitrue pro xr but it should work no problem on other glasses
 
-there 4 different driver you can choose,
+there are 4 different driver you can choose from,
 <table border="1">
   <tr>
     <td>monoscopic</td>
