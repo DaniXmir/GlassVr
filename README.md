@@ -7,21 +7,22 @@ i only tested the driver on my vitrue pro xr but it should work no problem on ot
 there 4 different driver you can choose,
 <table border="1">
   <tr>
-    <td>Row a, Cell 1, a</td>
-    <td>Row 1, Cell 2, b</td>
+    <td>monoscopic</td>
+    <td>default</td>
   </tr>
   <tr>
-    <td>Row 2, Cell 1</td>
-    <td>Row 2, Cell 2</td>
+    <td>monoscopic</td>
+    <td>wide</td>
+  </tr>
+  <tr>
+    <td>stereoscopic</td>
+    <td>default</td>
+  </tr>
+  <tr>
+    <td>stereoscopic</td>
+    <td>wide</td>
   </tr>
 </table>
-
-1. monoscopic default
-2. monoscopic wide
-4. stereoscopic default
-5. stereoscopic wide
-
-
 
 not every glasses out there support stereoscopic 3D, here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least 90hz in that mode
