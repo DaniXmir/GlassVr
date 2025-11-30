@@ -6,6 +6,7 @@ i only tested the driver on my vitrue pro xr but it should work no problem on ot
 
 i dont know if every glasses out there support stereoscopic 3D but mine do, here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least 90hz in that mode
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/viture%20tutorial.webp>
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
