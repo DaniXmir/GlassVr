@@ -7,8 +7,8 @@ i only tested the driver on my vitrue pro xr but it should work no problem on ot
 there 4 different driver you can choose,
 <table border="1">
   <tr>
-    <td>Row a, Cell 1</td>
-    <td>Row 1, Cell 2</td>
+    <td>Row a, Cell 1, a</td>
+    <td>Row 1, Cell 2, b</td>
   </tr>
   <tr>
     <td>Row 2, Cell 1</td>
