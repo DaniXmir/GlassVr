@@ -58,7 +58,7 @@ the full setup should look something like this (glasses, 2 base stations, 3 cont
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_085109.jpg width="512">
 
 # Mounting the controller/tracker
-mount it as close to the center of you'r head,
+mount it as close to the center of you'r head as you can,
 now as to how to mount it, that up to you, the most basic setup i could find is a hat and a shoe laces,
 if you end up 3D printing something, please share it online so other could use it
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="512">
