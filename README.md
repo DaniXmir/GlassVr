@@ -138,3 +138,7 @@ and add "activateMultipleDrivers" : true
 	option 1. find a way to stream the "headset window" to your phone
 	
 	option 2. search "wireless hdmi 120hz" on amazon/aliexpress
+
+6. I only have 2 controllers
+
+   driver doesn't care how many you have, strap one to you'r head and the other to you'r hand, keep in mind that it still be visible, buttons will still work and rumble will still be active
