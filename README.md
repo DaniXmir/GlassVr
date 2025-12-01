@@ -129,7 +129,7 @@ and add "activateMultipleDrivers" : true
 
 4. linux?
 	
-	haven't tested the driver on linux(wating for windows to dies lol),
+	haven't tested the driver on linux(wating for windows to die lol),
 	for the server, try the following:
 	download pyhton, click on the green botton and download the zip, extract and delete everything except "glassvrservercode", run main.py
 
