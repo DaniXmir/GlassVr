@@ -109,7 +109,7 @@ delete or move "glassvedriver {mode} {resolutio} {fov}" from C:\Program Files (x
 (renaming won't work)
 
 # Troubleshooting
-1. if you controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
+1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
 and add "activateMultipleDrivers" : true
 
 		 "steamvr" : {
