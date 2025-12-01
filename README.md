@@ -120,16 +120,20 @@ and add "activateMultipleDrivers" : true
 
 # QNA
 1. will this work with my (insert company name here aka, viture, xreal etc) glasses?
+	
 	yes, the driver doesn't care which glasses you have, literally any monitor will work
 
 2. i don't have base station, but i do have a quest headset
+
    nope
 
-3. linux?
+4. linux?
+	
 	haven't tested the driver on linux, (wating for windows to dies lol)
 	for the server, try the following:
 	download pyhton, click on the green botton and download the zip, extract and delete everything except "glassvrservercode", run main.py
 
 5. wireless?
+	
 	option 1. find a way to stream the "headset window" to your phone
 	option 2. search "wireless hdmi 120hz" on amazon/aliexpress
