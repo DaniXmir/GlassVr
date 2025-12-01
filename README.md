@@ -70,7 +70,7 @@ if you end up 3D printing something, please share it online so other could use i
 
 # PC Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
-2. in the "driver" folder, put you'r chosen driver "glassvedriver {mode} {resolutio} {fov}" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
+2. in the "drivers" folder, put you'r chosen driver "glassvedriver {mode} {resolutio} {fov}" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
 3. make sure that you'r glasses are connected, set as the primary display and resolution is correct
 4. connect you'r controllers and open steamvr
 5. in "glassvrserver" folder, click on "main.exe" to launch the server
