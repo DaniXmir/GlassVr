@@ -3,6 +3,7 @@ glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even st
 while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it
 
 showcase on youtube: https://www.youtube.com/watch?v=ySr_ktM-0Mo
+
 i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
 
 there are 2 thing you will need to download, 
