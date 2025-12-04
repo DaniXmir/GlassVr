@@ -147,8 +147,8 @@ float HeadToEyeDist = 0.0;
 bool Stereoscopic = GetBoolFromSettingsByKey("//Stereoscopic(SBS)");
 
 //resolution x and y
-float ResolutionX = GetFloatFromSettingsByKey("//Resulotion x");
-float ResolutionY = GetFloatFromSettingsByKey("//Resulotion Y");
+float ResolutionX = GetFloatFromSettingsByKey("//Resolution x");
+float ResolutionY = GetFloatFromSettingsByKey("//Resolution Y");
 
 //fullscreen
 bool FullScreen = GetBoolFromSettingsByKey("//Fullscreen");
