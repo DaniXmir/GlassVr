@@ -10,41 +10,9 @@ there are 2 thing you will need to download,
 1. server: copies one of you'r controller/tracker position and rotation and applies it to the glasses
 2. driver: tells steamvr what to display in you'r glasses
 
-there are 4 different driver you can choose from,
-<table border="1">
-  <tr>
-    <td>mono</td>
-    <td>default</td>
-  </tr>
-  <tr>
-    <td>mono</td>
-    <td>wide</td>
-  </tr>
-  <tr>
-    <td>stereo</td>
-    <td>default</td>
-  </tr>
-  <tr>
-    <td>stereo</td>
-    <td>wide</td>
-  </tr>
-</table>
-
-default/wide is the FOV,
- - default: is more 1:1 with reality but very narrow since the fov of the glasses is so small
- - wide: i recommend this one since you can see more
-
-monoscopic/stereoscopic,
- - monoscopic: screen will mirror each other
- - stereoscopic: each screen renders its own image to give you the illusion of 3d(won't be used if "ipd" is set to 0.0)
-
-not every glasses out there support stereoscopic 3D, here is how to enable it on the viture pro xr
+note: not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
-
-i recommend monoscopic wide if you'r glasses cant do more then 3840x1080@90+
-and stereoscopic wide if they can,
-the default fov is unusable
 
 # Requirements
 - glasses that can act like monitors, for you'r eyes ofcourse
@@ -72,14 +40,16 @@ if you end up 3D printing something, please share it online so other could use i
 
 # PC Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
-2. in the "drivers" folder, put you'r chosen driver "glassvedriver {mode} {resolutio} {fov}" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
-3. make sure that you'r glasses are connected, set as the primary display and resolution is correct
-4. connect you'r controllers and open steamvr
-5. in "glassvrserver" folder, click on "main.exe" to launch the server
+2. put the "glassvrdriver" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
+3. configure "driver settings.txt" in "glassvrdriver\bin\win64" if you need (explanation below on each setting)
+4. make sure that you'r glasses are connected and set as the primary display
+5. connect you'r controllers and open steamvr (pair to dongles in steamvr if needed)
+6. in "glassvrserver" folder, click on "main.exe" to launch the server (always launch it after opening steamvr!)
 
-you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation
+you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation,
+now you need to change some settings
 
-now you need to change some settings in the "settings.json"
+settings.json(for the server):
 
 	{
 		#set to "controller" to track a controller, set to "tracker" to track a tracker
@@ -106,8 +76,39 @@ now you need to change some settings in the "settings.json"
 	    }
 	}
 
+driver settings.txt(for the driver) edit this before launching steamvr:
+```
+#you'r glasses resolution, dont you SBS resulotion if you using that
+//Resolution x
+1920
+//Resolution Y
+1080
+
+#SBS mode if you using it
+//Stereoscopic(SBS)
+false
+
+#make "Headset Window" fullscreen, if you cant see steamvr in you'r glasses, this could fix it
+//Fullscreen
+false
+
+#self explanatory
+//Refresh Rate
+120
+
+#FOV, defaults values are doubled to be more usable
+//Outer Horizontal
+36.0
+//Inner Horizontal
+50.0
+//Top Vertical
+24.0
+//Bottom Vertical
+22.0
+```
+
 # disabling the driver
-delete or move "glassvedriver {mode} {resolutio} {fov}" from C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
+delete or move "glassvedriver" from C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
 (renaming won't work)
 
 # Troubleshooting
