@@ -1,16 +1,15 @@
 ﻿#include "csampledevicedriver.h"
 
 #include "basics.h"
-
 #include <math.h>
-
 #include <windows.h>
-
 #include <string>
-
 #include <iostream>
-
 #include <algorithm>
+#include <fstream>
+#include <limits>
+#include <stdexcept>
+#include <cctype>
 
 #include <cmath>
 #ifndef M_PI
@@ -18,6 +17,114 @@
 #endif
 
 using namespace vr;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//settings path
+const std::string SettingsPath = "C:/Program Files (x86)/Steam/steamapps/common/SteamVR/drivers/glassvrdriver/bin/win64/driver settings.txt";
+
+float GetFloatFromSettingsByKey(const std::string& keyString) {
+    const std::string& path = SettingsPath;
+
+    if (keyString.empty()) {
+        std::cerr << "Error: Key string cannot be empty." << std::endl;
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file at hardcoded path: " << path << std::endl;
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    std::string lineContent;
+    bool keyFound = false;
+
+    while (std::getline(file, lineContent)) {
+        if (lineContent.find(keyString) != std::string::npos) {
+            keyFound = true;
+            break;
+        }
+    }
+
+    if (!keyFound) {
+        std::cerr << "Error: Key string '" << keyString << "' not found in file." << std::endl;
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    if (std::getline(file, lineContent)) {
+        try {
+            return std::stof(lineContent);
+        }
+        catch (const std::invalid_argument& e) {
+            std::cerr << "Error: Content '" << lineContent << "' (after key '" << keyString << "') is not a valid float (std::invalid_argument)." << std::endl;
+            return std::numeric_limits<float>::quiet_NaN();
+        }
+        catch (const std::out_of_range& e) {
+            std::cerr << "Error: Float value (after key '" << keyString << "') is out of range (std::out_of_range)." << std::endl;
+            return std::numeric_limits<float>::quiet_NaN();
+        }
+    }
+    else {
+        std::cerr << "Error: Key string '" << keyString << "' found, but no line follows it." << std::endl;
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+}
+
+bool GetBoolFromSettingsByKey(const std::string& keyString) {
+    const std::string& path = SettingsPath;
+
+    if (keyString.empty()) {
+        std::cerr << "Error: Key string cannot be empty." << std::endl;
+        return false;
+    }
+
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file at hardcoded path: " << path << std::endl;
+        return false;
+    }
+
+    std::string lineContent;
+    bool keyFound = false;
+
+    while (std::getline(file, lineContent)) {
+        if (lineContent.find(keyString) != std::string::npos) {
+            keyFound = true;
+            break;
+        }
+    }
+
+    if (!keyFound) {
+        std::cerr << "Error: Key string '" << keyString << "' not found in file." << std::endl;
+        return false;
+    }
+
+    if (std::getline(file, lineContent)) {
+        std::string normalizedContent = lineContent;
+
+        normalizedContent.erase(0, normalizedContent.find_first_not_of(" \t\n\r"));
+        normalizedContent.erase(normalizedContent.find_last_not_of(" \t\n\r") + 1);
+
+        std::transform(normalizedContent.begin(), normalizedContent.end(), normalizedContent.begin(),
+            ::tolower);
+
+        if (normalizedContent == "true" || normalizedContent == "1") {
+            return true;
+        }
+        else if (normalizedContent == "false" || normalizedContent == "0") {
+            return false;
+        }
+        else {
+            std::cerr << "Error: Line content '" << lineContent << "' (after key '" << keyString << "') is not a valid boolean ('true', 'false', '1', or '0')." << std::endl;
+            return false;
+        }
+    }
+    else {
+        std::cerr << "Error: Key string '" << keyString << "' found, but no line follows it." << std::endl;
+        return false;
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct SharedPoseData {
     double pos_x;
@@ -36,11 +143,18 @@ struct SharedPoseData {
 
 float HeadToEyeDist = 0.0;
 
-//if both screen can be accessed
-bool dual = true;
+//if using SBS
+bool Stereoscopic = GetBoolFromSettingsByKey("//Stereoscopic(SBS)");
 
-//fov scale
-float FovModifier = 2.0;
+//resolution x and y
+float ResolutionX = GetFloatFromSettingsByKey("//Resulotion x");
+float ResolutionY = GetFloatFromSettingsByKey("//Resulotion Y");
+
+//fullscreen
+bool FullScreen = GetBoolFromSettingsByKey("//Fullscreen");
+
+//refresh rate
+float RefreshRate = GetFloatFromSettingsByKey("//Refresh Rate");
 
 const wchar_t* SHM_NAME = L"GlassVrSHM";
 
@@ -128,28 +242,22 @@ CSampleDeviceDriver::CSampleDeviceDriver()
     vr::VRSettings()->GetString(k_pch_Sample_Section, k_pch_Sample_ModelNumber_String, buf, sizeof(buf));
     m_sModelNumber = buf;
 
-    m_nWindowX = 0;//vr::VRSettings()->GetInt32(k_pch_Sample_Section, k_pch_Sample_WindowX_Int32);
-    m_nWindowY = 0;//vr::VRSettings()->GetInt32(k_pch_Sample_Section, k_pch_Sample_WindowY_Int32);
+    m_nWindowX = 0;
+    m_nWindowY = 0;
 
-    if (dual) {
-        m_nWindowWidth = 1920 * 2;
-        m_nRenderWidth = 1920 * 2;
+    if (Stereoscopic) {
+        m_nWindowWidth = ResolutionX * 2;
+        m_nRenderWidth = ResolutionX * 2;
     }
     else {
-        m_nWindowWidth = 1920;
-        m_nRenderWidth = 1920;
+        m_nWindowWidth = ResolutionX;
+        m_nRenderWidth = ResolutionX;
     }
-    m_nWindowHeight = 1080;
-    m_nRenderHeight = 1080;
+    m_nWindowHeight = ResolutionY;
+    m_nRenderHeight = ResolutionY;
 
-    //m_nWindowWidth = 1920 * 2;// *offset;//vr::VRSettings()->GetInt32(k_pch_Sample_Section, k_pch_Sample_WindowWidth_Int32);
-    //    m_nWindowHeight = 1080;//vr::VRSettings()->GetInt32(k_pch_Sample_Section, k_pch_Sample_WindowHeight_Int32);
-
-    //m_nRenderWidth = 1920 * 2;// *offset;//vr::VRSettings()->GetInt32(k_pch_Sample_Section, k_pch_Sample_RenderWidth_Int32);
-    //    m_nRenderHeight = 1080;//vr::VRSettings()->GetInt32(k_pch_Sample_Section, k_pch_Sample_RenderHeight_Int32);
-
-    m_flSecondsFromVsyncToPhotons = 0.008;//vr::VRSettings()->GetFloat(k_pch_Sample_Section, k_pch_Sample_SecondsFromVsyncToPhotons_Float);
-    m_flDisplayFrequency = 120.0;//vr::VRSettings()->GetFloat(k_pch_Sample_Section, k_pch_Sample_DisplayFrequency_Float);
+    m_flSecondsFromVsyncToPhotons = 0.008;
+    //m_flDisplayFrequency = 120.0;
 }
 
 CSampleDeviceDriver::~CSampleDeviceDriver()
@@ -165,11 +273,11 @@ EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
     vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, Prop_RenderModelName_String, m_sModelNumber.c_str());
     vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_UserIpdMeters_Float, m_flIPD);
     vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_UserHeadToEyeDepthMeters_Float, HeadToEyeDist);
-    vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_DisplayFrequency_Float, m_flDisplayFrequency);
+    vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_DisplayFrequency_Float, RefreshRate);
     vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_SecondsFromVsyncToPhotons_Float, m_flSecondsFromVsyncToPhotons);
     vr::VRProperties()->SetUint64Property(m_ulPropertyContainer, Prop_CurrentUniverseId_Uint64, 2);
     vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_IsOnDesktop_Bool, false);
-    vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_DisplayDebugMode_Bool, true);//LOW FPS!!! DO NOT ENABLE!!!, FOR DEBUGING(window mode) SET TO true FOR REALESE(fullscreen) SET TO false
+    vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_DisplayDebugMode_Bool, !FullScreen);//LOW FPS!!! DO NOT ENABLE!!!, true = window mode, false = fullscreen
 
     //bool bSetupIconUsingExternalResourceFile = false;
 
@@ -253,7 +361,7 @@ void CSampleDeviceDriver::GetEyeOutputViewport(EVREye eEye, uint32_t* pnX, uint3
     //*pnWidth = m_nWindowWidth;
     //*pnHeight = m_nWindowHeight;
 
-    if (dual) {
+    if (Stereoscopic) {
         *pnY = 0;
         *pnWidth = m_nWindowWidth / 2;
         *pnHeight = m_nWindowHeight;
@@ -324,11 +432,16 @@ void CSampleDeviceDriver::GetEyeOutputViewport(EVREye eEye, uint32_t* pnX, uint3
 //constexpr float k_fAngleTopV_Deg = 30.0;
 //constexpr float k_fAngleBottomV_Deg = 30.0;
 
+//float k_fAngleOuterH_Deg = GetBoolFromSettings(8);
+//float k_fAngleInnerH_Deg = GetBoolFromSettings(10);
+//float k_fAngleTopV_Deg = GetBoolFromSettings(12);
+//float k_fAngleBottomV_Deg = GetBoolFromSettings(14);
+
 //thank you genimi, now why is my youtube homepage filled with DIY vr headsets and trackers? i used incognito!!!
-float k_fAngleOuterH_Deg = 18.0f * FovModifier;
-float k_fAngleInnerH_Deg = 25.0f * FovModifier;
-float k_fAngleTopV_Deg = 12.0f * FovModifier;
-float k_fAngleBottomV_Deg = 11.0f * FovModifier;
+float k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("//Outer Horizontal");
+float k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("//Inner Horizontal");
+float k_fAngleTopV_Deg = GetFloatFromSettingsByKey("//Top Vertical");
+float k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("//Bottom Vertical");
 
 constexpr float k_fRadFactor = (float)M_PI / 180.0f;
 
