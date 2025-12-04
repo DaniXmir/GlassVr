@@ -137,7 +137,7 @@ and add "activateMultipleDrivers" : true
 
 5. wireless?
 	
-	option 1. find a way to stream the "headset window" to your phone
+	option 1. find a way to stream the "headset window" to your phone, Parsec could work
 	
 	option 2. search "wireless hdmi 120hz" on amazon/aliexpress
 
