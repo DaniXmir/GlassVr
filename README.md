@@ -143,4 +143,4 @@ and add "activateMultipleDrivers" : true
 
 6. I only have 2 controllers
 
-   the driver doesn't care how many you have, strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
+   strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
