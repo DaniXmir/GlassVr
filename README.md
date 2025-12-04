@@ -45,7 +45,7 @@ if you end up 3D printing something, please share it online so other could use i
 4. goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings, under "steamvr" add "activateMultipleDrivers" : true
 5. make sure that you'r glasses are connected and set as the primary display
 6. connect you'r controllers and open steamvr (pair to dongles in steamvr if needed)
-7. in "glassvrserver" folder, click on "main.exe" to launch the server (always launch it after opening steamvr!)
+7. in the "glassvrserver" folder, click on "main.exe" to launch the server (always launch it after opening steamvr!)
 
 you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation,
 now you need to change some settings
