@@ -1,0 +1,14 @@
+{
+    "controller/tracker": "controller",
+    "index": 1,
+    "ipd": 0.062,
+    "head to eye dist": -0.06,
+    "offsets": {
+        "position x": 0,
+        "position y": -0.2,
+        "position z": 0.0,
+        "rotation yaw": 0.2,
+        "rotation pitch": 0.17,
+        "rotation roll": -0.6
+    }
+}

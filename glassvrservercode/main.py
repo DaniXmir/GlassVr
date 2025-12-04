@@ -3,16 +3,14 @@
 import multiprocessing.shared_memory
 import struct
 import time
-import math
-import json
 from values import values
 
 v = values()
 v.start()
 
 SHM_NAME = 'GlassVrSHM'
-SHM_SIZE = 56
-PACK_FORMAT = '7d'
+SHM_SIZE = 72
+PACK_FORMAT = '9d'
 
 def main():
     try:
@@ -37,17 +35,22 @@ def main():
                 rot_y = data['rotation y']
                 rot_z = data['rotation z']
 
-                print("Position: x_" + str(pos_x),"y_" + str(pos_y),"z_" + str(pos_z),"Rotation: w_" + str(rot_w),"x_" + str(rot_x),"y_" + str(rot_y),"z_" + str(rot_z))
+                ipd = settings.get('ipd')
+                head_to_eye_dist = settings.get('head to eye dist')
+
+                print(f"Pos: {pos_x:.2f} {pos_y:.2f} {pos_z:.2f} | Rot: {rot_x:.2f} {rot_y:.2f} {rot_z:.2f}")# | IPD: {ipd} | head to eye dist: {head_to_eye_dist}")
 
                 buffer = struct.pack(
                     PACK_FORMAT, 
                     pos_x, pos_y, pos_z, 
-                    rot_w, rot_x, rot_y, rot_z
+                    rot_w, rot_x, rot_y, rot_z,
+                    ipd,head_to_eye_dist
                 )
 
                 shm.buf[:SHM_SIZE] = buffer
                 time.sleep(1.0 / 120.0)
-            except:
+            except Exception as e:
+                print(f"Valve plz fix: {e}")
                 time.sleep(1.0 / 120.0)
 
     except KeyboardInterrupt:

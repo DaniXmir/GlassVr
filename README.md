@@ -1,8 +1,14 @@
 # GlassVr
-glassvr is a driver to use XR/AR glasses from xreal, viture etc, with 6dof and even stereoscopic 3D in steamvr,
+glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even stereoscopic 3D in steamvr,
 while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it
 
-i only tested the driver on my vitrue pro xr but it should work no problem on other glasses
+showcase on youtube: https://www.youtube.com/watch?v=ySr_ktM-0Mo
+
+i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
+
+there are 2 thing you will need to download, 
+1. server: copies one of you'r controller/tracker position and rotation and applies it to the glasses
+2. driver: tells steamvr what to display in you'r glasses
 
 there are 4 different driver you can choose from,
 <table border="1">
@@ -25,15 +31,15 @@ there are 4 different driver you can choose from,
 </table>
 
 default/wide is the FOV,
-	default: is more 1:1 with reality but very narrow since the fov of the glasses is so small
-	wide: i recommend this one since you can see more
+ - default: is more 1:1 with reality but very narrow since the fov of the glasses is so small
+ - wide: i recommend this one since you can see more
 
 monoscopic/stereoscopic,
-	monoscopic: screen will mirror each other
-	stereoscopic: each screen renders its own image to give you the illusion of 3d
+ - monoscopic: screen will mirror each other
+ - stereoscopic: each screen renders its own image to give you the illusion of 3d(won't be used if "ipd" is set to 0.0)
 
 not every glasses out there support stereoscopic 3D, here is how to enable it on the viture pro xr
-hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least 90hz in that mode
+hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
 
 i recommend monoscopic wide if you'r glasses cant do more then 3840x1080@90+
@@ -44,7 +50,7 @@ the default fov is unusable
 - glasses that can act like monitors, for you'r eyes ofcourse
 - base stations and 1 vr controller(vive, index etc) or 1 vr tracker(vive, Tundra etc), to track you'r head
 
-note: with something like the vive ultimate tracker you could skip needing base stations, but then you won't be able to track you'r controllers for you'r hands
+note: with SLAM based trackers like the vive ultimate tracker you could skip needing base stations, but then you won't be able to track you'r controllers for you'r hands, good for game that dont need controllers like racing/flight sims
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
@@ -66,7 +72,7 @@ if you end up 3D printing something, please share it online so other could use i
 
 # PC Setup
 1. download the .rar in the Releases tab and extract it, you will see 2 folders
-2. in the "driver" folder, put you'r chosen driver "glassvedriver {mode} {resolutio} {fov}" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
+2. in the "drivers" folder, put you'r chosen driver "glassvedriver {mode} {resolutio} {fov}" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
 3. make sure that you'r glasses are connected, set as the primary display and resolution is correct
 4. connect you'r controllers and open steamvr
 5. in "glassvrserver" folder, click on "main.exe" to launch the server
@@ -101,13 +107,38 @@ now you need to change some settings in the "settings.json"
 	}
 
 # disabling the driver
-delete or move "glassvedriver" from C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
+delete or move "glassvedriver {mode} {resolutio} {fov}" from C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
 (renaming won't work)
 
 # Troubleshooting
-1. if you controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
+1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
 and add "activateMultipleDrivers" : true
 
 		 "steamvr" : {
 			"activateMultipleDrivers" : true
 		 }
+
+# QNA
+1. will this work with my (insert company name here aka, viture, xreal etc) glasses?
+	
+	yes, the driver doesn't care which glasses you have, literally any monitor will work
+
+2. i don't have base station, but i do have a quest headset
+
+   nope
+
+4. linux?
+	
+	haven't tested the driver on linux(wating for windows to die lol),
+	for the server, try the following:
+	download pyhton, click on the green botton and download the zip, extract and delete everything except "glassvrservercode", run main.py
+
+5. wireless?
+	
+	option 1. find a way to stream the "headset window" to your phone
+	
+	option 2. search "wireless hdmi 120hz" on amazon/aliexpress
+
+6. I only have 2 controllers
+
+   the driver doesn't care how many you have, strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
