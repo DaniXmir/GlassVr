@@ -79,7 +79,7 @@ settings.json(for the server):
 
 driver settings.txt(for the driver) edit this before launching steamvr:
 ```
-#you'r glasses resolution, dont you SBS resolution if you using that
+#you'r glasses resolution, dont use SBS resolution if you'r using that
 //Resolution x
 1920
 //Resolution Y
