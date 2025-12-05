@@ -127,7 +127,7 @@ and add "activateMultipleDrivers" : true
 
 2. i don't have base station, but i do have a quest headset
 
-   nope
+   maybe, if you could find a way to use the controllers without the headset
 
 4. linux?
 	
