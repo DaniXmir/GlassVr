@@ -45,7 +45,7 @@ if you end up 3D printing something, please share it online so other could use i
 4. goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings, under "steamvr" add "activateMultipleDrivers" : true
 5. make sure that you'r glasses are connected and set as the primary display
 6. connect you'r controllers and open steamvr (pair to dongles in steamvr if needed)
-7. in "glassvrserver" folder, click on "main.exe" to launch the server (always launch it after opening steamvr!)
+7. in the "glassvrserver" folder, click on "main.exe" to launch the server (always launch it after opening steamvr!)
 
 you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation,
 now you need to change some settings
@@ -79,7 +79,7 @@ settings.json(for the server):
 
 driver settings.txt(for the driver) edit this before launching steamvr:
 ```
-#you'r glasses resolution, dont you SBS resulotion if you using that
+#you'r glasses resolution, dont use SBS resolution if you are using that
 //Resolution x
 1920
 //Resolution Y
@@ -127,7 +127,7 @@ and add "activateMultipleDrivers" : true
 
 2. i don't have base station, but i do have a quest headset
 
-   nope
+   maybe, if you could find a way to use the controllers without the headset
 
 4. linux?
 	
@@ -137,10 +137,10 @@ and add "activateMultipleDrivers" : true
 
 5. wireless?
 	
-	option 1. find a way to stream the "headset window" to your phone
+	option 1. find a way to stream the "headset window" to your phone, Parsec could work
 	
 	option 2. search "wireless hdmi 120hz" on amazon/aliexpress
 
 6. I only have 2 controllers
 
-   the driver doesn't care how many you have, strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
+   strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
