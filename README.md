@@ -80,32 +80,41 @@ settings.json(for the server):
 driver settings.txt(for the driver) edit this before launching steamvr:
 ```
 #you'r glasses resolution, dont use SBS resolution if you are using that
-//Resolution x
+=Resolution x
 1920
-//Resolution Y
+=Resolution Y
 1080
 
 #SBS mode if you using it
-//Stereoscopic(SBS)
+=Stereoscopic(SBS)
 false
 
 #make "Headset Window" fullscreen, if you cant see steamvr in you'r glasses, this could fix it
-//Fullscreen
+=Fullscreen
 false
 
 #self explanatory
-//Refresh Rate
+=Refresh Rate
 120
 
-#FOV, defaults values are doubled to be more usable
-//Outer Horizontal
-36.0
-//Inner Horizontal
-50.0
-//Top Vertical
-24.0
-//Bottom Vertical
-22.0
+#FOV, defaults values are increased to be more usable
+=Outer Horizontal Mono
+45.0
+=Inner Horizontal Mono
+45.0
+=Top Vertical Mono
+30.0
+=Bottom Vertical Mono
+30.0
+
+=Outer Horizontal Stereo
+38.0
+=Inner Horizontal Stereo
+54.0
+=Top Vertical Stereo
+25.0
+=Bottom Vertical Stereo
+23.0
 ```
 
 # disabling the driver
