@@ -1,4 +1,5 @@
-﻿#include "csampledevicedriver.h"
+﻿//code modified from: https://github.com/r57zone/OpenVR-driver-for-DIY
+#include "csampledevicedriver.h"
 
 #include "basics.h"
 #include <math.h>
@@ -144,17 +145,17 @@ struct SharedPoseData {
 float HeadToEyeDist = 0.0;
 
 //if using SBS
-bool Stereoscopic = GetBoolFromSettingsByKey("//Stereoscopic(SBS)");
+bool Stereoscopic = GetBoolFromSettingsByKey("=Stereoscopic(SBS)");
 
 //resolution x and y
-float ResolutionX = GetFloatFromSettingsByKey("//Resolution x");
-float ResolutionY = GetFloatFromSettingsByKey("//Resolution Y");
+float ResolutionX = GetFloatFromSettingsByKey("=Resolution x");
+float ResolutionY = GetFloatFromSettingsByKey("=Resolution Y");
 
 //fullscreen
-bool FullScreen = GetBoolFromSettingsByKey("//Fullscreen");
+bool FullScreen = GetBoolFromSettingsByKey("=Fullscreen");
 
 //refresh rate
-float RefreshRate = GetFloatFromSettingsByKey("//Refresh Rate");
+float RefreshRate = GetFloatFromSettingsByKey("=Refresh Rate");
 
 const wchar_t* SHM_NAME = L"GlassVrSHM";
 
@@ -421,7 +422,7 @@ void CSampleDeviceDriver::GetEyeOutputViewport(EVREye eEye, uint32_t* pnX, uint3
 //}
 
 
-//asymmetrical best///////////////////////////////////////////////////////////////////////
+
 //constexpr float k_fAngleOuterH_Deg = 18.0f;
 //constexpr float k_fAngleInnerH_Deg = 25.0f;
 //constexpr float k_fAngleTopV_Deg = 12.0f;
@@ -437,29 +438,89 @@ void CSampleDeviceDriver::GetEyeOutputViewport(EVREye eEye, uint32_t* pnX, uint3
 //float k_fAngleTopV_Deg = GetBoolFromSettings(12);
 //float k_fAngleBottomV_Deg = GetBoolFromSettings(14);
 
-//thank you genimi, now why is my youtube homepage filled with DIY vr headsets and trackers? i used incognito!!!
-float k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("//Outer Horizontal");
-float k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("//Inner Horizontal");
-float k_fAngleTopV_Deg = GetFloatFromSettingsByKey("//Top Vertical");
-float k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("//Bottom Vertical");
-
 constexpr float k_fRadFactor = (float)M_PI / 180.0f;
-
-const float k_fTangentOuterH = std::tan(k_fAngleOuterH_Deg * k_fRadFactor);
-const float k_fTangentInnerH = std::tan(k_fAngleInnerH_Deg * k_fRadFactor);
-const float k_fTangentTopV = std::tan(k_fAngleTopV_Deg * k_fRadFactor);
-const float k_fTangentBottomV = std::tan(k_fAngleBottomV_Deg * k_fRadFactor);
 
 void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom)
 {
-    *pfRight = k_fTangentOuterH;
-    *pfLeft = -k_fTangentInnerH;
+    //tan(36.0) = 0.72654252800536088589546675748062
+    float k_fAngleOuterH_Deg = 0.0;
+    float k_fAngleInnerH_Deg = 0.0;
+    float k_fAngleTopV_Deg = 0.0;
+    float k_fAngleBottomV_Deg = 0.0;
+
+    if (Stereoscopic) {
+        k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("=Outer Horizontal Stereo");
+        k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("=Inner Horizontal Stereo");
+        k_fAngleTopV_Deg = GetFloatFromSettingsByKey("=Top Vertical Stereo");
+        k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("=Bottom Vertical Stereo");
+    }
+    else {
+        k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("=Outer Horizontal Mono");
+        k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("=Inner Horizontal Mono");
+        k_fAngleTopV_Deg = GetFloatFromSettingsByKey("=Top Vertical Mono");
+        k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("=Bottom Vertical Mono");
+    }
+
+    float k_fTangentTopV = std::tan(k_fAngleTopV_Deg * k_fRadFactor);
+    float k_fTangentBottomV = std::tan(k_fAngleBottomV_Deg * k_fRadFactor);
+    float k_fTangentOuterH = std::tan(k_fAngleOuterH_Deg * k_fRadFactor);
+    float k_fTangentInnerH = std::tan(k_fAngleInnerH_Deg * k_fRadFactor);
 
     *pfTop = -k_fTangentTopV;
     *pfBottom = k_fTangentBottomV;
-}
-//asymmetrical best///////////////////////////////////////////////////////////////////////
 
+    if (eEye == vr::Eye_Left)
+    {
+        *pfLeft = -k_fTangentOuterH;
+        *pfRight = k_fTangentInnerH;
+    }
+    else
+    {
+        *pfLeft = -k_fTangentInnerH;
+        *pfRight = k_fTangentOuterH;
+    }
+}
+
+
+
+//void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom)
+//{
+//    *pfTop = -GetFloatFromSettingsByKey("//Top Vertical");
+//    *pfBottom = GetFloatFromSettingsByKey("//Bottom Vertical");
+//
+//    if (eEye == vr::Eye_Left)
+//    {
+//        *pfLeft = -GetFloatFromSettingsByKey("//Outer Horizontal");
+//        *pfRight = GetFloatFromSettingsByKey("//Inner Horizontal");
+//    }
+//    else
+//    {
+//        *pfLeft = -GetFloatFromSettingsByKey("//Inner Horizontal");
+//        *pfRight = GetFloatFromSettingsByKey("//Outer Horizontal");
+//    }
+//}
+
+vr::DriverPose_t CSampleDeviceDriver::GetHeadFromEyePose(EVREye eEye)
+{
+    vr::DriverPose_t pose = { 0 };
+    pose.qDriverFromHeadRotation.w = 1.0;
+
+    float fHalfIPD = m_flIPD / 2.0f;
+
+    if (eEye == vr::Eye_Left)
+    {
+        pose.vecPosition[0] = -fHalfIPD;
+    }
+    else
+    {
+        pose.vecPosition[0] = fHalfIPD;
+    }
+
+    pose.vecPosition[1] = 0.0f;
+    pose.vecPosition[2] = 0.0f;
+
+    return pose;
+}
 
 DistortionCoordinates_t CSampleDeviceDriver::ComputeDistortion(EVREye eEye, float fU, float fV)
 {
