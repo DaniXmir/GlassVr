@@ -1,9 +1,19 @@
-﻿//code modified from: https://github.com/r57zone/OpenVR-driver-for-DIY
+﻿////code modified from: https://github.com/r57zone/OpenVR-driver-for-DIY
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include "csampledevicedriver.h"
 
 #include "basics.h"
 #include <math.h>
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+
 #include <windows.h>
+
 #include <string>
 #include <iostream>
 #include <algorithm>
@@ -11,123 +21,16 @@
 #include <limits>
 #include <stdexcept>
 #include <cctype>
-
 #include <cmath>
+#include <cstring> 
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
 using namespace vr;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//settings path
-const std::string SettingsPath = "C:/Program Files (x86)/Steam/steamapps/common/SteamVR/drivers/glassvrdriver/bin/win64/driver settings.txt";
-
-float GetFloatFromSettingsByKey(const std::string& keyString) {
-    const std::string& path = SettingsPath;
-
-    if (keyString.empty()) {
-        std::cerr << "Error: Key string cannot be empty." << std::endl;
-        return std::numeric_limits<float>::quiet_NaN();
-    }
-
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open file at hardcoded path: " << path << std::endl;
-        return std::numeric_limits<float>::quiet_NaN();
-    }
-
-    std::string lineContent;
-    bool keyFound = false;
-
-    while (std::getline(file, lineContent)) {
-        if (lineContent.find(keyString) != std::string::npos) {
-            keyFound = true;
-            break;
-        }
-    }
-
-    if (!keyFound) {
-        std::cerr << "Error: Key string '" << keyString << "' not found in file." << std::endl;
-        return std::numeric_limits<float>::quiet_NaN();
-    }
-
-    if (std::getline(file, lineContent)) {
-        try {
-            return std::stof(lineContent);
-        }
-        catch (const std::invalid_argument& e) {
-            std::cerr << "Error: Content '" << lineContent << "' (after key '" << keyString << "') is not a valid float (std::invalid_argument)." << std::endl;
-            return std::numeric_limits<float>::quiet_NaN();
-        }
-        catch (const std::out_of_range& e) {
-            std::cerr << "Error: Float value (after key '" << keyString << "') is out of range (std::out_of_range)." << std::endl;
-            return std::numeric_limits<float>::quiet_NaN();
-        }
-    }
-    else {
-        std::cerr << "Error: Key string '" << keyString << "' found, but no line follows it." << std::endl;
-        return std::numeric_limits<float>::quiet_NaN();
-    }
-}
-
-bool GetBoolFromSettingsByKey(const std::string& keyString) {
-    const std::string& path = SettingsPath;
-
-    if (keyString.empty()) {
-        std::cerr << "Error: Key string cannot be empty." << std::endl;
-        return false;
-    }
-
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open file at hardcoded path: " << path << std::endl;
-        return false;
-    }
-
-    std::string lineContent;
-    bool keyFound = false;
-
-    while (std::getline(file, lineContent)) {
-        if (lineContent.find(keyString) != std::string::npos) {
-            keyFound = true;
-            break;
-        }
-    }
-
-    if (!keyFound) {
-        std::cerr << "Error: Key string '" << keyString << "' not found in file." << std::endl;
-        return false;
-    }
-
-    if (std::getline(file, lineContent)) {
-        std::string normalizedContent = lineContent;
-
-        normalizedContent.erase(0, normalizedContent.find_first_not_of(" \t\n\r"));
-        normalizedContent.erase(normalizedContent.find_last_not_of(" \t\n\r") + 1);
-
-        std::transform(normalizedContent.begin(), normalizedContent.end(), normalizedContent.begin(),
-            ::tolower);
-
-        if (normalizedContent == "true" || normalizedContent == "1") {
-            return true;
-        }
-        else if (normalizedContent == "false" || normalizedContent == "0") {
-            return false;
-        }
-        else {
-            std::cerr << "Error: Line content '" << lineContent << "' (after key '" << keyString << "') is not a valid boolean ('true', 'false', '1', or '0')." << std::endl;
-            return false;
-        }
-    }
-    else {
-        std::cerr << "Error: Key string '" << keyString << "' found, but no line follows it." << std::endl;
-        return false;
-    }
-}
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct SharedPoseData {
+struct PoseData {
     double pos_x;
     double pos_y;
     double pos_z;
@@ -139,73 +42,271 @@ struct SharedPoseData {
 
     double ipd;
 
-    double head_to_eye_dist; //(center of head)->(eye)--->(screen)
+    double head_to_eye_dist; // (center of head)->(eye)--->(screen)
 };
 
-float HeadToEyeDist = 0.0;
+const size_t UDP_PACKET_SIZE = sizeof(PoseData);
 
-//if using SBS
-bool Stereoscopic = GetBoolFromSettingsByKey("=Stereoscopic(SBS)");
+//todo:
+//1.make settings path not hardcoded
+//2.if "driver setting.txt" is removed, create a new one
+//3.maybe change to json
+const std::string DefaultSettingsContent = R"(
+=Resolution X
+1920
+=Resolution Y
+1080
 
-//resolution x and y
-float ResolutionX = GetFloatFromSettingsByKey("=Resolution x");
-float ResolutionY = GetFloatFromSettingsByKey("=Resolution Y");
+=Stereoscopic(SBS)
+false
 
-//fullscreen
-bool FullScreen = GetBoolFromSettingsByKey("=Fullscreen");
+=Fullscreen
+false
 
-//refresh rate
-float RefreshRate = GetFloatFromSettingsByKey("=Refresh Rate");
+=Refresh Rate
+120
 
-const wchar_t* SHM_NAME = L"GlassVrSHM";
+=Outer Horizontal Mono
+45.0
+=Inner Horizontal Mono
+45.0
+=Top Vertical Mono
+30.0
+=Bottom Vertical Mono
+30.0
 
-HANDLE hMapFile = NULL;
-SharedPoseData* pSharedData = NULL;
-ULONGLONG g_lastAttemptTick = 0;
+=Outer Horizontal Stereo
+18.0
+=Inner Horizontal Stereo
+25.0
+=Top Vertical Stereo
+12.0
+=Bottom Vertical Stereo
+11.0
+)";
 
-bool TryConnectSharedMemory() {
+const std::string SettingsPathDir = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\SteamVR\\drivers\\glassvrdriver\\bin\\win64\\";
+const std::string SettingsFileName = "driver settings.txt";
+const std::string FullSettingsPath = SettingsPathDir + SettingsFileName;
 
-    if (pSharedData != NULL) {
-        return true;
+static std::string g_settingsContent;
+
+std::string trim(const std::string& str) {
+    size_t first = str.find_first_not_of(" \t\n\r");
+    if (std::string::npos == first) {
+        return "";
     }
-
-    hMapFile = OpenFileMappingW(FILE_MAP_READ, FALSE, SHM_NAME);
-
-
-    if (hMapFile == NULL) {
-        return false;
-    }
-
-    pSharedData = (SharedPoseData*)MapViewOfFile(hMapFile, FILE_MAP_READ, 0, 0, sizeof(SharedPoseData));
-
-
-    if (pSharedData == NULL) {
-        CloseHandle(hMapFile);
-        hMapFile = NULL;
-
-        return false;
-
-    }
-
-    return true;
-
+    size_t last = str.find_last_not_of(" \t\n\r");
+    return str.substr(first, (last - first + 1));
 }
 
-void CleanupSharedMemory() {
-    if (pSharedData != NULL) {
-        UnmapViewOfFile(pSharedData);
-
-        pSharedData = NULL;
-
+const std::string& GetSettings() {
+    if (!g_settingsContent.empty()) {
+        return g_settingsContent;
     }
 
-    if (hMapFile != NULL) {
-        CloseHandle(hMapFile);
+    std::ifstream file(FullSettingsPath);
 
-        hMapFile = NULL;
+    if (file.is_open()) {
+        std::cout << "Loading settings from file: " << FullSettingsPath << std::endl;
 
+        g_settingsContent.assign(
+            (std::istreambuf_iterator<char>(file)),
+            (std::istreambuf_iterator<char>())
+        );
+    }
+    else {
+        std::cout << "Settings file not found. Using default settings." << std::endl;
+        g_settingsContent = DefaultSettingsContent;
     }
 
+    return g_settingsContent;
+}
+
+std::string GetValueStringFromContent(const std::string& keyString) {
+    if (keyString.empty()) {
+        return "";
+    }
+
+    const std::string& content = GetSettings();
+
+    size_t keyPos = content.find(keyString);
+    if (keyPos == std::string::npos) {
+        return "";
+    }
+
+    size_t startPos = content.find('\n', keyPos);
+    if (startPos == std::string::npos) {
+        return "";
+    }
+
+    size_t endPos = content.find('\n', startPos + 1);
+
+    if (endPos == std::string::npos) {
+        endPos = content.length();
+    }
+
+    std::string valueLine = content.substr(startPos + 1, endPos - (startPos + 1));
+
+    return trim(valueLine);
+}
+
+std::string GetStringFromSettingsByKey(const std::string& keyString) {
+    return GetValueStringFromContent(keyString);
+}
+
+int GetIntFromSettingsByKey(const std::string& keyString) {
+    std::string valueStr = GetValueStringFromContent(keyString);
+    if (valueStr.empty()) {
+        return 0;
+    }
+
+    try {
+        return std::stoi(valueStr);
+    }
+    catch (const std::exception& e) {
+        return 0;
+    }
+}
+
+float GetFloatFromSettingsByKey(const std::string& keyString) {
+    std::string valueStr = GetValueStringFromContent(keyString);
+    if (valueStr.empty()) {
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    try {
+        return std::stof(valueStr);
+    }
+    catch (const std::exception& e) {
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+}
+
+bool GetBoolFromSettingsByKey(const std::string& keyString) {
+    std::string normalizedContent = GetValueStringFromContent(keyString);
+    if (normalizedContent.empty()) {
+        return false;
+    }
+
+    std::transform(normalizedContent.begin(), normalizedContent.end(), normalizedContent.begin(), ::tolower);
+
+    if (normalizedContent == "true" || normalizedContent == "1") {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+float HeadToEyeDist = 0.0;
+bool Stereoscopic = GetBoolFromSettingsByKey("=Stereoscopic(SBS)");
+float ResolutionX = GetFloatFromSettingsByKey("=Resolution x");
+float ResolutionY = GetFloatFromSettingsByKey("=Resolution Y");
+bool FullScreen = GetBoolFromSettingsByKey("=Fullscreen");
+float RefreshRate = GetFloatFromSettingsByKey("=Refresh Rate");
+
+PoseData g_PoseDataInstance = { 0 };
+PoseData* pSharedData = &g_PoseDataInstance;
+
+
+SOCKET g_udpSocket = INVALID_SOCKET;
+
+
+std::string IpAddress = "127.0.0.1";
+int UdpPort = 9999;
+
+
+ULONGLONG g_lastAttemptTick = 0;
+
+bool TryConnectUDP() {
+    IpAddress = GetStringFromSettingsByKey("=ip address");
+    UdpPort = GetFloatFromSettingsByKey("=port");
+
+    if (g_udpSocket != INVALID_SOCKET) {
+        return true;
+    }
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        return false;
+    }
+    g_udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (g_udpSocket == INVALID_SOCKET) {
+        WSACleanup();
+        return false;
+    }
+    sockaddr_in service;
+    service.sin_family = AF_INET;
+
+    // *** MODIFIED IP BINDING LOGIC ***
+    if (IpAddress.c_str() == NULL || strcmp(IpAddress.c_str(), "0.0.0.0") == 0) {
+        // Use INADDR_ANY (default behavior)
+        service.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+    else {
+        // Use a specific IP address
+        if (inet_pton(AF_INET, IpAddress.c_str(), &(service.sin_addr)) != 1) {
+            closesocket(g_udpSocket);
+            g_udpSocket = INVALID_SOCKET;
+            WSACleanup();
+            return false;
+        }
+    }
+    // *** END MODIFIED IP BINDING LOGIC ***
+
+    service.sin_port = htons(UdpPort);
+    if (bind(g_udpSocket, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR) {
+        closesocket(g_udpSocket);
+        g_udpSocket = INVALID_SOCKET;
+        WSACleanup();
+        return false;
+    }
+    u_long nonBlocking = 1;
+    if (ioctlsocket(g_udpSocket, FIONBIO, &nonBlocking) != 0) {
+    }
+    return true;
+}
+
+//bool TryConnectUDP() {
+//    if (g_udpSocket != INVALID_SOCKET) {
+//        return true;
+//    }
+//    WSADATA wsaData;
+//    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+//        std::cerr << "Error: WSAStartup failed." << std::endl;
+//        return false;
+//    }
+//    g_udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+//    if (g_udpSocket == INVALID_SOCKET) {
+//        std::cerr << "Error: socket creation failed. Error code: " << WSAGetLastError() << std::endl;
+//        WSACleanup();
+//        return false;
+//    }
+//    sockaddr_in service;
+//    service.sin_family = AF_INET;
+//    service.sin_addr.s_addr = htonl(INADDR_ANY);
+//    service.sin_port = htons(UdpPort);
+//    if (bind(g_udpSocket, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR) {
+//        std::cerr << "Error: bind failed on port " << UdpPort << ". Error code: " << WSAGetLastError() << std::endl;
+//        closesocket(g_udpSocket);
+//        g_udpSocket = INVALID_SOCKET;
+//        WSACleanup();
+//        return false;
+//    }
+//    u_long nonBlocking = 1;
+//    if (ioctlsocket(g_udpSocket, FIONBIO, &nonBlocking) != 0) {
+//        std::cerr << "Warning: Failed to set non-blocking mode." << std::endl;
+//    }
+//    std::cout << "UDP Socket connected and listening on port " << UdpPort << std::endl;
+//    return true;
+//}
+
+void CleanupUDP() {
+    if (g_udpSocket != INVALID_SOCKET) {
+        closesocket(g_udpSocket);
+        g_udpSocket = INVALID_SOCKET;
+    }
+    WSACleanup();
 }
 
 double GetValuseFor(std::string key) {
@@ -227,12 +328,24 @@ double GetValuseFor(std::string key) {
     return 0.0;
 }
 
+
 CSampleDeviceDriver::CSampleDeviceDriver()
 {
     m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
     m_ulPropertyContainer = vr::k_ulInvalidPropertyContainer;
 
+    if (pSharedData != NULL) {
+        memset(pSharedData, 0, sizeof(PoseData));
+        pSharedData->rot_w = 1.0;
+    }
+
+
     m_flIPD = vr::VRSettings()->GetFloat(k_pch_SteamVR_Section, k_pch_SteamVR_IPD_Float);
+
+    if (pSharedData != NULL) {
+        pSharedData->ipd = m_flIPD;
+        pSharedData->head_to_eye_dist = 0.0;
+    }
 
     char buf[1024];
 
@@ -247,18 +360,17 @@ CSampleDeviceDriver::CSampleDeviceDriver()
     m_nWindowY = 0;
 
     if (Stereoscopic) {
-        m_nWindowWidth = ResolutionX * 2;
-        m_nRenderWidth = ResolutionX * 2;
+        m_nWindowWidth = (uint32_t)(ResolutionX * 2);
+        m_nRenderWidth = (uint32_t)(ResolutionX * 2);
     }
     else {
-        m_nWindowWidth = ResolutionX;
-        m_nRenderWidth = ResolutionX;
+        m_nWindowWidth = (uint32_t)ResolutionX;
+        m_nRenderWidth = (uint32_t)ResolutionX;
     }
-    m_nWindowHeight = ResolutionY;
-    m_nRenderHeight = ResolutionY;
+    m_nWindowHeight = (uint32_t)ResolutionY;
+    m_nRenderHeight = (uint32_t)ResolutionY;
 
     m_flSecondsFromVsyncToPhotons = 0.008;
-    //m_flDisplayFrequency = 120.0;
 }
 
 CSampleDeviceDriver::~CSampleDeviceDriver()
@@ -278,29 +390,16 @@ EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
     vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_SecondsFromVsyncToPhotons_Float, m_flSecondsFromVsyncToPhotons);
     vr::VRProperties()->SetUint64Property(m_ulPropertyContainer, Prop_CurrentUniverseId_Uint64, 2);
     vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_IsOnDesktop_Bool, false);
-    vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_DisplayDebugMode_Bool, !FullScreen);//LOW FPS!!! DO NOT ENABLE!!!, true = window mode, false = fullscreen
+    vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_DisplayDebugMode_Bool, !FullScreen);//true = window mode, false = fullscreen
 
-    //bool bSetupIconUsingExternalResourceFile = false;
-
-    //if (!bSetupIconUsingExternalResourceFile) {
-    //    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceOff_String, "{null}/icons/headset_sample_status_off.png");
-    //    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceSearching_String, "{null}/icons/headset_sample_status_searching.gif");
-    //    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceSearchingAlert_String, "{null}/icons/headset_sample_status_searching_alert.gif");
-    //    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceReady_String, "{null}/icons/headset_sample_status_ready.png");
-    //    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceReadyAlert_String, "{null}/icons/headset_sample_status_ready_alert.png");
-    //    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceNotReady_String, "{null}/icons/headset_sample_status_error.png");
-    //    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceStandby_String, "{null}/icons/headset_sample_status_standby.png");
-    //    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceAlertLow_String, "{null}/icons/headset_sample_status_ready_low.png");
-    //}
-
-    TryConnectSharedMemory();
+    TryConnectUDP();
 
     return VRInitError_None;
 }
 
 void CSampleDeviceDriver::Deactivate()
 {
-    CleanupSharedMemory();
+    CleanupUDP();
     m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
 }
 
@@ -357,11 +456,6 @@ void CSampleDeviceDriver::GetRecommendedRenderTargetSize(uint32_t* pnWidth, uint
 
 void CSampleDeviceDriver::GetEyeOutputViewport(EVREye eEye, uint32_t* pnX, uint32_t* pnY, uint32_t* pnWidth, uint32_t* pnHeight)
 {
-    //*pnX = 0;
-    //*pnY = 0;
-    //*pnWidth = m_nWindowWidth;
-    //*pnHeight = m_nWindowHeight;
-
     if (Stereoscopic) {
         *pnY = 0;
         *pnWidth = m_nWindowWidth / 2;
@@ -392,57 +486,10 @@ void CSampleDeviceDriver::GetEyeOutputViewport(EVREye eEye, uint32_t* pnX, uint3
     }
 }
 
-//void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom)
-//{
-//    ////fov: 90 is pretty good, dont use the actual fov of your glasses, its too zoomed in!!!
-//    //float FovDeg = 90.0f;
-//
-//    //float fAspectRatio = (float)m_nWindowWidth / (float)m_nWindowHeight;
-//
-//    //float fHalfAngleRad = (FovDeg / 2.0f) * (3.14159265f / 180.0f);
-//    //float fTanHalfAngle = tan(fHalfAngleRad);
-//
-//    //*pfLeft = -fTanHalfAngle;
-//    //*pfRight = fTanHalfAngle;
-//
-//    //float fVerticalTan = fTanHalfAngle / fAspectRatio;
-//
-//    //*pfTop = -fVerticalTan;
-//    //*pfBottom = fVerticalTan;
-//}
-
-
-
-//void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom)
-//{
-//    *pfLeft = -1.0;
-//    *pfRight = 1.0;
-//    *pfTop = -1.0;
-//    *pfBottom = 1.0;
-//}
-
-
-
-//constexpr float k_fAngleOuterH_Deg = 18.0f;
-//constexpr float k_fAngleInnerH_Deg = 25.0f;
-//constexpr float k_fAngleTopV_Deg = 12.0f;
-//constexpr float k_fAngleBottomV_Deg = 11.0f;
-
-//constexpr float k_fAngleOuterH_Deg = 30.0;
-//constexpr float k_fAngleInnerH_Deg = 30.0;
-//constexpr float k_fAngleTopV_Deg = 30.0;
-//constexpr float k_fAngleBottomV_Deg = 30.0;
-
-//float k_fAngleOuterH_Deg = GetBoolFromSettings(8);
-//float k_fAngleInnerH_Deg = GetBoolFromSettings(10);
-//float k_fAngleTopV_Deg = GetBoolFromSettings(12);
-//float k_fAngleBottomV_Deg = GetBoolFromSettings(14);
-
 constexpr float k_fRadFactor = (float)M_PI / 180.0f;
 
 void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom)
 {
-    //tan(36.0) = 0.72654252800536088589546675748062
     float k_fAngleOuterH_Deg = 0.0;
     float k_fAngleInnerH_Deg = 0.0;
     float k_fAngleTopV_Deg = 0.0;
@@ -480,25 +527,6 @@ void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pf
         *pfRight = k_fTangentOuterH;
     }
 }
-
-
-
-//void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom)
-//{
-//    *pfTop = -GetFloatFromSettingsByKey("//Top Vertical");
-//    *pfBottom = GetFloatFromSettingsByKey("//Bottom Vertical");
-//
-//    if (eEye == vr::Eye_Left)
-//    {
-//        *pfLeft = -GetFloatFromSettingsByKey("//Outer Horizontal");
-//        *pfRight = GetFloatFromSettingsByKey("//Inner Horizontal");
-//    }
-//    else
-//    {
-//        *pfLeft = -GetFloatFromSettingsByKey("//Inner Horizontal");
-//        *pfRight = GetFloatFromSettingsByKey("//Outer Horizontal");
-//    }
-//}
 
 vr::DriverPose_t CSampleDeviceDriver::GetHeadFromEyePose(EVREye eEye)
 {
@@ -541,34 +569,19 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
     vr::DriverPose_t pose = { 0 };
 
     pose.poseIsValid = true;
-
     pose.result = vr::TrackingResult_Running_OK;
-
     pose.deviceIsConnected = true;
 
     pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
     pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
 
-    if (pSharedData == NULL) {
-
-        ULONGLONG currentTick = GetTickCount64();
-
-        if (currentTick - g_lastAttemptTick > 2000) {
-
-            g_lastAttemptTick = currentTick;
-
-            TryConnectSharedMemory();
-
-        }
-
-    }
-
     if (pSharedData != NULL) {
-
+        // Position comes directly from the UDP data
         pose.vecPosition[0] = GetValuseFor("position x");
         pose.vecPosition[1] = GetValuseFor("position y");
         pose.vecPosition[2] = GetValuseFor("position z");
 
+        // Rotation (Quaternion) comes directly from the UDP data
         pose.qRotation.w = GetValuseFor("rotation w");
         pose.qRotation.x = GetValuseFor("rotation x");
         pose.qRotation.y = GetValuseFor("rotation y");
@@ -590,22 +603,65 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
 
 void CSampleDeviceDriver::RunFrame()
 {
+    if (g_udpSocket == INVALID_SOCKET) {
+        ULONGLONG currentTick = GetTickCount64();
+        if (currentTick - g_lastAttemptTick > 2000) {
+            g_lastAttemptTick = currentTick;
+            TryConnectUDP();
+        }
+    }
+
+    if (g_udpSocket != INVALID_SOCKET) {
+        char buffer[UDP_PACKET_SIZE];
+        sockaddr_in senderAddr;
+        int senderAddrSize = sizeof(senderAddr);
+        int bytesReceived = 0;
+        int packetsProcessed = 0;
+
+        do {
+            bytesReceived = recvfrom(
+                g_udpSocket,
+                buffer,
+                UDP_PACKET_SIZE,
+                0,
+                (SOCKADDR*)&senderAddr,
+                &senderAddrSize
+            );
+
+            if (bytesReceived > 0) {
+                if (bytesReceived == UDP_PACKET_SIZE) {
+                    if (pSharedData != NULL) {
+                        memcpy(pSharedData, buffer, UDP_PACKET_SIZE);
+                        packetsProcessed++;
+                    }
+                }
+            }
+            else if (bytesReceived == SOCKET_ERROR) {
+                if (WSAGetLastError() == WSAEWOULDBLOCK) {
+                    break;
+                }
+                else {
+                    break;
+                }
+            }
+        } while (bytesReceived > 0);
+    }
+
     if (m_unObjectId != vr::k_unTrackedDeviceIndexInvalid) {
         vr::VRServerDriverHost()->TrackedDevicePoseUpdated(m_unObjectId, GetPose(), sizeof(DriverPose_t));
 
-        m_flIPD = GetValuseFor("ipd");
+        m_flIPD = (float)GetValuseFor("ipd");
         vr::VRProperties()->SetFloatProperty(
             m_ulPropertyContainer,
             vr::Prop_UserIpdMeters_Float,
             m_flIPD
         );
 
-        HeadToEyeDist = GetValuseFor("head to eye dist");
+        HeadToEyeDist = (float)GetValuseFor("head to eye dist");
         vr::VRProperties()->SetFloatProperty(
             m_ulPropertyContainer,
             vr::Prop_UserHeadToEyeDepthMeters_Float,
             HeadToEyeDist
         );
-
     }
 }
