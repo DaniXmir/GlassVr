@@ -15,6 +15,9 @@ tracker_arr = []
 
 def get_default_settings():
     return {
+    "ip": "127.0.0.1",
+    "port": 9999,
+    
     "controller/tracker": "controller",
     "index": 1,
 
