@@ -25,7 +25,7 @@ def get_default_settings():
     "head to eye dist" : 0.0,
     
     "offsets": {
-        "position x": 0,
+        "position x": 0.0,
         "position y": 0.0,
         "position z": 0.0,
 

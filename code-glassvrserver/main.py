@@ -21,6 +21,8 @@ def main():
     try:
         while True:
             try:
+                settings = v.get_settings()
+                
                 idx = settings['index']
                 data = v.get_device_position(idx)
                 
