@@ -44,16 +44,6 @@ if you end up 3D printing something, please share it online so other could use i
 
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="512">
 
-# PC Setup
-1. download the .rar in the Releases tab and extract it
-2. run main.exe
-3. in the Driver tab click install
-
-now when you launch steamvr you should see a window called "Headset Window" and it should be copying one of you'r trackers position and rotation
-
-# uninstall the driver
-in the Driver tab click uninstall
-
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
 and add "activateMultipleDrivers" : true
