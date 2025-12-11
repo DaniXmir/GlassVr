@@ -57,11 +57,11 @@ and add "activateMultipleDrivers" : true
 	
 	yes, the driver doesn't care which glasses you have, literally any monitor will work
 
-2. i don't have base station, but i do have a quest headset
+2. i don't have base station, but i do have quest controllers, can i use them?
 
-   maybe, if you could find a way to use the controllers without the headset
+   maybe, if you could find a way to use the controllers without the headset in steamvr
    
-4. I only have 2 controllers
+4. I only have 2 controllers...
 
    strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
 
@@ -74,7 +74,7 @@ and add "activateMultipleDrivers" : true
    
 7. linux?
 	
-	in the furure, maybe
+	in the future, maybe
 
 8. wireless?
 	
