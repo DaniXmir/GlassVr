@@ -65,9 +65,9 @@ and add "activateMultipleDrivers" : true
 
    strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
 
-5. can i use the builtin 3DOF in glasses?
+5. can i use the builtin 3DOF imu?
 
-	check this project: https://docs.vertoxr.com/docs/features/steamvr/
+	no... check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
 
    	that project allows access to the imu and has some steamvr support, maybe in the future ill add 3DOF,
 	i had another idea of forwarding imu data to slimeVR and letting it calculate a 6DOF position
