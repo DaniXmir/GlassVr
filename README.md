@@ -21,6 +21,7 @@ hold the button closest to the screen until the resolution change to 3840x1080@6
 # Requirements
 - xr glasses or a monitors, for you'r eyes ofcourse
 - vr controller or vr tracker, to track you'r head
+
 base stations aren't required, they just the easiest to setup
 
 # Optinal Hardware
