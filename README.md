@@ -4,13 +4,17 @@ while steamvr isn't really designed for a "headset" like this, they work surpris
 
 showcase on youtube: https://www.youtube.com/watch?v=ySr_ktM-0Mo
 
-i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
+# Installing
+1. download the .rar in the Releases tab and extract it
+2. run main.exe
+3. in the Driver tab click "install"
+now when you launch steamvr you should see a window called "Headset Window" and it should be copying one of you'r trackers position and rotation
 
-there are 2 thing you will need to download, 
-1. server: copies one of you'r controller/tracker position and rotation and applies it to the glasses
-2. driver: tells steamvr what to display in you'r glasses
+to uninstall, simply click on "uninstall" in the Driver tab
 
-note: not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
+# note
+ - i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
+ - not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
 
