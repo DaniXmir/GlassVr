@@ -23,6 +23,9 @@
 #include <cctype>
 #include <cmath>
 #include <cstring> 
+#include <cstdlib>
+#include <cstdio>
+#include <sstream>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -47,61 +50,56 @@ struct PoseData {
 
 const size_t UDP_PACKET_SIZE = sizeof(PoseData);
 
-//todo:
-//1.make settings path not hardcoded
-//2.if "driver setting.txt" is removed, create a new one
-//3.maybe change to json
-const std::string DefaultSettingsContent = R"(
-=Resolution X
-1920
-=Resolution Y
-1080
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+const std::string SettingsFileName = "settings.json";
+const std::string AppFolderName = "glassvr";
 
-=Stereoscopic(SBS)
-false
-
-=Fullscreen
-false
-
-=Refresh Rate
-120
-
-=Outer Horizontal Mono
-45.0
-=Inner Horizontal Mono
-45.0
-=Top Vertical Mono
-30.0
-=Bottom Vertical Mono
-30.0
-
-=Outer Horizontal Stereo
-18.0
-=Inner Horizontal Stereo
-25.0
-=Top Vertical Stereo
-12.0
-=Bottom Vertical Stereo
-11.0
-)";
-
-const std::string SettingsPathDir = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\SteamVR\\drivers\\glassvrdriver\\bin\\win64\\";
-const std::string SettingsFileName = "driver settings.txt";
-const std::string FullSettingsPath = SettingsPathDir + SettingsFileName;
-
+// Global cache for settings content
 static std::string g_settingsContent;
 
-std::string trim(const std::string& str) {
-    size_t first = str.find_first_not_of(" \t\n\r");
-    if (std::string::npos == first) {
-        return "";
+
+std::string GetFullSettingsPath() {
+    char* appDataPath = nullptr;
+    size_t len;
+    std::string fullPath;
+
+    if (_dupenv_s(&appDataPath, &len, "APPDATA") == 0 && appDataPath != nullptr) {
+
+        // %APPDATA%\\glassvr\\driver settings.json
+        fullPath = std::string(appDataPath) + "\\" + AppFolderName + "\\" + SettingsFileName;
+
+        free(appDataPath);
+
     }
-    size_t last = str.find_last_not_of(" \t\n\r");
-    return str.substr(first, (last - first + 1));
+    else {
+        std::cerr << "CRITICAL ERROR: Failed to retrieve APPDATA path. Defaulting to current directory." << std::endl;
+        fullPath = SettingsFileName; // Fallback
+    }
+
+    return fullPath;
 }
 
+// Simple trim function (removes leading/trailing whitespace and quotes)
+// Essential for cleaning the value string from JSON extraction
+std::string trim_value(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\n\r\"");
+    if (std::string::npos == start) {
+        return "";
+    }
+    size_t end = str.find_last_not_of(" \t\n\r\"");
+    return str.substr(start, (end - start + 1));
+}
+
+
+// --- 1. GetSettings() ---
 const std::string& GetSettings() {
     if (!g_settingsContent.empty()) {
+        return g_settingsContent;
+    }
+
+    const std::string FullSettingsPath = GetFullSettingsPath();
+    if (FullSettingsPath.empty()) {
+        g_settingsContent = "";
         return g_settingsContent;
     }
 
@@ -114,49 +112,79 @@ const std::string& GetSettings() {
             (std::istreambuf_iterator<char>(file)),
             (std::istreambuf_iterator<char>())
         );
+        file.close();
     }
     else {
-        std::cout << "Settings file not found. Using default settings." << std::endl;
-        g_settingsContent = DefaultSettingsContent;
+        std::cerr << "Settings file not found at " << FullSettingsPath << ". Returning empty content." << std::endl;
+        g_settingsContent = "";
     }
 
     return g_settingsContent;
 }
 
-std::string GetValueStringFromContent(const std::string& keyString) {
-    if (keyString.empty()) {
-        return "";
-    }
 
+// --- Generic Value Extraction Function (Internal Helper) ---
+std::string GetValueStringFromContent_JSONLike(const std::string& key) {
     const std::string& content = GetSettings();
+    if (content.empty()) {
+        return "";
+    }
 
-    size_t keyPos = content.find(keyString);
+    // 1. Construct the search key: "key" (JSON standard)
+    std::string searchKey = "\"" + key + "\"";
+
+    // 2. Find the position of the key
+    size_t keyPos = content.find(searchKey);
     if (keyPos == std::string::npos) {
+        // Key not found
         return "";
     }
 
-    size_t startPos = content.find('\n', keyPos);
-    if (startPos == std::string::npos) {
+    // 3. Find the colon (':') which must follow the key
+    size_t colonPos = content.find(':', keyPos + searchKey.length());
+    if (colonPos == std::string::npos) {
+        std::cerr << "Colon separator not found after key: " << key << std::endl;
         return "";
     }
 
-    size_t endPos = content.find('\n', startPos + 1);
-
-    if (endPos == std::string::npos) {
-        endPos = content.length();
+    // 4. Find the beginning of the value (after the colon and any whitespace)
+    size_t valueStartPos = content.find_first_not_of(" \t\n\r", colonPos + 1);
+    if (valueStartPos == std::string::npos) {
+        return "";
     }
 
-    std::string valueLine = content.substr(startPos + 1, endPos - (startPos + 1));
+    // 5. Find the end of the value (comma ',' or closing brace '}')
+    // Note: This relies on the file being clean/unformatted JSON.
+    size_t commaPos = content.find(',', valueStartPos);
+    size_t bracePos = content.find('}', valueStartPos);
 
-    return trim(valueLine);
+    // Get the earliest valid JSON terminator
+    size_t valueEndPos = std::min(commaPos, bracePos);
+
+    if (valueEndPos == std::string::npos) {
+        valueEndPos = content.length();
+    }
+
+    // Extract the raw value string
+    std::string rawValue = content.substr(valueStartPos, valueEndPos - valueStartPos);
+
+    // Trim whitespace and quotation marks
+    return trim_value(rawValue);
 }
 
-std::string GetStringFromSettingsByKey(const std::string& keyString) {
-    return GetValueStringFromContent(keyString);
+
+// --- 2. GetStringFromSettingsByKey(const std::string& key) ---
+std::string GetStringFromSettingsByKey(const std::string& key) {
+    std::string result = GetValueStringFromContent_JSONLike(key);
+    if (result.empty()) {
+        std::cerr << "Warning: Key '" << key << "' not found or value empty in settings." << std::endl;
+    }
+    return result;
 }
 
-int GetIntFromSettingsByKey(const std::string& keyString) {
-    std::string valueStr = GetValueStringFromContent(keyString);
+// --- GetIntFromSettingsByKey(const std::string& key) ---
+int GetIntFromSettingsByKey(const std::string& key) {
+    std::string valueStr = GetValueStringFromContent_JSONLike(key);
     if (valueStr.empty()) {
         return 0;
     }
@@ -165,12 +193,14 @@ int GetIntFromSettingsByKey(const std::string& keyString) {
         return std::stoi(valueStr);
     }
     catch (const std::exception& e) {
+        std::cerr << "Error converting '" << valueStr << "' for key '" << key << "' to int: " << e.what() << std::endl;
         return 0;
     }
 }
 
-float GetFloatFromSettingsByKey(const std::string& keyString) {
-    std::string valueStr = GetValueStringFromContent(keyString);
+// --- 3. GetFloatFromSettingsByKey(const std::string& key) ---
+float GetFloatFromSettingsByKey(const std::string& key) {
+    std::string valueStr = GetValueStringFromContent_JSONLike(key);
     if (valueStr.empty()) {
         return std::numeric_limits<float>::quiet_NaN();
     }
@@ -179,15 +209,14 @@ float GetFloatFromSettingsByKey(const std::string& keyString) {
         return std::stof(valueStr);
     }
     catch (const std::exception& e) {
+        std::cerr << "Error converting '" << valueStr << "' for key '" << key << "' to float: " << e.what() << std::endl;
         return std::numeric_limits<float>::quiet_NaN();
     }
 }
 
-bool GetBoolFromSettingsByKey(const std::string& keyString) {
-    std::string normalizedContent = GetValueStringFromContent(keyString);
-    if (normalizedContent.empty()) {
-        return false;
-    }
+// --- 4. GetBoolFromSettingsByKey(const std::string& key) ---
+bool GetBoolFromSettingsByKey(const std::string& key) {
+    std::string normalizedContent = GetValueStringFromContent_JSONLike(key);
 
     std::transform(normalizedContent.begin(), normalizedContent.end(), normalizedContent.begin(), ::tolower);
 
@@ -198,13 +227,13 @@ bool GetBoolFromSettingsByKey(const std::string& keyString) {
         return false;
     }
 }
-
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float HeadToEyeDist = 0.0;
-bool Stereoscopic = GetBoolFromSettingsByKey("=Stereoscopic(SBS)");
-float ResolutionX = GetFloatFromSettingsByKey("=Resolution x");
-float ResolutionY = GetFloatFromSettingsByKey("=Resolution Y");
-bool FullScreen = GetBoolFromSettingsByKey("=Fullscreen");
-float RefreshRate = GetFloatFromSettingsByKey("=Refresh Rate");
+bool Stereoscopic = GetBoolFromSettingsByKey("stereoscopic");
+float ResolutionX = GetFloatFromSettingsByKey("resolution x");
+float ResolutionY = GetFloatFromSettingsByKey("resolution y");
+bool FullScreen = GetBoolFromSettingsByKey("fullscreen");
+float RefreshRate = GetFloatFromSettingsByKey("refresh rate");
 
 PoseData g_PoseDataInstance = { 0 };
 PoseData* pSharedData = &g_PoseDataInstance;
@@ -216,12 +245,11 @@ SOCKET g_udpSocket = INVALID_SOCKET;
 std::string IpAddress = "127.0.0.1";
 int UdpPort = 9999;
 
-
 ULONGLONG g_lastAttemptTick = 0;
 
 bool TryConnectUDP() {
-    IpAddress = GetStringFromSettingsByKey("=ip address");
-    UdpPort = GetFloatFromSettingsByKey("=port");
+    IpAddress = GetStringFromSettingsByKey("ip receiving");
+    UdpPort = GetFloatFromSettingsByKey("port receiving");
 
     if (g_udpSocket != INVALID_SOCKET) {
         return true;
@@ -266,40 +294,6 @@ bool TryConnectUDP() {
     }
     return true;
 }
-
-//bool TryConnectUDP() {
-//    if (g_udpSocket != INVALID_SOCKET) {
-//        return true;
-//    }
-//    WSADATA wsaData;
-//    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-//        std::cerr << "Error: WSAStartup failed." << std::endl;
-//        return false;
-//    }
-//    g_udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-//    if (g_udpSocket == INVALID_SOCKET) {
-//        std::cerr << "Error: socket creation failed. Error code: " << WSAGetLastError() << std::endl;
-//        WSACleanup();
-//        return false;
-//    }
-//    sockaddr_in service;
-//    service.sin_family = AF_INET;
-//    service.sin_addr.s_addr = htonl(INADDR_ANY);
-//    service.sin_port = htons(UdpPort);
-//    if (bind(g_udpSocket, (SOCKADDR*)&service, sizeof(service)) == SOCKET_ERROR) {
-//        std::cerr << "Error: bind failed on port " << UdpPort << ". Error code: " << WSAGetLastError() << std::endl;
-//        closesocket(g_udpSocket);
-//        g_udpSocket = INVALID_SOCKET;
-//        WSACleanup();
-//        return false;
-//    }
-//    u_long nonBlocking = 1;
-//    if (ioctlsocket(g_udpSocket, FIONBIO, &nonBlocking) != 0) {
-//        std::cerr << "Warning: Failed to set non-blocking mode." << std::endl;
-//    }
-//    std::cout << "UDP Socket connected and listening on port " << UdpPort << std::endl;
-//    return true;
-//}
 
 void CleanupUDP() {
     if (g_udpSocket != INVALID_SOCKET) {
@@ -496,16 +490,16 @@ void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pf
     float k_fAngleBottomV_Deg = 0.0;
 
     if (Stereoscopic) {
-        k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("=Outer Horizontal Stereo");
-        k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("=Inner Horizontal Stereo");
-        k_fAngleTopV_Deg = GetFloatFromSettingsByKey("=Top Vertical Stereo");
-        k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("=Bottom Vertical Stereo");
+        k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("outer stereo");
+        k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("inner stereo");
+        k_fAngleTopV_Deg = GetFloatFromSettingsByKey("top stereo");
+        k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("bottom stereo");
     }
     else {
-        k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("=Outer Horizontal Mono");
-        k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("=Inner Horizontal Mono");
-        k_fAngleTopV_Deg = GetFloatFromSettingsByKey("=Top Vertical Mono");
-        k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("=Bottom Vertical Mono");
+        k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("outer mono");
+        k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("inner mono");
+        k_fAngleTopV_Deg = GetFloatFromSettingsByKey("top mono");
+        k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("bottom mono");
     }
 
     float k_fTangentTopV = std::tan(k_fAngleTopV_Deg * k_fRadFactor);
