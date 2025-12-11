@@ -65,11 +65,11 @@ and add "activateMultipleDrivers" : true
 
    strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
 
-5. can i use the built in 3DOF, dont they already support that?
+5. can i use the builtin 3DOF in glasses?
 
 	check this project: https://docs.vertoxr.com/docs/features/steamvr/
 
-   	that project allows access to the imu and has some steamvr support, maybe in the future ill add 3DOF support,
+   	that project allows access to the imu and has some steamvr support, maybe in the future ill add 3DOF,
 	i had another idea of forwarding imu data to slimeVR and letting it calculate a 6DOF position
    
 7. linux?
@@ -78,6 +78,6 @@ and add "activateMultipleDrivers" : true
 
 8. wireless?
 	
-	option 1. find a way to stream the "headset window" to your phone, Parsec could work, or alvr maybe?
+	option 1. find a way to stream the "headset window" to your phone, maybe alvr or even Parsec?
 	
 	option 2. there are some "wireless hdmi 120hz" on amazon/aliexpress, but i dont know how good they actually are, especially for vr
