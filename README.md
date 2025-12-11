@@ -19,15 +19,17 @@ hold the button closest to the screen until the resolution change to 3840x1080@6
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
 
 # Requirements
-- glasses that can act like monitors, for you'r eyes ofcourse
-- base stations and 1 vr controller(vive, index etc) or 1 vr tracker(vive, Tundra etc), to track you'r head
+- xr glasses or a monitors, for you'r eyes ofcourse
+- vr controller or vr tracker(base station aren't needed), to track you'r head
 
-note: you dont need base stations, they are just easy to set up, maybe a full set of slimevr trackers could work...
+for now the only supported method of tracking is by copying a trackers/controller positon and rotation from steamvr to the headset
+this means you can use anything that steamvr can see, as long as you can disable you'r actual headset,
+i am experimenting with other tracking methods like SlimeVR, cameras, lights, magnets and more
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
 - a way to attach you'r controller/tracker to you head, alignment isn't critical since you can adjust position and rotation offsets later
-- steamvr watchman dongles, while not required, needed if you want to use your controllers wirelessly, one dongle per device
+- steamvr watchman dongles(for vive, index etc controllres only), while not required, needed if you want to use your controllers wirelessly, one dongle per device
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
 
@@ -68,17 +70,24 @@ and add "activateMultipleDrivers" : true
 2. i don't have base station, but i do have a quest headset
 
    maybe, if you could find a way to use the controllers without the headset
+   
+4. I only have 2 controllers
 
-4. linux?
+   strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
+
+5. can i use the built in 3DOF, dont they already support that?
+
+	check this project: https://docs.vertoxr.com/docs/features/steamvr/
+
+   	that project allows access to the imu and has some steamvr support, maybe in the future ill add 3DOF support,
+	i had another idea of forwarding imu data to slimeVR and letting it calculate a 6DOF position
+   
+7. linux?
 	
 	in the furure, maybe
 
-5. wireless?
+8. wireless?
 	
-	option 1. find a way to stream the "headset window" to your phone, Parsec could work
+	option 1. find a way to stream the "headset window" to your phone, Parsec could work, or alvr maybe?
 	
-	option 2. search "wireless hdmi 120hz" on amazon/aliexpress
-
-6. I only have 2 controllers
-
-   strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
+	option 2. there are some "wireless hdmi 120hz" on amazon/aliexpress, but i dont know how good they actually are, especially for vr
