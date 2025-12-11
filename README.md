@@ -12,7 +12,7 @@ now when you launch steamvr you should see a window called "Headset Window" and 
 
 to uninstall, simply click on "uninstall" in the Driver tab
 
-# note
+note:
  - i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
  - not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
@@ -20,16 +20,13 @@ hold the button closest to the screen until the resolution change to 3840x1080@6
 
 # Requirements
 - xr glasses or a monitors, for you'r eyes ofcourse
-- vr controller or vr tracker(base station aren't needed), to track you'r head
-
-for now the only supported method of tracking is by copying a trackers/controller positon and rotation from steamvr to the headset
-this means you can use anything that steamvr can see, as long as you can disable you'r actual headset,
-more tracking methods are to come
+- vr controller or vr tracker, to track you'r head
+base stations aren't required, they just the easiest to setup
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
 - a way to attach you'r controller/tracker to you head, alignment isn't critical since you can adjust position and rotation offsets later
-- steamvr watchman dongles(for vive, index etc controllres only), while not required, needed if you want to use your controllers wirelessly, one dongle per device
+- steamvr watchman dongles(for vive, index etc controllres only), while not required, are needed if you want to use your controllers wirelessly, one dongle per device
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
 
@@ -69,8 +66,6 @@ and add "activateMultipleDrivers" : true
 
 	no... check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
 
-   	that project allows access to the imu and has some steamvr support, maybe in the future ill add 3DOF,
-	i had another idea of forwarding imu data to slimeVR and letting it calculate a 6DOF position
    
 7. linux?
 	
