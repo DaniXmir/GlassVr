@@ -39,87 +39,14 @@ if you end up 3D printing something, please share it online so other could use i
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="512">
 
 # PC Setup
-1. download the .rar in the Releases tab and extract it, you will see 2 folders
-2. put the "glassvrdriver" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
-3. configure "driver settings.txt" in "glassvrdriver\bin\win64" if you need (explanation below on each setting)
-4. goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings, under "steamvr" add "activateMultipleDrivers" : true
-5. make sure that you'r glasses are connected and set as the primary display
-6. connect you'r controllers and open steamvr (pair to dongles in steamvr if needed)
-7. in the "glassvrserver" folder, click on "main.exe" to launch the server (always launch it after opening steamvr!)
+1. download the .rar in the Releases tab and extract it
+2. run main.exe
+3. in the Driver tab click install
 
-you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation,
-now you need to change some settings
+now when you launch steamvr you should see a window called "Headset Window" and it should be copying one of you'r trackers position and rotation
 
-settings.json(for the server):
-
-	{
-		#set to "controller" to track a controller, set to "tracker" to track a tracker
-	    "controller/tracker": "controller",
-
-		#which controller/tracker to track
-	    "index": 1,
-
-		#distance between eyes
-	    "ipd": 0.0,
-
-		#distance from the center of you'r head to you'r eyes
-	    "head to eye dist": 0.0,
-
-		#DO NOT USE "position x" and "position z"
-	    "offsets": {
-	        "position x": 0.0,
-	        "position y": 0.0,
-	        "position z": 0.0,
-			
-	        "rotation yaw": 0.0,
-	        "rotation pitch": 0.0,
-	        "rotation roll": 0.0
-	    }
-	}
-
-driver settings.txt(for the driver) edit this before launching steamvr:
-```
-#you'r glasses resolution, dont use SBS resolution if you are using that
-=Resolution x
-1920
-=Resolution Y
-1080
-
-#SBS mode if you using it
-=Stereoscopic(SBS)
-false
-
-#make "Headset Window" fullscreen, if you cant see steamvr in you'r glasses, this could fix it
-=Fullscreen
-false
-
-#self explanatory
-=Refresh Rate
-120
-
-#FOV, defaults values are increased to be more usable
-=Outer Horizontal Mono
-45.0
-=Inner Horizontal Mono
-45.0
-=Top Vertical Mono
-30.0
-=Bottom Vertical Mono
-30.0
-
-=Outer Horizontal Stereo
-38.0
-=Inner Horizontal Stereo
-54.0
-=Top Vertical Stereo
-25.0
-=Bottom Vertical Stereo
-23.0
-```
-
-# disabling the driver
-delete or move "glassvedriver" from C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
-(renaming won't work)
+# uninstall the driver
+in the Driver tab click uninstall
 
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
