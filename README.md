@@ -24,7 +24,7 @@ hold the button closest to the screen until the resolution change to 3840x1080@6
 
 for now the only supported method of tracking is by copying a trackers/controller positon and rotation from steamvr to the headset
 this means you can use anything that steamvr can see, as long as you can disable you'r actual headset,
-i am experimenting with other tracking methods like SlimeVR, cameras, lights, magnets and more
+more tracking methods are to come
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
