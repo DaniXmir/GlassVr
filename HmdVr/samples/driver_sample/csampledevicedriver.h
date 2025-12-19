@@ -2,50 +2,40 @@
 #define CSAMPLEDEVICEDRIVER_H
 
 #include <openvr_driver.h>
+#include "settings.h"
+#include "packet.h" 
+#include <string> 
+#include <cstdint>
 
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
 class CSampleDeviceDriver : public vr::ITrackedDeviceServerDriver, public vr::IVRDisplayComponent
 {
 public:
     CSampleDeviceDriver();
-
     virtual ~CSampleDeviceDriver();
 
-    virtual vr::EVRInitError Activate(vr::TrackedDeviceIndex_t unObjectId);
+    void UpdateData(const Packet& data);
 
-    virtual void Deactivate();
-
-    virtual void EnterStandby();
-
-    void *GetComponent(const char *pchComponentNameAndVersion);
-
+    virtual vr::EVRInitError Activate(vr::TrackedDeviceIndex_t unObjectId) override;
+    virtual void Deactivate() override;
+    virtual void EnterStandby() override;
+    virtual void* GetComponent(const char* pchComponentNameAndVersion) override;
     virtual void PowerOff();
+    virtual void DebugRequest(const char* pchRequest, char* pchResponseBuffer, uint32_t unResponseBufferSize) override;
+    virtual vr::DriverPose_t GetPose() override;
 
-    /** debug request from a client */
-    virtual void DebugRequest(const char *pchRequest, char *pchResponseBuffer, uint32_t unResponseBufferSize);
+    virtual void GetWindowBounds(int32_t* pnX, int32_t* pnY, uint32_t* pnWidth, uint32_t* pnHeight) override;
+    virtual bool IsDisplayOnDesktop() override;
+    virtual bool IsDisplayRealDisplay() override;
+    virtual void GetRecommendedRenderTargetSize(uint32_t* pnWidth, uint32_t* pnHeight) override;
+    virtual void GetEyeOutputViewport(vr::EVREye eEye, uint32_t* pnX, uint32_t* pnY, uint32_t* pnWidth, uint32_t* pnHeight) override;
+    virtual void GetProjectionRaw(vr::EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom) override;
+    virtual vr::DriverPose_t GetHeadFromEyePose(vr::EVREye eEye);
 
-    virtual void GetWindowBounds(int32_t *pnX, int32_t *pnY, uint32_t *pnWidth, uint32_t *pnHeight);
+    virtual vr::DistortionCoordinates_t ComputeDistortion(vr::EVREye eEye, float fU, float fV) override;
 
-    virtual bool IsDisplayOnDesktop();
-
-    virtual bool IsDisplayRealDisplay();
-
-    virtual void GetRecommendedRenderTargetSize(uint32_t *pnWidth, uint32_t *pnHeight);
-
-
-
-    virtual void GetEyeOutputViewport(vr::EVREye eEye, uint32_t *pnX, uint32_t *pnY, uint32_t *pnWidth, uint32_t *pnHeight);
-
-    virtual void GetProjectionRaw(vr::EVREye eEye, float *pfLeft, float *pfRight, float *pfTop, float *pfBottom);
-
-    virtual vr::DistortionCoordinates_t ComputeDistortion(vr::EVREye eEye, float fU, float fV);
-
-    virtual vr::DriverPose_t GetPose();
+    virtual bool ComputeInverseDistortion(vr::HmdVector2_t* pA, vr::EVREye eEye, uint32_t unElement, float fU, float fV) override;
 
     void RunFrame();
-
     std::string GetSerialNumber() const { return m_sSerialNumber; }
 
 private:
@@ -55,15 +45,17 @@ private:
     std::string m_sSerialNumber;
     std::string m_sModelNumber;
 
+    Packet m_poseDataCache;
+
     int32_t m_nWindowX;
     int32_t m_nWindowY;
-    int32_t m_nWindowWidth;
-    int32_t m_nWindowHeight;
-    int32_t m_nRenderWidth;
-    int32_t m_nRenderHeight;
+    uint32_t m_nWindowWidth;
+    uint32_t m_nWindowHeight;
+    uint32_t m_nRenderWidth;
+    uint32_t m_nRenderHeight;
     float m_flSecondsFromVsyncToPhotons;
     float m_flDisplayFrequency;
-    float m_flIPD = 0;
+    float m_flIPD;
 };
 
-#endif // CSAMPLEDEVICEDRIVER_H
+#endif

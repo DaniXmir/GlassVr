@@ -1,5 +1,9 @@
 include_directories(../../headers)
 
+cmake_minimum_required(VERSION 3.10)
+
+target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
+
 set(TARGET_NAME driver_sample)
 
 add_library(${TARGET_NAME} MODULE

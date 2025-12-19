@@ -1,12 +1,12 @@
 {
     "driver_sample": {
         "enable": true,
-        "id": "Sample Driver",
+        "id": "GlassVr",
         "renderWidth": 1080,
         "renderHeight": 1920,
         "secondsFromVsyncToPhotons": 0.008,
         "displayFrequency": 120.0,
-        "serialNumber": "Sample 4711",
+        "serialNumber": "GlassVr999999999",
         "windowHeight": 1080,
         "windowWidth": 1920,
         "windowX": 0,
