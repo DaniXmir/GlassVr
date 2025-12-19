@@ -22,23 +22,81 @@ default_settings = {
     "top stereo" : 25.0,
     "bottom stereo" : 23.0,
 
-    "tracker index": 0,
-
     "ip sending": "127.0.0.1",
     "port sending": 9999,
     "ip receiving": "127.0.0.1",
     "port receiving": 9999,
 
+    "hmd index": 0,
+
+    "hmd offset x": 0.0,
+    "hmd offset y": 0.0,
+    "hmd offset z": 0.0,
+
+    "hmd offset yaw": 0.0,
+    "hmd offset pitch": 0.0,
+    "hmd offset roll": 0.0,
+
     "ipd": 0.0,
     "head to eye dist": 0.0,
 
-    "offset x": 0.0,
-    "offset y": 0.0,
-    "offset z": 0.0,
+    "cr index": 0,
 
-    "offset yaw": 0.0,
-    "offset pitch": 0.0,
-    "offset roll": 0.0
+    "cr offset x": 0.0,
+    "cr offset y": 0.0,
+    "cr offset z": 0.0,
+
+    "cr offset yaw": 0.0,
+    "cr offset pitch": 0.0,
+    "cr offset roll": 0.0,
+
+    "cl index": 0,
+
+    "cl offset x": 0.0,
+    "cl offset y": 0.0,
+    "cl offset z": 0.0,
+
+    "cl offset yaw": 0.0,
+    "cl offset pitch": 0.0,
+    "cl offset roll": 0.0,
+    
+    "controller index 1" : 0,
+    "controller index 2" : 1,
+
+    "a": "right a",
+    "b": "right b",
+    "x": "left grip",
+    "y": "right grip",
+    "dpup": "left grip",
+    "dpdown": "left a",
+    "dpleft": "left b",
+    "dpright": "right grip",
+    "leftshoulder": "left touch modifier",
+    "rightshoulder": "right touch modifier",
+    "lefttrigger": "left trigger",
+    "righttrigger": "right trigger",
+    "leftstick": "left joy button",
+    "rightstick": "right joy button",
+    "leftx": "left joy x",
+    "lefty": "left joy y",
+    "rightx": "right joy x",
+    "righty": "right joy y",
+    "back": "left menu",
+    "start": "right menu",
+    "guide": "right a",
+    "misc1": "",
+    "touchpad": "",
+    "paddle1": "right grip",
+    "paddle2": "left grip",
+    "paddle3": "right grip",
+    "paddle4": "left grip",
+
+    "enable hmd": True,
+    "enable cr": False,
+    "enable cl": False,
+
+    "opengloves": False,
+    "camera index": 0,
 }
 
 ##################################################################################################
@@ -63,6 +121,9 @@ file_path = get_path()
 #file_path = 'settings.json'
 ##################################################################################################
 
+def reset_settings():
+    with open(file_path, 'w') as f:
+        json.dump(default_settings, f, indent=4)
 
 def get_settings():
     try:
@@ -71,8 +132,9 @@ def get_settings():
         
     except (FileNotFoundError):#, json.JSONDecodeError):
         try:
-            with open(file_path, 'w') as f:
-                json.dump(default_settings, f, indent=4)
+            reset_settings()
+            # with open(file_path, 'w') as f:
+            #     json.dump(default_settings, f, indent=4)
         except OSError:
             print(OSError)
         return default_settings
