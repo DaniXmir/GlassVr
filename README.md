@@ -4,26 +4,30 @@ while steamvr isn't really designed for a "headset" like this, they work surpris
 
 showcase on youtube: https://www.youtube.com/watch?v=ySr_ktM-0Mo
 
-i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
+# Installing
+1. download the .rar in the Releases tab and extract it
+2. run main.exe
+3. in the Driver tab click "install"
+now when you launch steamvr you should see a window called "Headset Window" and it should be copying one of you'r trackers position and rotation
 
-there are 2 thing you will need to download, 
-1. server: copies one of you'r controller/tracker position and rotation and applies it to the glasses
-2. driver: tells steamvr what to display in you'r glasses
+to uninstall, simply click on "uninstall" in the Driver tab
 
-note: not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
+note:
+ - i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
+ - not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
 
 # Requirements
-- glasses that can act like monitors, for you'r eyes ofcourse
-- base stations and 1 vr controller(vive, index etc) or 1 vr tracker(vive, Tundra etc), to track you'r head
+- xr glasses or a monitors, for you'r eyes ofcourse
+- vr controller or vr tracker, to track you'r head
 
-note: you dont need base stations, they are just easy to set up, maybe a full set of slimevr trackers could work...
+base stations aren't required, they just the easiest to setup
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
 - a way to attach you'r controller/tracker to you head, alignment isn't critical since you can adjust position and rotation offsets later
-- steamvr watchman dongles, while not required, needed if you want to use your controllers wirelessly, one dongle per device
+- steamvr watchman dongles(for vive, index etc controllres only), while not required, are needed if you want to use your controllers wirelessly, one dongle per device
 
 here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
 
@@ -38,89 +42,6 @@ if you end up 3D printing something, please share it online so other could use i
 
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="512">
 
-# PC Setup
-1. download the .rar in the Releases tab and extract it, you will see 2 folders
-2. put the "glassvrdriver" folder in C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
-3. configure "driver settings.txt" in "glassvrdriver\bin\win64" if you need (explanation below on each setting)
-4. goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings, under "steamvr" add "activateMultipleDrivers" : true
-5. make sure that you'r glasses are connected and set as the primary display
-6. connect you'r controllers and open steamvr (pair to dongles in steamvr if needed)
-7. in the "glassvrserver" folder, click on "main.exe" to launch the server (always launch it after opening steamvr!)
-
-you should see a window called "Headset Window" and it should be copying one of you'r controller position and rotation,
-now you need to change some settings
-
-settings.json(for the server):
-
-	{
-		#set to "controller" to track a controller, set to "tracker" to track a tracker
-	    "controller/tracker": "controller",
-
-		#which controller/tracker to track
-	    "index": 1,
-
-		#distance between eyes
-	    "ipd": 0.0,
-
-		#distance from the center of you'r head to you'r eyes
-	    "head to eye dist": 0.0,
-
-		#DO NOT USE "position x" and "position z"
-	    "offsets": {
-	        "position x": 0.0,
-	        "position y": 0.0,
-	        "position z": 0.0,
-			
-	        "rotation yaw": 0.0,
-	        "rotation pitch": 0.0,
-	        "rotation roll": 0.0
-	    }
-	}
-
-driver settings.txt(for the driver) edit this before launching steamvr:
-```
-#you'r glasses resolution, dont use SBS resolution if you are using that
-=Resolution x
-1920
-=Resolution Y
-1080
-
-#SBS mode if you using it
-=Stereoscopic(SBS)
-false
-
-#make "Headset Window" fullscreen, if you cant see steamvr in you'r glasses, this could fix it
-=Fullscreen
-false
-
-#self explanatory
-=Refresh Rate
-120
-
-#FOV, defaults values are increased to be more usable
-=Outer Horizontal Mono
-45.0
-=Inner Horizontal Mono
-45.0
-=Top Vertical Mono
-30.0
-=Bottom Vertical Mono
-30.0
-
-=Outer Horizontal Stereo
-38.0
-=Inner Horizontal Stereo
-54.0
-=Top Vertical Stereo
-25.0
-=Bottom Vertical Stereo
-23.0
-```
-
-# disabling the driver
-delete or move "glassvedriver" from C:\Program Files (x86)\Steam\steamapps\common\SteamVR\drivers
-(renaming won't work)
-
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
 and add "activateMultipleDrivers" : true
@@ -134,20 +55,25 @@ and add "activateMultipleDrivers" : true
 	
 	yes, the driver doesn't care which glasses you have, literally any monitor will work
 
-2. i don't have base station, but i do have a quest headset
+2. i don't have base station, but i do have quest controllers, can i use them?
 
-   maybe, if you could find a way to use the controllers without the headset
-
-4. linux?
-	
-	in the furure, maybe
-
-5. wireless?
-	
-	option 1. find a way to stream the "headset window" to your phone, Parsec could work
-	
-	option 2. search "wireless hdmi 120hz" on amazon/aliexpress
-
-6. I only have 2 controllers
+   maybe, if you could find a way to use the controllers without the headset in steamvr
+   
+4. I only have 2 controllers...
 
    strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
+
+5. can i use the builtin 3DOF imu?
+
+	no... check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
+
+   
+7. linux?
+	
+	in the future, maybe
+
+8. wireless?
+	
+	option 1. find a way to stream the "headset window" to your phone, maybe alvr or even Parsec?
+	
+	option 2. there are some "wireless hdmi 120hz" on amazon/aliexpress, but i dont know how good they actually are, especially for vr
