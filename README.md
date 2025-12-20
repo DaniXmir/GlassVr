@@ -4,7 +4,7 @@ while steamvr isn't really designed for a "headset" like this, they work surpris
 
 showcase on youtube: https://www.youtube.com/watch?v=ySr_ktM-0Mo
 
-discord: https://discord.gg/WbEqvHKs
+join the discord! https://discord.gg/WbEqvHKs
 
 # Installing
 1. download the .rar in the Releases tab and extract it
@@ -61,21 +61,25 @@ and add "activateMultipleDrivers" : true
 
    maybe, if you could find a way to use the controllers without the headset in steamvr
    
-4. I only have 2 controllers...
+3. I only have 2 controllers...
 
    strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
 
-5. can i use the builtin 3DOF imu?
+4. can i use the builtin 3DOF imu?
 
 	no... check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
-
    
-7. linux?
+5. linux?
 	
 	in the future, maybe
 
-8. wireless?
+6. wireless?
 	
 	option 1. find a way to stream the "headset window" to your phone, maybe alvr or even Parsec?
 	
 	option 2. there are some "wireless hdmi 120hz" on amazon/aliexpress, but i dont know how good they actually are, especially for vr
+
+7. any more quetions?
+    
+	ask them in the discord server: https://discord.gg/WbEqvHKs
+
