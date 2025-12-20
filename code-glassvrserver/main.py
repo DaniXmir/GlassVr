@@ -576,10 +576,10 @@ def send_udp():
             
             sock.sendto(buffer, (settings['ip sending'], settings['port receiving']))
 
-            time.sleep(0.001)
+            time.sleep(0.0001)
         except Exception as e:
             print(e)
-            time.sleep(1.0 / 120.0)
+            time.sleep(0.0001)
 
 def start_send_udp():
     t = threading.Thread(target=send_udp, daemon=True)
@@ -672,7 +672,7 @@ def start_vr_utility():
                         trackers_transforms.append(dict)
                         
                 trackers_arr = trackers_transforms
-                time.sleep(0.001)
+                time.sleep(0.0001)
             except:
                 time.sleep(1)
                 start_vr_utility()
@@ -868,7 +868,7 @@ def update_controller_mapping():
             else:
                 controller_2_dict.update(get_default_state())
 
-            time.sleep(0.01)
+            time.sleep(0.0001)
 
         except Exception as e:
             print(f"Error: {e}")
@@ -908,7 +908,7 @@ VERSION = "v2"
 PIPE_NAME_R = fr'\\.\pipe\vrapplication\input\glove\{VERSION}\{HAND_R}'
 PIPE_NAME_L = fr'\\.\pipe\vrapplication\input\glove\{VERSION}\{HAND_L}'
 PACK_FORMAT2 = '<20f5f2f8?f'
-SEND_INTERVAL = 0.01
+SEND_INTERVAL = 0.0001
 
 hand_data = {
     "l pos x": 0.0, "l pos y": 0.0, "l pos z": 0.0,
@@ -1096,7 +1096,7 @@ def camera_loop():
             with caps_lock:
                 if caps:
                     break
-            time.sleep(0.1)
+            time.sleep(0.0001)
             timeout += 1
         
         if not caps:
@@ -1161,7 +1161,7 @@ def camera_loop():
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         camera_running = False
             
-            time.sleep(0.001)
+            time.sleep(0.0001)
     
     except Exception as e:
         print(f"Camera loop error: {e}")
@@ -1945,13 +1945,26 @@ def create_credits():
     image_button.clicked.connect(lambda: click())
     layout_credits1.addWidget(image_button, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
 
+    group_links = QWidget()
+    layout_link = QHBoxLayout(group_links)
+    
     link = '<a href=https://github.com/DaniXmir/GlassVr> https://github.com/DaniXmir/GlassVr </a>'
-    label = QLabel("project github:" + link)
-    label.setTextFormat(Qt.TextFormat.RichText)
-    label.setOpenExternalLinks(True)
+    label1 = QLabel("project github:" + link)
+    label1.setTextFormat(Qt.TextFormat.RichText)
+    label1.setOpenExternalLinks(True)
+    label1.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
+    layout_link.addWidget(label1)
+    #layout_credits1.addWidget(label)
 
-    label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
-    layout_credits1.addWidget(label)
+    link = '<a href=https://discord.gg/WbEqvHKs> https://discord.gg/WbEqvHKs </a>'
+    label2 = QLabel("discord server:" + link)
+    label2.setTextFormat(Qt.TextFormat.RichText)
+    label2.setOpenExternalLinks(True)
+    label2.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
+    layout_link.addWidget(label2)
+    #layout_credits1.addWidget(label)
+
+    layout_credits1.addWidget(group_links)
 
     return create_group
 
@@ -2009,9 +2022,9 @@ layout_index = QHBoxLayout(tab_index)
 
 spinbox_cr_index = QSpinBox()
 spinbox_cr_index.setRange(0, 999999999)
-spinbox_cr_index.setValue(settings_core.get_settings()['cr index'])
+spinbox_cr_index.setValue(settings_core.get_settings()['cl index'])
 spinbox_cr_index.setSingleStep(1)
-spinbox_cr_index.valueChanged.connect(lambda: settings_core.update_setting("cr index", spinbox_cr_index.value()))
+spinbox_cr_index.valueChanged.connect(lambda: settings_core.update_setting("cl index", spinbox_cl_index.value()))
 
 layout_index.addWidget(spinbox_cr_index)
 
@@ -2023,9 +2036,9 @@ layout_index.addWidget(label3)
 
 spinbox_cl_index = QSpinBox()
 spinbox_cl_index.setRange(0, 999999999)
-spinbox_cl_index.setValue(settings_core.get_settings()['cl index'])
+spinbox_cl_index.setValue(settings_core.get_settings()['cr index'])
 spinbox_cl_index.setSingleStep(1)
-spinbox_cl_index.valueChanged.connect(lambda: settings_core.update_setting("cl index", spinbox_cl_index.value()))
+spinbox_cl_index.valueChanged.connect(lambda: settings_core.update_setting("cr index", spinbox_cr_index.value()))
 
 layout_index.addWidget(spinbox_cl_index)
 layout_controllers.addWidget(tab_index)
