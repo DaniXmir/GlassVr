@@ -50,14 +50,26 @@ tldr i was bored and added some cool features
  - controller emulation:
 
 	emulate index controller with a tracker and a physical controller, supports xbox, joycons, ps4/5 etc
+	
+	demonstration: darth maul dual saber using only one controller:
+	
+	<a href="https://www.youtube.com/watch?v=AHyDTgIQ-1U">
+	  <img src="https://img.youtube.com/vi/AHyDTgIQ-1U/maxresdefault.jpg" width="600" alt="Watch the video">
+	</a>
 
  - hand tracking using a webcam(curl and splay only):
 
 	use a webcam for hand tracking, tracker for 6dof and a physical controller for buttons, requires the OpenGloves driver
-
+	
 	1, download it from steam: https://store.steampowered.com/app/1574050/OpenGloves/
 
     2, and enable named pipe communication
+
+	demonstration: webcam, joycon, vive wand
+
+	<a href="https://www.youtube.com/watch?v=JJEYXxnN9h8">
+	  <img src="https://img.youtube.com/vi/JJEYXxnN9h8/maxresdefault.jpg" width="600" alt="Watch the video">
+	</a>
 
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
