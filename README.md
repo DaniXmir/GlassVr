@@ -54,8 +54,10 @@ tldr i was bored and added some cool features
  - hand tracking using a webcam(curl and splay only):
 
 	use a webcam for hand tracking, tracker for 6dof and a physical controller for buttons, requires the OpenGloves driver
-    1) download it from steam: https://store.steampowered.com/app/1574050/OpenGloves/
-	2) and enable named pipe communication
+
+	1, download it from steam: https://store.steampowered.com/app/1574050/OpenGloves/
+
+    2, and enable named pipe communication
 
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
