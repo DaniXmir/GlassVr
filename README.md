@@ -46,13 +46,16 @@ if you end up 3D printing something, please share it online so other could use i
 
 # Other features
 tldr i was bored and added some cool features
-controller emulation:
-emulate index controller with a tracker and a physical controller, supports xbox, joycons, ps4/5 etc
 
-hand tracking using a webcam(curl and splay only):
-use a webcam for hand tracking, requires the OpenGloves driver
-set it from steam: https://store.steampowered.com/app/1574050/OpenGloves/
-and enable named pipe communication
+ - controller emulation:
+
+	emulate index controller with a tracker and a physical controller, supports xbox, joycons, ps4/5 etc
+
+ - hand tracking using a webcam(curl and splay only):
+
+	use a webcam for hand tracking, requires the OpenGloves driver
+	set it from steam: https://store.steampowered.com/app/1574050/OpenGloves/
+	and enable named pipe communication
 
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
