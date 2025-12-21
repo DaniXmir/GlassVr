@@ -2020,13 +2020,13 @@ layout_controllers.addWidget(trackers_label2)
 tab_index = QWidget()
 layout_index = QHBoxLayout(tab_index)
 
-spinbox_cr_index = QSpinBox()
-spinbox_cr_index.setRange(0, 999999999)
-spinbox_cr_index.setValue(settings_core.get_settings()['cl index'])
-spinbox_cr_index.setSingleStep(1)
-spinbox_cr_index.valueChanged.connect(lambda: settings_core.update_setting("cl index", spinbox_cl_index.value()))
+spinbox_cl_index = QSpinBox()
+spinbox_cl_index.setRange(0, 999999999)
+spinbox_cl_index.setValue(settings_core.get_settings()['cl index'])
+spinbox_cl_index.setSingleStep(1)
+spinbox_cl_index.valueChanged.connect(lambda: settings_core.update_setting("cl index", spinbox_cl_index.value()))
 
-layout_index.addWidget(spinbox_cr_index)
+layout_index.addWidget(spinbox_cl_index)
 
 label3 = create_label({
     "text" : "<- left (index) right ->", 
@@ -2034,13 +2034,13 @@ label3 = create_label({
 })
 layout_index.addWidget(label3)
 
-spinbox_cl_index = QSpinBox()
-spinbox_cl_index.setRange(0, 999999999)
-spinbox_cl_index.setValue(settings_core.get_settings()['cr index'])
-spinbox_cl_index.setSingleStep(1)
-spinbox_cl_index.valueChanged.connect(lambda: settings_core.update_setting("cr index", spinbox_cr_index.value()))
+spinbox_cr_index = QSpinBox()
+spinbox_cr_index.setRange(0, 999999999)
+spinbox_cr_index.setValue(settings_core.get_settings()['cr index'])
+spinbox_cr_index.setSingleStep(1)
+spinbox_cr_index.valueChanged.connect(lambda: settings_core.update_setting("cr index", spinbox_cr_index.value()))
 
-layout_index.addWidget(spinbox_cl_index)
+layout_index.addWidget(spinbox_cr_index)
 layout_controllers.addWidget(tab_index)
 #/////////////
 
