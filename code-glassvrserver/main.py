@@ -293,11 +293,11 @@ check_box_hmd = create_checkbox(
     })
 layout_main.addWidget(check_box_hmd)
 
-label2 = create_label({
+tracker_title_label1 = create_label({
     "text" : "---------Trackers---------", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-layout_main.addWidget(label2)
+layout_main.addWidget(tracker_title_label1)
 
 trackers_label1 = create_label({
     "text" : "0 found", 
@@ -627,21 +627,61 @@ def start_vr_utility():
             try:
                 trackers = get_trackers(vr_system)
 
+                # trackers = [{"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"}]
+
                 #print connected
                 count = 0
-                text = str(len(trackers)) + " found= "
+                line = 0
+                text = ""
+                
                 for n in trackers:
-                    text += "[" + str(count) + "]"
+                    if line == 5:
+                        line = 0
+                        text += "\n"
+
+                    text += "[" + str(count) + " "
                     if n['class'] == 2:
                         text += "{controller "
                     if n['class'] == 3:
                         text += "tracker "
                     text += n['model'] + " "
-                    text += n['role'] + "} "
+                    text += n['role'] + "] "
 
                     count += 1
+
+                    line += 1
+
                 trackers_label1.findChild(QLabel).setText(text)
                 trackers_label2.findChild(QLabel).setText(text)
+
+
+                found = "---------" + str(len(trackers)) + " Trackers Found---------"
+
+                tracker_title_label1.findChild(QLabel).setText(found)
+                tracker_title_label2.findChild(QLabel).setText(found)
+
                 #print connected
 
                 #keep the first argument as 2, do not change it
@@ -706,18 +746,45 @@ def get_trackers(vr_system):
                 
                 render_model_name = vr_system.getStringTrackedDeviceProperty(i, PROP_RENDER_MODEL)
                 
-                if 'right' in render_model_name.lower():
-                    role_hint = "right"
-                elif 'left' in render_model_name.lower():
-                    role_hint = "left"
-                else:
-                    role_enum = vr_system.getControllerRoleForTrackedDeviceIndex(i)
-                    if role_enum == vr.TrackedControllerRole_LeftHand:
-                        role_hint = "left"
-                    elif role_enum == vr.TrackedControllerRole_RightHand:
-                        role_hint = "right"
-                    elif role_enum == vr.TrackedControllerRole_Treadmill:
-                        role_hint = "treadmill"
+                role_hint = "unknown"
+
+                match vr_system.getControllerRoleForTrackedDeviceIndex(i):
+                    case vr.TrackedControllerRole_Invalid:
+                        role_hint = "Unknown"
+                    case vr.TrackedControllerRole_LeftHand:
+                        role_hint = "Left Hand"
+                    case vr.TrackedControllerRole_RightHand:
+                        role_hint = "Right Hand"
+                    case vr.TrackedControllerRole_OptOut:
+                        role_hint = "OptOut"
+                    case vr.TrackedControllerRole_Treadmill:
+                        role_hint = "Treadmill"
+                    case vr.TrackedControllerRole_Stylus:
+                        role_hint = "Stylus"
+                    case vr.TrackedControllerRole_Max:
+                        role_hint = "Max"
+
+                # if 'right' in render_model_name.lower():
+                #     role_hint = "right"
+                # elif 'left' in render_model_name.lower():
+                #     role_hint = "left"
+                # else:
+                #     role_enum = vr_system.getControllerRoleForTrackedDeviceIndex(i)
+                #     if role_enum == vr.TrackedControllerRole_LeftHand:
+                #         role_hint = "left"
+                #     elif role_enum == vr.TrackedControllerRole_RightHand:
+                #         role_hint = "right"
+                #     elif role_enum == vr.TrackedControllerRole_OptOut:
+                #         role_hint = "OptOut"
+                #     elif role_enum == vr.TrackedControllerRole_Treadmill:
+                #         role_hint = "treadmill"
+# TrackedControllerRole_Invalid = ENUM_VALUE_TYPE(0)
+# TrackedControllerRole_LeftHand = ENUM_VALUE_TYPE(1)
+# TrackedControllerRole_RightHand = ENUM_VALUE_TYPE(2)
+# TrackedControllerRole_OptOut = ENUM_VALUE_TYPE(3)
+# TrackedControllerRole_Treadmill = ENUM_VALUE_TYPE(4)
+# TrackedControllerRole_Stylus = ENUM_VALUE_TYPE(5)
+# TrackedControllerRole_Max = ENUM_VALUE_TYPE(5)
 
             except Exception as e:
                 pass
@@ -2004,11 +2071,11 @@ layout_enable.addWidget(check_cl)
 layout_controllers.addWidget(tab_enable)
 #/////////////
 
-label2 = create_label({
+tracker_title_label2 = create_label({
     "text" : "---------Trackers---------", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-layout_controllers.addWidget(label2)
+layout_controllers.addWidget(tracker_title_label2)
 
 trackers_label2 = create_label({
     "text" : "0 found", 
