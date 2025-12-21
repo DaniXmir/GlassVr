@@ -12,15 +12,15 @@ default_settings = {
 
     "stereoscopic" : False,
     
-    "outer mono" : 45.0,
-    "inner mono" : 45.0,
-    "top mono" : 30.0,
-    "bottom mono" : 30.0,
+    "outer mono" : 30.0,
+    "inner mono" : 30.0,
+    "top mono" : 17.5,
+    "bottom mono" : 17.5,
 
-    "outer stereo" : 38.0,
-    "inner stereo" : 54.0,
-    "top stereo" : 25.0,
-    "bottom stereo" : 23.0,
+    "outer stereo" : 30.0,
+    "inner stereo" : 30.0,
+    "top stereo" : 17.5,
+    "bottom stereo" : 17.5,
 
     "ip sending": "127.0.0.1",
     "port sending": 9999,
