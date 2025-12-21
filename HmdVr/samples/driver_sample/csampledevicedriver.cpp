@@ -82,11 +82,11 @@ EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
 
     if (Stereoscopic) {
         m_nWindowWidth = (uint32_t)(ResolutionX * 2);
-        m_nRenderWidth = (uint32_t)(ResolutionX * 2);
+        //m_nRenderWidth = (uint32_t)(ResolutionX * 2);
     }
     else {
         m_nWindowWidth = (uint32_t)ResolutionX;
-        m_nRenderWidth = (uint32_t)ResolutionX;
+        //m_nRenderWidth = (uint32_t)ResolutionX;
     }
     m_nWindowHeight = (uint32_t)ResolutionY;
     m_nRenderHeight = (uint32_t)ResolutionY;
