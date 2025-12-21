@@ -127,19 +127,32 @@ def reset_settings():
 
 def get_settings():
     try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-        
-    except (FileNotFoundError):#, json.JSONDecodeError):
-        try:
+        if not os.path.exists(file_path):
             reset_settings()
-            # with open(file_path, 'w') as f:
-            #     json.dump(default_settings, f, indent=4)
-        except OSError:
-            print(OSError)
-        return default_settings
-    except Exception:
-        print(Exception)
+            return default_settings
+
+        with open(file_path, 'r') as f:
+            current_settings = json.load(f)
+
+        # Check if any keys from default_settings are missing in current_settings
+        missing_keys = [key for key in default_settings if key not in current_settings]
+
+        if missing_keys:
+            # Merge defaults into current: 
+            # This keeps user values for existing keys but adds missing defaults
+            updated_settings = default_settings.copy()
+            updated_settings.update(current_settings)
+            
+            # Save the updated dictionary back to the file
+            with open(file_path, 'w') as f:
+                json.dump(updated_settings, f, indent=4)
+            
+            return updated_settings
+        
+        return current_settings
+        
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Error reading settings, falling back to defaults: {e}")
         return default_settings
 
 def update_setting(key, new_value):

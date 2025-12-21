@@ -293,11 +293,11 @@ check_box_hmd = create_checkbox(
     })
 layout_main.addWidget(check_box_hmd)
 
-label2 = create_label({
+tracker_title_label1 = create_label({
     "text" : "---------Trackers---------", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-layout_main.addWidget(label2)
+layout_main.addWidget(tracker_title_label1)
 
 trackers_label1 = create_label({
     "text" : "0 found", 
@@ -576,10 +576,10 @@ def send_udp():
             
             sock.sendto(buffer, (settings['ip sending'], settings['port receiving']))
 
-            time.sleep(0.001)
+            time.sleep(0.0001)
         except Exception as e:
             print(e)
-            time.sleep(1.0 / 120.0)
+            time.sleep(0.0001)
 
 def start_send_udp():
     t = threading.Thread(target=send_udp, daemon=True)
@@ -627,21 +627,61 @@ def start_vr_utility():
             try:
                 trackers = get_trackers(vr_system)
 
+                # trackers = [{"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+                #             {"index" : 2, "class" : "test", "model" : "a", "render" : "vive", "role" : "idk"},
+
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"},
+                #             {"index" : 0, "class" : "GENERIC CONTROLLER", "model" : "VIVE TRACKER+++", "render" : "vive", "role" : "OPTOUT"}]
+
                 #print connected
                 count = 0
-                text = str(len(trackers)) + " found= "
+                line = 0
+                text = ""
+                
                 for n in trackers:
-                    text += "[" + str(count) + "]"
+                    if line == 5:
+                        line = 0
+                        text += "\n"
+
+                    text += "[" + str(count) + " "
                     if n['class'] == 2:
                         text += "{controller "
                     if n['class'] == 3:
                         text += "tracker "
                     text += n['model'] + " "
-                    text += n['role'] + "} "
+                    text += n['role'] + "] "
 
                     count += 1
+
+                    line += 1
+
                 trackers_label1.findChild(QLabel).setText(text)
                 trackers_label2.findChild(QLabel).setText(text)
+
+
+                found = "---------" + str(len(trackers)) + " Trackers Found---------"
+
+                tracker_title_label1.findChild(QLabel).setText(found)
+                tracker_title_label2.findChild(QLabel).setText(found)
+
                 #print connected
 
                 #keep the first argument as 2, do not change it
@@ -672,7 +712,7 @@ def start_vr_utility():
                         trackers_transforms.append(dict)
                         
                 trackers_arr = trackers_transforms
-                time.sleep(0.001)
+                time.sleep(0.0001)
             except:
                 time.sleep(1)
                 start_vr_utility()
@@ -706,18 +746,45 @@ def get_trackers(vr_system):
                 
                 render_model_name = vr_system.getStringTrackedDeviceProperty(i, PROP_RENDER_MODEL)
                 
-                if 'right' in render_model_name.lower():
-                    role_hint = "right"
-                elif 'left' in render_model_name.lower():
-                    role_hint = "left"
-                else:
-                    role_enum = vr_system.getControllerRoleForTrackedDeviceIndex(i)
-                    if role_enum == vr.TrackedControllerRole_LeftHand:
-                        role_hint = "left"
-                    elif role_enum == vr.TrackedControllerRole_RightHand:
-                        role_hint = "right"
-                    elif role_enum == vr.TrackedControllerRole_Treadmill:
-                        role_hint = "treadmill"
+                role_hint = "unknown"
+
+                match vr_system.getControllerRoleForTrackedDeviceIndex(i):
+                    case vr.TrackedControllerRole_Invalid:
+                        role_hint = "Unknown"
+                    case vr.TrackedControllerRole_LeftHand:
+                        role_hint = "Left Hand"
+                    case vr.TrackedControllerRole_RightHand:
+                        role_hint = "Right Hand"
+                    case vr.TrackedControllerRole_OptOut:
+                        role_hint = "OptOut"
+                    case vr.TrackedControllerRole_Treadmill:
+                        role_hint = "Treadmill"
+                    case vr.TrackedControllerRole_Stylus:
+                        role_hint = "Stylus"
+                    case vr.TrackedControllerRole_Max:
+                        role_hint = "Max"
+
+                # if 'right' in render_model_name.lower():
+                #     role_hint = "right"
+                # elif 'left' in render_model_name.lower():
+                #     role_hint = "left"
+                # else:
+                #     role_enum = vr_system.getControllerRoleForTrackedDeviceIndex(i)
+                #     if role_enum == vr.TrackedControllerRole_LeftHand:
+                #         role_hint = "left"
+                #     elif role_enum == vr.TrackedControllerRole_RightHand:
+                #         role_hint = "right"
+                #     elif role_enum == vr.TrackedControllerRole_OptOut:
+                #         role_hint = "OptOut"
+                #     elif role_enum == vr.TrackedControllerRole_Treadmill:
+                #         role_hint = "treadmill"
+# TrackedControllerRole_Invalid = ENUM_VALUE_TYPE(0)
+# TrackedControllerRole_LeftHand = ENUM_VALUE_TYPE(1)
+# TrackedControllerRole_RightHand = ENUM_VALUE_TYPE(2)
+# TrackedControllerRole_OptOut = ENUM_VALUE_TYPE(3)
+# TrackedControllerRole_Treadmill = ENUM_VALUE_TYPE(4)
+# TrackedControllerRole_Stylus = ENUM_VALUE_TYPE(5)
+# TrackedControllerRole_Max = ENUM_VALUE_TYPE(5)
 
             except Exception as e:
                 pass
@@ -868,7 +935,7 @@ def update_controller_mapping():
             else:
                 controller_2_dict.update(get_default_state())
 
-            time.sleep(0.01)
+            time.sleep(0.0001)
 
         except Exception as e:
             print(f"Error: {e}")
@@ -908,7 +975,7 @@ VERSION = "v2"
 PIPE_NAME_R = fr'\\.\pipe\vrapplication\input\glove\{VERSION}\{HAND_R}'
 PIPE_NAME_L = fr'\\.\pipe\vrapplication\input\glove\{VERSION}\{HAND_L}'
 PACK_FORMAT2 = '<20f5f2f8?f'
-SEND_INTERVAL = 0.01
+SEND_INTERVAL = 0.0001
 
 hand_data = {
     "l pos x": 0.0, "l pos y": 0.0, "l pos z": 0.0,
@@ -1096,7 +1163,7 @@ def camera_loop():
             with caps_lock:
                 if caps:
                     break
-            time.sleep(0.1)
+            time.sleep(0.0001)
             timeout += 1
         
         if not caps:
@@ -1161,7 +1228,7 @@ def camera_loop():
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         camera_running = False
             
-            time.sleep(0.001)
+            time.sleep(0.0001)
     
     except Exception as e:
         print(f"Camera loop error: {e}")
@@ -1945,13 +2012,26 @@ def create_credits():
     image_button.clicked.connect(lambda: click())
     layout_credits1.addWidget(image_button, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
 
+    group_links = QWidget()
+    layout_link = QHBoxLayout(group_links)
+    
     link = '<a href=https://github.com/DaniXmir/GlassVr> https://github.com/DaniXmir/GlassVr </a>'
-    label = QLabel("project github:" + link)
-    label.setTextFormat(Qt.TextFormat.RichText)
-    label.setOpenExternalLinks(True)
+    label1 = QLabel("project github:" + link)
+    label1.setTextFormat(Qt.TextFormat.RichText)
+    label1.setOpenExternalLinks(True)
+    label1.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
+    layout_link.addWidget(label1)
+    #layout_credits1.addWidget(label)
 
-    label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
-    layout_credits1.addWidget(label)
+    link = '<a href=https://discord.gg/WbEqvHKs> https://discord.gg/WbEqvHKs </a>'
+    label2 = QLabel("discord server:" + link)
+    label2.setTextFormat(Qt.TextFormat.RichText)
+    label2.setOpenExternalLinks(True)
+    label2.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
+    layout_link.addWidget(label2)
+    #layout_credits1.addWidget(label)
+
+    layout_credits1.addWidget(group_links)
 
     return create_group
 
@@ -1991,11 +2071,11 @@ layout_enable.addWidget(check_cl)
 layout_controllers.addWidget(tab_enable)
 #/////////////
 
-label2 = create_label({
+tracker_title_label2 = create_label({
     "text" : "---------Trackers---------", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-layout_controllers.addWidget(label2)
+layout_controllers.addWidget(tracker_title_label2)
 
 trackers_label2 = create_label({
     "text" : "0 found", 
@@ -2007,20 +2087,6 @@ layout_controllers.addWidget(trackers_label2)
 tab_index = QWidget()
 layout_index = QHBoxLayout(tab_index)
 
-spinbox_cr_index = QSpinBox()
-spinbox_cr_index.setRange(0, 999999999)
-spinbox_cr_index.setValue(settings_core.get_settings()['cr index'])
-spinbox_cr_index.setSingleStep(1)
-spinbox_cr_index.valueChanged.connect(lambda: settings_core.update_setting("cr index", spinbox_cr_index.value()))
-
-layout_index.addWidget(spinbox_cr_index)
-
-label3 = create_label({
-    "text" : "<- left (index) right ->", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-})
-layout_index.addWidget(label3)
-
 spinbox_cl_index = QSpinBox()
 spinbox_cl_index.setRange(0, 999999999)
 spinbox_cl_index.setValue(settings_core.get_settings()['cl index'])
@@ -2028,6 +2094,20 @@ spinbox_cl_index.setSingleStep(1)
 spinbox_cl_index.valueChanged.connect(lambda: settings_core.update_setting("cl index", spinbox_cl_index.value()))
 
 layout_index.addWidget(spinbox_cl_index)
+
+label3 = create_label({
+    "text" : "<- left (index) right ->", 
+    "alignment" : Qt.AlignmentFlag.AlignCenter
+})
+layout_index.addWidget(label3)
+
+spinbox_cr_index = QSpinBox()
+spinbox_cr_index.setRange(0, 999999999)
+spinbox_cr_index.setValue(settings_core.get_settings()['cr index'])
+spinbox_cr_index.setSingleStep(1)
+spinbox_cr_index.valueChanged.connect(lambda: settings_core.update_setting("cr index", spinbox_cr_index.value()))
+
+layout_index.addWidget(spinbox_cr_index)
 layout_controllers.addWidget(tab_index)
 #/////////////
 

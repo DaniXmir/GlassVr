@@ -4,6 +4,8 @@ while steamvr isn't really designed for a "headset" like this, they work surpris
 
 showcase on youtube: https://www.youtube.com/watch?v=ySr_ktM-0Mo
 
+join the discord! https://discord.gg/WbEqvHKs
+
 # Installing
 1. download the .rar in the Releases tab and extract it
 2. run main.exe
@@ -42,6 +44,33 @@ if you end up 3D printing something, please share it online so other could use i
 
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="512">
 
+# Other features
+tldr i was bored and added some cool features
+
+ - controller emulation:
+
+	emulate index controller with a tracker and a physical controller, supports xbox, joycons, ps4/5 etc
+	
+	demonstration: darth maul dual saber using only one controller:
+	
+	<a href="https://www.youtube.com/watch?v=AHyDTgIQ-1U">
+	  <img src="https://img.youtube.com/vi/AHyDTgIQ-1U/maxresdefault.jpg" width="600" alt="Watch the video">
+	</a>
+
+ - hand tracking using a webcam(curl and splay only):
+
+	use a webcam for hand tracking, tracker for 6dof and a physical controller for buttons, requires the OpenGloves driver
+	
+	1, download it from steam: https://store.steampowered.com/app/1574050/OpenGloves/
+
+    2, and enable named pipe communication
+
+	demonstration: webcam, joycon, vive wand
+
+	<a href="https://www.youtube.com/watch?v=JJEYXxnN9h8">
+	  <img src="https://img.youtube.com/vi/JJEYXxnN9h8/maxresdefault.jpg" width="600" alt="Watch the video">
+	</a>
+
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
 and add "activateMultipleDrivers" : true
@@ -59,21 +88,25 @@ and add "activateMultipleDrivers" : true
 
    maybe, if you could find a way to use the controllers without the headset in steamvr
    
-4. I only have 2 controllers...
+3. I only have 2 controllers...
 
    strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
 
-5. can i use the builtin 3DOF imu?
+4. can i use the builtin 3DOF imu?
 
 	no... check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
-
    
-7. linux?
+5. linux?
 	
 	in the future, maybe
 
-8. wireless?
+6. wireless?
 	
 	option 1. find a way to stream the "headset window" to your phone, maybe alvr or even Parsec?
 	
 	option 2. there are some "wireless hdmi 120hz" on amazon/aliexpress, but i dont know how good they actually are, especially for vr
+
+7. any more quetions?
+    
+	ask them in the discord server: https://discord.gg/WbEqvHKs
+
