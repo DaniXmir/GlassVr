@@ -5,6 +5,8 @@
 #include "csampledevicedriver.h"
 #include "csamplecontrollerdriver.h"
 
+//#include "cstracker.h"
+
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
@@ -23,6 +25,8 @@ private:
     CSampleDeviceDriver* m_pNullHmdLatest = nullptr;
     CSampleControllerDriver* m_pController = nullptr;
     CSampleControllerDriver* m_pController2 = nullptr;
+
+    //CSampleTracker* m_tracker = nullptr;
 };
 
 #endif // CSERVERDRIVER_SAMPLE_H

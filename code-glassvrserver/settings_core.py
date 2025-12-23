@@ -12,15 +12,36 @@ default_settings = {
 
     "stereoscopic" : False,
     
-    "outer mono" : 30.0,
-    "inner mono" : 30.0,
-    "top mono" : 17.5,
-    "bottom mono" : 17.5,
+    #fov///////////////////////////
+    #96
+    "outer mono" : 45.0,
+    "inner mono" : 45.0,
+    "top mono" : 30.0,
+    "bottom mono" : 30.0,
 
-    "outer stereo" : 30.0,
-    "inner stereo" : 30.0,
-    "top stereo" : 17.5,
-    "bottom stereo" : 17.5,
+    #96
+    "outer stereo" : 38.0,
+    "inner stereo" : 54.0,
+    "top stereo" : 25.0,
+    "bottom stereo" : 23.0,
+
+    #60
+    # "outer stereo" : 25.0,
+    # "inner stereo" : 35.0,
+    # "top stereo" : 20.0,
+    # "bottom stereo" : 18.0,
+
+    #70
+    # "outer stereo" : 30.0,
+    # "inner stereo" : 40.0,
+    # "top stereo" : 22.0,
+    # "bottom stereo" : 20.0
+
+    #80
+    # "outer stereo" : 34.0,
+    # "inner stereo" : 46.0,
+    # "top stereo" : 24.0,
+    # "bottom stereo" : 22.0
 
     "ip sending": "127.0.0.1",
     "port sending": 9999,
@@ -29,37 +50,55 @@ default_settings = {
 
     "hmd index": 0,
 
-    "hmd offset x": 0.0,
-    "hmd offset y": 0.0,
-    "hmd offset z": 0.0,
+    "hmd offset world x": 0.0,
+    "hmd offset world y": 0.0,
+    "hmd offset world z": 0.0,
+    "hmd offset world yaw": 0.0,
+    "hmd offset world pitch": 0.0,
+    "hmd offset world roll": 0.0,
 
-    "hmd offset yaw": 0.0,
-    "hmd offset pitch": 0.0,
-    "hmd offset roll": 0.0,
+    "hmd offset local x": 0.0,
+    "hmd offset local y": 0.0,
+    "hmd offset local z": 0.0,
+    "hmd offset local yaw": 0.0,
+    "hmd offset local pitch": 0.0,
+    "hmd offset local roll": 0.0,
 
     "ipd": 0.0,
     "head to eye dist": 0.0,
 
     "cr index": 0,
 
-    "cr offset x": 0.0,
-    "cr offset y": 0.0,
-    "cr offset z": 0.0,
+    "cr offset world x": 0.0,
+    "cr offset world y": 0.0,
+    "cr offset world z": 0.0,
+    "cr offset world yaw": 0.0,
+    "cr offset world pitch": 0.0,
+    "cr offset world roll": 0.0,
 
-    "cr offset yaw": 0.0,
-    "cr offset pitch": 0.0,
-    "cr offset roll": 0.0,
+    "cr offset local x": 0.0,
+    "cr offset local y": 0.0,
+    "cr offset local z": 0.0,
+    "cr offset local yaw": 0.0,
+    "cr offset local pitch": 0.0,
+    "cr offset local roll": 0.0,
 
     "cl index": 0,
 
-    "cl offset x": 0.0,
-    "cl offset y": 0.0,
-    "cl offset z": 0.0,
+    "cl offset world x": 0.0,
+    "cl offset world y": 0.0,
+    "cl offset world z": 0.0,
+    "cl offset world yaw": 0.0,
+    "cl offset world pitch": 0.0,
+    "cl offset world roll": 0.0,
 
-    "cl offset yaw": 0.0,
-    "cl offset pitch": 0.0,
-    "cl offset roll": 0.0,
-    
+    "cl offset local x": 0.0,
+    "cl offset local y": 0.0,
+    "cl offset local z": 0.0,
+    "cl offset local yaw": 0.0,
+    "cl offset local pitch": 0.0,
+    "cl offset local roll": 0.0,
+
     "controller index 1" : 0,
     "controller index 2" : 1,
 
