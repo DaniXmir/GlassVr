@@ -79,6 +79,9 @@ and add "activateMultipleDrivers" : true
 			"activateMultipleDrivers" : true
 		 }
 
+2. if the latest release doesn't work, try this one
+https://github.com/DaniXmir/GlassVr/releases/tag/named-pipe-test
+
 # QNA
 1. will this work with my (insert company name here aka, viture, xreal etc) glasses?
 	
