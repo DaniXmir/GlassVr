@@ -33,9 +33,7 @@ float ResolutionY = 1080.0f;
 bool FullScreen = false;
 float RefreshRate = 90.0f;
 
-//Packet m_poseDataCache = { 0 };
-
-void CSampleDeviceDriver::UpdateData(const Packet& data)
+void CSampleDeviceDriver::UpdateData(const PacketHmd& data)
 {
     m_poseDataCache = data;
 }
@@ -45,12 +43,12 @@ CSampleDeviceDriver::CSampleDeviceDriver()
     m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
     m_ulPropertyContainer = vr::k_ulInvalidPropertyContainer;
 
-    m_poseDataCache.hmd_rot_w = 1.0;
+    m_poseDataCache.rot_w = 1.0;
 
     m_flIPD = vr::VRSettings()->GetFloat(k_pch_SteamVR_Section, k_pch_SteamVR_IPD_Float);
 
-    m_poseDataCache.hmd_ipd = m_flIPD;
-    m_poseDataCache.hmd_head_to_eye_dist = 0.0;
+    m_poseDataCache.ipd = m_flIPD;
+    m_poseDataCache.head_to_eye_dist = 0.0;
 
     char buf[1024];
 
@@ -82,11 +80,11 @@ EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
 
     if (Stereoscopic) {
         m_nWindowWidth = (uint32_t)(ResolutionX * 2);
-        //m_nRenderWidth = (uint32_t)(ResolutionX * 2);
+        m_nRenderWidth = (uint32_t)(ResolutionX);
     }
     else {
         m_nWindowWidth = (uint32_t)ResolutionX;
-        //m_nRenderWidth = (uint32_t)ResolutionX;
+        m_nRenderWidth = (uint32_t)ResolutionX;
     }
     m_nWindowHeight = (uint32_t)ResolutionY;
     m_nRenderHeight = (uint32_t)ResolutionY;
@@ -104,11 +102,20 @@ EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
     vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_IsOnDesktop_Bool, false);
     vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_DisplayDebugMode_Bool, !FullScreen);
 
+    m_bThreadRunning = true;
+    m_pPipeThread = new std::thread(&CSampleDeviceDriver::PipeThreadThreadEntry, this);
+
     return VRInitError_None;
 }
 
 void CSampleDeviceDriver::Deactivate()
 {
+    m_bThreadRunning = false;
+    if (m_pPipeThread) {
+        m_pPipeThread->join();
+        delete m_pPipeThread;
+        m_pPipeThread = nullptr;
+    }
     m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
 }
 
@@ -167,15 +174,23 @@ void CSampleDeviceDriver::GetEyeOutputViewport(EVREye eEye, uint32_t* pnX, uint3
 {
     *pnY = m_nWindowY;
     *pnHeight = m_nWindowHeight;
-    *pnWidth = Stereoscopic ? (m_nWindowWidth / 2) : m_nWindowWidth;
 
-    if (eEye == Eye_Left)
+    if (Stereoscopic)
     {
-        *pnX = m_nWindowX;
+        *pnWidth = m_nWindowWidth / 2;
+        if (eEye == Eye_Left)
+        {
+            *pnX = m_nWindowX;
+        }
+        else
+        {
+            *pnX = m_nWindowX + m_nWindowWidth / 2;
+        }
     }
     else
     {
-        *pnX = Stereoscopic ? (m_nWindowX + m_nWindowWidth / 2) : m_nWindowX;
+        *pnX = m_nWindowX;
+        *pnWidth = m_nWindowWidth;
     }
 }
 
@@ -219,26 +234,49 @@ void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pf
     }
 }
 
-vr::DriverPose_t CSampleDeviceDriver::GetHeadFromEyePose(EVREye eEye)
+//vr::DriverPose_t CSampleDeviceDriver::GetHeadFromEyePose(EVREye eEye)
+//{
+//    vr::DriverPose_t pose = { 0 };
+//    pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
+//
+//    float fHalfIPD = m_flIPD / 2.0f;
+//
+//    if (eEye == vr::Eye_Left)
+//    {
+//        pose.vecPosition[0] = -fHalfIPD;
+//    }
+//    else
+//    {
+//        pose.vecPosition[0] = fHalfIPD;
+//    }
+//
+//    pose.vecPosition[1] = 0.0f;
+//    pose.vecPosition[2] = 0.0f;
+//
+//    return pose;
+//}
+
+vr::HmdMatrix34_t CSampleDeviceDriver::GetEyeToHeadTransform(vr::EVREye eEye)
 {
-    vr::DriverPose_t pose = { 0 };
-    pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
+    //test later
+    vr::HmdMatrix34_t matrix = {
+        1.0f, 0.0f, 0.0f, 0.0f,//x right-left
+        0.0f, 1.0f, 0.0f, 0.0f,//y up-down
+        0.0f, 0.0f, 1.0f, 0.0f//z forward-back
+    };
 
     float fHalfIPD = m_flIPD / 2.0f;
 
     if (eEye == vr::Eye_Left)
     {
-        pose.vecPosition[0] = -fHalfIPD;
+        matrix.m[0][3] = -fHalfIPD;
     }
     else
     {
-        pose.vecPosition[0] = fHalfIPD;
+        matrix.m[0][3] = fHalfIPD;
     }
 
-    pose.vecPosition[1] = 0.0f;
-    pose.vecPosition[2] = 0.0f;
-
-    return pose;
+    return matrix;
 }
 
 vr::DistortionCoordinates_t CSampleDeviceDriver::ComputeDistortion(EVREye eEye, float fU, float fV)
@@ -271,14 +309,14 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
     pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
     pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
 
-    pose.vecPosition[0] = m_poseDataCache.hmd_pos_x;
-    pose.vecPosition[1] = m_poseDataCache.hmd_pos_y;
-    pose.vecPosition[2] = m_poseDataCache.hmd_pos_z;
+    pose.vecPosition[0] = m_poseDataCache.pos_x;
+    pose.vecPosition[1] = m_poseDataCache.pos_y;
+    pose.vecPosition[2] = m_poseDataCache.pos_z;
 
-    pose.qRotation.w = m_poseDataCache.hmd_rot_w;
-    pose.qRotation.x = m_poseDataCache.hmd_rot_x;
-    pose.qRotation.y = m_poseDataCache.hmd_rot_y;
-    pose.qRotation.z = m_poseDataCache.hmd_rot_z;
+    pose.qRotation.w = m_poseDataCache.rot_w;
+    pose.qRotation.x = m_poseDataCache.rot_x;
+    pose.qRotation.y = m_poseDataCache.rot_y;
+    pose.qRotation.z = m_poseDataCache.rot_z;
 
     return pose;
 }
@@ -288,17 +326,60 @@ void CSampleDeviceDriver::RunFrame()
     if (m_unObjectId != vr::k_unTrackedDeviceIndexInvalid) {
         vr::VRServerDriverHost()->TrackedDevicePoseUpdated(m_unObjectId, GetPose(), sizeof(DriverPose_t));
 
-        m_flIPD = (float)m_poseDataCache.hmd_ipd;
+        m_flIPD = (float)m_poseDataCache.ipd;
         vr::VRProperties()->SetFloatProperty(
             m_ulPropertyContainer,
             vr::Prop_UserIpdMeters_Float,
             m_flIPD
         );
-        HeadToEyeDist = (float)m_poseDataCache.hmd_head_to_eye_dist;
+        HeadToEyeDist = (float)m_poseDataCache.head_to_eye_dist;
         vr::VRProperties()->SetFloatProperty(
             m_ulPropertyContainer,
             vr::Prop_UserHeadToEyeDepthMeters_Float,
             HeadToEyeDist
         );
+    }
+}
+
+void CSampleDeviceDriver::PipeThreadThreadEntry()
+{
+    while (m_bThreadRunning)
+    {
+        m_hPipe = CreateFileA(
+            "\\\\.\\pipe\\GlassVR_HMD",
+            GENERIC_READ,
+            0,
+            NULL,
+            OPEN_EXISTING,
+            0,
+            NULL);
+
+        if (m_hPipe == INVALID_HANDLE_VALUE) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            continue;
+        }
+
+        // 2. Read loop
+        PacketHmd incomingData;
+        DWORD bytesRead;
+        while (m_bThreadRunning)
+        {
+            bool bSuccess = ReadFile(
+                m_hPipe,
+                &incomingData,
+                sizeof(PacketHmd),
+                &bytesRead,
+                NULL);
+
+            if (bSuccess && bytesRead == sizeof(PacketHmd)) {
+                UpdateData(incomingData);
+            }
+            else {
+                break;
+            }
+        }
+
+        CloseHandle(m_hPipe);
+        m_hPipe = INVALID_HANDLE_VALUE;
     }
 }

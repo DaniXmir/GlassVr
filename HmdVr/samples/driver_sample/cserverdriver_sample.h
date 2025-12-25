@@ -4,10 +4,10 @@
 #include <openvr_driver.h>
 #include "csampledevicedriver.h"
 #include "csamplecontrollerdriver.h"
+#include "cstracker.h"
 
-//-----------------------------------------------------------------------------
-// Purpose:
-//-----------------------------------------------------------------------------
+#include "settings.h"
+
 class CServerDriver_Sample : public vr::IServerTrackedDeviceProvider
 {
 public:
@@ -23,6 +23,9 @@ private:
     CSampleDeviceDriver* m_pNullHmdLatest = nullptr;
     CSampleControllerDriver* m_pController = nullptr;
     CSampleControllerDriver* m_pController2 = nullptr;
+
+    std::vector<CSampleTracker*> m_vecTrackers;
+
 };
 
-#endif // CSERVERDRIVER_SAMPLE_H
+#endif
