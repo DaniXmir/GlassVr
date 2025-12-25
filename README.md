@@ -71,6 +71,15 @@ tldr i was bored and added some cool features
 	  <img src="https://img.youtube.com/vi/JJEYXxnN9h8/maxresdefault.jpg" width="600" alt="Watch the video">
 	</a>
 
+
+ - Tracker Emulation:
+
+	convert old controllers into trackers for FBT
+
+	demonstration(not video): using 2 index controllers as trackers
+
+	<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/tracker%20emulation.png width="600">
+	
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
 and add "activateMultipleDrivers" : true
