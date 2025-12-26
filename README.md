@@ -20,6 +20,13 @@ note:
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
 
+there is a way to overclock the glasses to 3840x1080@90 but...
+WARNING: this method will make you'r gpu driver unable to use 2D mode so do it at you'r own risk,
+fix(if needed): uninstall you'r gpu driver in device manager
+1) download cru https://customresolutionutility.net/ nvidia's or amd's custom resolution won't work here
+2) add 3840x1080@90
+3) click restart.exe
+
 # Requirements
 - xr glasses or a monitors, for you'r eyes ofcourse
 - vr controller or vr tracker, to track you'r head
