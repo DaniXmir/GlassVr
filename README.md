@@ -93,6 +93,7 @@ and add "activateMultipleDrivers" : true
 		 "steamvr" : {
 			"activateMultipleDrivers" : true
 		 }
+3. weird flickering/objects not rendering in some games? specifically godot XR? set IPD to be greater than 0
 
 # QNA
 1. will this work with my (insert company name here aka, viture, xreal etc) glasses?
