@@ -12,54 +12,78 @@ default_settings = {
 
     "stereoscopic" : False,
     
-    "outer mono" : 45.0,
-    "inner mono" : 45.0,
-    "top mono" : 30.0,
-    "bottom mono" : 30.0,
+    #fov///////////////////////////
 
-    "outer stereo" : 38.0,
-    "inner stereo" : 54.0,
-    "top stereo" : 25.0,
-    "bottom stereo" : 23.0,
+    "fov" : 90,
 
-    "ip sending": "127.0.0.1",
-    "port sending": 9999,
-    "ip receiving": "127.0.0.1",
-    "port receiving": 9999,
+    #90
+    "outer mono" : 41.070,
+    "inner mono" : 41.070,
+    "top mono" : 26.120,
+    "bottom mono" : 26.120,
+
+    #90
+    "outer stereo" : 41.070,
+    "inner stereo" : 41.070,
+    "top stereo" : 26.120,
+    "bottom stereo" : 26.120,
+
+    # "ip sending": "127.0.0.1",
+    # "port sending": 9999,
+    # "ip receiving": "127.0.0.1",
+    # "port receiving": 9999,
 
     "hmd index": 0,
 
-    "hmd offset x": 0.0,
-    "hmd offset y": 0.0,
-    "hmd offset z": 0.0,
+    "hmd offset world x": 0.0,
+    "hmd offset world y": 0.0,
+    "hmd offset world z": 0.0,
+    "hmd offset world yaw": 0.0,
+    "hmd offset world pitch": 0.0,
+    "hmd offset world roll": 0.0,
 
-    "hmd offset yaw": 0.0,
-    "hmd offset pitch": 0.0,
-    "hmd offset roll": 0.0,
+    "hmd offset local x": 0.0,
+    "hmd offset local y": 0.0,
+    "hmd offset local z": 0.0,
+    "hmd offset local yaw": 0.0,
+    "hmd offset local pitch": 0.0,
+    "hmd offset local roll": 0.0,
 
     "ipd": 0.0,
     "head to eye dist": 0.0,
 
     "cr index": 0,
 
-    "cr offset x": 0.0,
-    "cr offset y": 0.0,
-    "cr offset z": 0.0,
+    "cr offset world x": 0.0,
+    "cr offset world y": 0.0,
+    "cr offset world z": 0.0,
+    "cr offset world yaw": 0.0,
+    "cr offset world pitch": 0.0,
+    "cr offset world roll": 0.0,
 
-    "cr offset yaw": 0.0,
-    "cr offset pitch": 0.0,
-    "cr offset roll": 0.0,
+    "cr offset local x": 0.0,
+    "cr offset local y": 0.0,
+    "cr offset local z": 0.0,
+    "cr offset local yaw": 0.0,
+    "cr offset local pitch": 0.0,
+    "cr offset local roll": 0.0,
 
     "cl index": 0,
 
-    "cl offset x": 0.0,
-    "cl offset y": 0.0,
-    "cl offset z": 0.0,
+    "cl offset world x": 0.0,
+    "cl offset world y": 0.0,
+    "cl offset world z": 0.0,
+    "cl offset world yaw": 0.0,
+    "cl offset world pitch": 0.0,
+    "cl offset world roll": 0.0,
 
-    "cl offset yaw": 0.0,
-    "cl offset pitch": 0.0,
-    "cl offset roll": 0.0,
-    
+    "cl offset local x": 0.0,
+    "cl offset local y": 0.0,
+    "cl offset local z": 0.0,
+    "cl offset local yaw": 0.0,
+    "cl offset local pitch": 0.0,
+    "cl offset local roll": 0.0,
+
     "controller index 1" : 0,
     "controller index 2" : 1,
 
@@ -97,14 +121,12 @@ default_settings = {
 
     "opengloves": False,
     "camera index": 0,
+
+    "trackers num": 0,
 }
 
 ##################################################################################################
 def get_path():
-    """
-    Constructs and returns the full file path for settings.json 
-    inside the 'glassvr' folder within the user's %APPDATA% directory.
-    """
     appdata_path = os.getenv('APPDATA')
     folder_name = 'glassvr'
     settings_dir = os.path.join(appdata_path, folder_name)
@@ -113,7 +135,8 @@ def get_path():
     try:
         os.makedirs(settings_dir, exist_ok=True)
     except OSError as e:
-        print(f"Error creating directory {settings_dir}: {e}")
+        #print(e)
+        pass
         
     return file_path
 
@@ -134,16 +157,12 @@ def get_settings():
         with open(file_path, 'r') as f:
             current_settings = json.load(f)
 
-        # Check if any keys from default_settings are missing in current_settings
         missing_keys = [key for key in default_settings if key not in current_settings]
 
         if missing_keys:
-            # Merge defaults into current: 
-            # This keeps user values for existing keys but adds missing defaults
             updated_settings = default_settings.copy()
             updated_settings.update(current_settings)
             
-            # Save the updated dictionary back to the file
             with open(file_path, 'w') as f:
                 json.dump(updated_settings, f, indent=4)
             
@@ -152,7 +171,7 @@ def get_settings():
         return current_settings
         
     except (json.JSONDecodeError, OSError) as e:
-        print(f"Error reading settings, falling back to defaults: {e}")
+        #print(e)
         return default_settings
 
 def update_setting(key, new_value):
@@ -165,4 +184,5 @@ def update_setting(key, new_value):
             json.dump(settings, f, indent=4)
 
     except Exception as e:
-        print(e)
+        pass
+        #print(e)
