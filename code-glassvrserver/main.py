@@ -309,19 +309,25 @@ check_box_hmd = create_checkbox(
     })
 layout_main.addWidget(check_box_hmd)
 
-label3 = create_label({
-    "text" : "hmd index", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-})
-layout_main.addWidget(label3)
-
-spinbox_hmd_index = QSpinBox()
-spinbox_hmd_index.setRange(0, 999999999)
-spinbox_hmd_index.setValue(settings_core.get_settings()['hmd index'])
-spinbox_hmd_index.setSingleStep(1)
-spinbox_hmd_index.valueChanged.connect(lambda: settings_core.update_setting("hmd index", spinbox_hmd_index.value()))
-
-layout_main.addWidget(spinbox_hmd_index)
+hmd_redirect_group = create_group_horizontal([{
+        "type" : "spinbox", 
+        "text" :"HMD Redirect Index", 
+        "min":0, 
+        "max":999999999, 
+        "default": settings_core.get_settings()['hmd index'], 
+        "steps" : 1,
+        "func"  : lambda: settings_core.update_setting("hmd index", hmd_redirect_group.findChildren(QSpinBox)[0].value())
+    }
+    #dont delete!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    # ,{
+    #     "type" : "checkbox", 
+    #     "text" : "Update From Client(Slow)",
+    #     "default" : settings_core.get_settings()['hmd update from server'], 
+    #     "func" : lambda: settings_core.update_setting("hmd update from server", hmd_redirect_group.findChildren(QCheckBox)[0].isChecked())
+    # }
+    #dont delete!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ])
+layout_main.addWidget(hmd_redirect_group)
 
 trackers_arr = [] #[{"pos x" : m[0][3],
                     #"pos y" : m[1][3],
@@ -1003,13 +1009,12 @@ def start_vr_utility():
                 trackers_arr = new_arr
 
                 update_found_label()
-                
                 time.sleep(0.001)
 
             except Exception as e:
                 #print(e)
-                time.sleep(1)
-                continue 
+                time.sleep(0.001)
+                continue
 
     except Exception as e:
         #print(e)
@@ -1022,8 +1027,9 @@ def end_vr_utility():
 def update_found_label():
     global trackers_dict
     display_text = ""
-    
+    count = 0
     for serial, data in trackers_dict.items():
+        display_text += f'[{count}] '
         display_text += f"ROLE: {data['role']} | {data['model']}\n"
         display_text += f"Serial: {serial}\n"
         
@@ -1042,11 +1048,14 @@ def update_found_label():
         
         display_text += "-----------------------------------\n"
 
+        count += 1
+
     try:
         label = trackers_label1.findChild(QLabel)
         if label:
             label.setText(display_text)
-    except Exception:
+    except Exception as e:
+        #print(e)
         pass
 
 
@@ -2229,7 +2238,7 @@ layout_driver.addWidget(create_label({
     "alignment" : Qt.AlignmentFlag.AlignCenter
 }))
 layout_driver.addWidget(create_button({
-        "text" : "reset config(ui won't update, click each time the server updates)", 
+        "text" : "reset config(ui won't update)",
         "enabled" : True,
         "func"  : lambda: settings_core.reset_settings()
     }))
@@ -2485,33 +2494,43 @@ check_cl = create_checkbox(
     })
 layout_enable.addWidget(check_cl)
 layout_controllers.addWidget(tab_enable)
-#/////////////
-tab_index = QWidget()
-layout_index = QHBoxLayout(tab_index)
 
-spinbox_cl_index = QSpinBox()
-spinbox_cl_index.setRange(0, 999999999)
-spinbox_cl_index.setValue(settings_core.get_settings()['cl index'])
-spinbox_cl_index.setSingleStep(1)
-spinbox_cl_index.valueChanged.connect(lambda: settings_core.update_setting("cl index", spinbox_cl_index.value()))
-
-layout_index.addWidget(spinbox_cl_index)
-
-label3 = create_label({
-    "text" : "<- left (index) right ->", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-})
-layout_index.addWidget(label3)
-
-spinbox_cr_index = QSpinBox()
-spinbox_cr_index.setRange(0, 999999999)
-spinbox_cr_index.setValue(settings_core.get_settings()['cr index'])
-spinbox_cr_index.setSingleStep(1)
-spinbox_cr_index.valueChanged.connect(lambda: settings_core.update_setting("cr index", spinbox_cr_index.value()))
-
-layout_index.addWidget(spinbox_cr_index)
-layout_controllers.addWidget(tab_index)
-#/////////////
+controllers_redirect_group = create_group_horizontal([{
+        "type" : "spinbox", 
+        "text" :"Left Redirect Index", 
+        "min":0, 
+        "max":999999999, 
+        "default": settings_core.get_settings()['cl index'], 
+        "steps" : 1,
+        "func"  : lambda: settings_core.update_setting("cl index", controllers_redirect_group.findChildren(QSpinBox)[0].value())
+    }
+    #dont delete!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    # ,{
+    #     "type" : "checkbox", 
+    #     "text" : "Update From Client(Slow)",
+    #     "default" : settings_core.get_settings()['cl update from server'], 
+    #     "func" : lambda: settings_core.update_setting("cl update from server", controllers_redirect_group.findChildren(QCheckBox)[0].isChecked())
+    # }
+    #dont delete!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ,{
+        "type" : "spinbox", 
+        "text" :"Right Redirect Index", 
+        "min":0, 
+        "max":999999999, 
+        "default": settings_core.get_settings()['cr index'], 
+        "steps" : 1,
+        "func"  : lambda: settings_core.update_setting("cr index", controllers_redirect_group.findChildren(QSpinBox)[1].value())
+    }
+    #dont delete!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    # ,{
+    #     "type" : "checkbox", 
+    #     "text" : "Update From Client(Slow)",
+    #     "default" : settings_core.get_settings()['cr update from server'], 
+    #     "func" : lambda: settings_core.update_setting("cr update from server", controllers_redirect_group.findChildren(QCheckBox)[1].isChecked())
+    # }
+    #dont delete!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ])
+layout_controllers.addWidget(controllers_redirect_group)
 
 label6 = create_label({
     "text" : "---------Mapping---------", 
@@ -2639,8 +2658,12 @@ def start_stop_opengloves():
     new_value = webcam.findChild(QCheckBox).isChecked()
     settings_core.update_setting("opengloves",new_value)
     if new_value:
+        settings_core.update_setting("cl update from server", webcam.findChildren(QSpinBox)[0].value())
+        settings_core.update_setting("cr update from server", webcam.findChildren(QSpinBox)[0].value())
         start_opengloves()
     else:
+        settings_core.update_setting("cl update from server", webcam.findChildren(QSpinBox)[0].value())
+        settings_core.update_setting("cr update from server", webcam.findChildren(QSpinBox)[0].value())
         pass
 
 layout_controllers.addWidget(create_label({
@@ -2923,15 +2946,37 @@ def tracker_mode_specific_widget(index, layout, combo):
 
     match mode:
         case "copy from controller":
-            t = create_spinbox({
-                "text" : "controller index",
-                "min": 0,
-                "max": 999999,
-                "steps" : 1,
-                "default": settings.get(f'{index}tracker index', 0),
-                "func": lambda: settings_core.update_setting(f'{index}tracker index', t.findChild(QSpinBox).value())
-            })
-            layout.addWidget(t)
+            # t = create_spinbox({
+            #     "text" : "controller index",
+            #     "min": 0,
+            #     "max": 999999,
+            #     "steps" : 1,
+            #     "default": settings.get(f'{index}tracker index', 0),
+            #     "func": lambda: settings_core.update_setting(f'{index}tracker index', t.findChild(QSpinBox).value())
+            # })
+            # settings_core.update_setting(f'{index}tracker update from server', False)
+            # layout.addWidget(t)
+            tracker_redirect_group = create_group_horizontal([{
+                    "type" : "spinbox", 
+                    "text" :"HMD Redirect Index", 
+                    "min":0,
+                    "max":999999999, 
+                    "default": settings.get(f'{index}tracker index', 0),
+                    "steps" : 1,
+                    "func"  : lambda: settings_core.update_setting(f'{index}tracker index', tracker_redirect_group.findChildren(QSpinBox)[0].value())
+                }
+                #dont delete!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                # ,{
+                #     "type" : "checkbox", 
+                #     "text" : "Update From Client(Slow)",
+                #     "default" : settings.get(f'{index}tracker update from server', True), 
+                #     "func" : lambda: settings_core.update_setting(f'{index}tracker update from server', tracker_redirect_group.findChildren(QCheckBox)[0].isChecked())
+                # }
+                #dont delete!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                ])
+            settings_core.update_setting(f'{index}tracker update from server', False)
+            layout.addWidget(tracker_redirect_group)
+
 
         case "hip emulation":
 
@@ -2957,7 +3002,8 @@ def tracker_mode_specific_widget(index, layout, combo):
                 "default": settings.get(f'{index}tracker right foot index', 0),
                 "func": lambda: settings_core.update_setting(f'{index}tracker right foot index', t.findChildren(QSpinBox)[2].value())
             }])
-
+            
+            settings_core.update_setting(f'{index}tracker update from server', True)
             layout.addWidget(t)
 
 def create_tracker_widget(index = 0):

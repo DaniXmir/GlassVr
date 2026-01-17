@@ -33,7 +33,10 @@ default_settings = {
     # "ip receiving": "127.0.0.1",
     # "port receiving": 9999,
 
+    "prediction time" : 0.011,
+
     "hmd index": 0,
+    "hmd update from server" : False,
 
     "hmd offset world x": 0.0,
     "hmd offset world y": 0.0,
@@ -53,6 +56,7 @@ default_settings = {
     "head to eye dist": 0.0,
 
     "cr index": 0,
+    "cr update from server" : False,
 
     "cr offset world x": 0.0,
     "cr offset world y": 0.0,
@@ -69,6 +73,7 @@ default_settings = {
     "cr offset local roll": 0.0,
 
     "cl index": 0,
+    "cl update from server" : False,
 
     "cl offset world x": 0.0,
     "cl offset world y": 0.0,
