@@ -5,6 +5,7 @@
 //https://github.com/spayne/soft_knuckles/blob/master/soft_knuckles_device.cpp
 //https://github.com/HadesVR/HadesVR/blob/main/Software/Driver/src/samples/driver_HadesVR/src/driver_main.cpp
 #include "csamplecontrollerdriver.h"
+#include "settings.h" 
 #include <math.h>
 #include <string>
 
@@ -166,32 +167,160 @@ void CSampleControllerDriver::DebugRequest(const char* pchRequest, char* pchResp
     }
 }
 
+//pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static uint32_t g_foundTrackers[vr::k_unMaxTrackedDeviceCount];
+static uint32_t g_trackerCount = 0;
+static int g_selectedIndex = 0;//GetIntFromSettingsByKey("hmd index");
+
+static void UpdateTrackers() {
+    g_trackerCount = 0;
+    for (uint32_t i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
+        g_foundTrackers[g_trackerCount] = i;
+        g_trackerCount++;
+    }
+}
+
+static vr::HmdQuaternion_t GetRotationFromMatrix(const vr::HmdMatrix34_t& matrix) {
+    vr::HmdQuaternion_t q;
+    q.w = sqrt(fmax(0, 1 + matrix.m[0][0] + matrix.m[1][1] + matrix.m[2][2])) / 2;
+    q.x = sqrt(fmax(0, 1 + matrix.m[0][0] - matrix.m[1][1] - matrix.m[2][2])) / 2;
+    q.y = sqrt(fmax(0, 1 - matrix.m[0][0] + matrix.m[1][1] - matrix.m[2][2])) / 2;
+    q.z = sqrt(fmax(0, 1 - matrix.m[0][0] - matrix.m[1][1] + matrix.m[2][2])) / 2;
+    q.x = _copysign(q.x, matrix.m[2][1] - matrix.m[1][2]);
+    q.y = _copysign(q.y, matrix.m[0][2] - matrix.m[2][0]);
+    q.z = _copysign(q.z, matrix.m[1][0] - matrix.m[0][1]);
+    return q;
+}
+
+static void RotateVectorByQuat(const vr::HmdQuaternion_t& q, const float vIn[3], double vOut[3]) {
+    float x = q.x, y = q.y, z = q.z, w = q.w;
+    float vx = vIn[0], vy = vIn[1], vz = vIn[2];
+
+    vOut[0] = vx * (1 - 2 * y * y - 2 * z * z) + vy * (2 * x * y - 2 * w * z) + vz * (2 * x * z + 2 * w * y);
+    vOut[1] = vx * (2 * x * y + 2 * w * z) + vy * (1 - 2 * x * x - 2 * z * z) + vz * (2 * y * z - 2 * w * x);
+    vOut[2] = vx * (2 * x * z - 2 * w * y) + vy * (2 * y * z + 2 * w * x) + vz * (1 - 2 * x * x - 2 * y * y);
+}
+
+static vr::HmdQuaternion_t QuatMul(const vr::HmdQuaternion_t& q, const vr::HmdQuaternion_t& r) {
+    vr::HmdQuaternion_t res;
+    res.w = q.w * r.w - q.x * r.x - q.y * r.y - q.z * r.z;
+    res.x = q.w * r.x + q.x * r.w + q.y * r.z - q.z * r.y;
+    res.y = q.w * r.y - q.x * r.z + q.y * r.w + q.z * r.x;
+    res.z = q.w * r.z + q.x * r.y - q.y * r.x + q.z * r.w;
+    return res;
+}
+
+static vr::HmdQuaternion_t EulerToQuatZYX(float roll, float yaw, float pitch) {
+    float cr = cos(roll * 0.5f);  float sr = sin(roll * 0.5f);
+    float cy = cos(yaw * 0.5f);   float sy = sin(yaw * 0.5f);
+    float cp = cos(pitch * 0.5f); float sp = sin(pitch * 0.5f);
+
+    vr::HmdQuaternion_t q;
+    q.w = cr * cy * cp + sr * sy * sp;
+    q.x = cr * cy * sp - sr * sy * cp;
+    q.y = cr * sy * cp + sr * cy * sp;
+    q.z = sr * cy * cp - cr * sy * sp;
+    return q;
+}
+
 vr::DriverPose_t CSampleControllerDriver::GetPose()
 {
-    DriverPose_t pose = { 0 };
-    pose.poseIsValid = true;
-    pose.result = TrackingResult_Running_OK;
-    pose.deviceIsConnected = true;
+    UpdateTrackers();
+    std::string device = right ? "cr" : "cl";
 
+    vr::DriverPose_t pose = { 0 };
+    pose.poseIsValid = true;
+    pose.result = vr::TrackingResult_Running_OK;
+    pose.deviceIsConnected = true;
     pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
     pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
 
-    pose.vecVelocity[0] = pose.vecVelocity[1] = pose.vecVelocity[2] = 0.0f;
-    pose.vecAngularVelocity[0] = pose.vecAngularVelocity[1] = pose.vecAngularVelocity[2] = 0.0f;
-
-    {
+    bool updateFromServer = GetBoolFromSettingsByKey(device + " update from server");
+    if (updateFromServer) {
         std::lock_guard<std::mutex> lock(m_poseMutex);
         pose.vecPosition[0] = m_poseDataCache.pos_x;
         pose.vecPosition[1] = m_poseDataCache.pos_y;
         pose.vecPosition[2] = m_poseDataCache.pos_z;
-
-        pose.qRotation.w = m_poseDataCache.rot_w;
-        pose.qRotation.x = m_poseDataCache.rot_x;
-        pose.qRotation.y = m_poseDataCache.rot_y;
-        pose.qRotation.z = m_poseDataCache.rot_z;
+        if (m_poseDataCache.rot_w == 0 && m_poseDataCache.rot_x == 0) {
+            pose.qRotation.w = 1.0;
+        }
+        else {
+            pose.qRotation.w = m_poseDataCache.rot_w;
+            pose.qRotation.x = m_poseDataCache.rot_x;
+            pose.qRotation.y = m_poseDataCache.rot_y;
+            pose.qRotation.z = m_poseDataCache.rot_z;
+        }
+        return pose;
     }
+
+    int tracker_target_idx = GetIntFromSettingsByKey(device + " index");
+    vr::TrackedDevicePose_t rawPoses[vr::k_unMaxTrackedDeviceCount];
+    vr::VRServerDriverHost()->GetRawTrackedDevicePoses(0, rawPoses, vr::k_unMaxTrackedDeviceCount);
+
+    if (tracker_target_idx >= 0 && tracker_target_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_target_idx].bPoseIsValid)
+    {
+        auto& m = rawPoses[tracker_target_idx].mDeviceToAbsoluteTracking;
+        vr::HmdQuaternion_t device_rotation = GetRotationFromMatrix(m);
+
+        float offset_local[3] = {
+            GetFloatFromSettingsByKey(device + " offset local x"),
+            GetFloatFromSettingsByKey(device + " offset local y"),
+            GetFloatFromSettingsByKey(device + " offset local z")
+        };
+
+        double rotated_local_offset[3];
+        RotateVectorByQuat(device_rotation, offset_local, rotated_local_offset);
+
+        float offset_world[3] = {
+            GetFloatFromSettingsByKey(device + " offset world x"),
+            GetFloatFromSettingsByKey(device + " offset world y"),
+            GetFloatFromSettingsByKey(device + " offset world z")
+        };
+
+        pose.vecPosition[0] = m.m[0][3] + rotated_local_offset[0] + offset_world[0];
+        pose.vecPosition[1] = m.m[1][3] + rotated_local_offset[1] + offset_world[1];
+        pose.vecPosition[2] = m.m[2][3] + rotated_local_offset[2] + offset_world[2];
+
+        // Add velocity from raw pose for position prediction
+        pose.vecVelocity[0] = rawPoses[tracker_target_idx].vVelocity.v[0];
+        pose.vecVelocity[1] = rawPoses[tracker_target_idx].vVelocity.v[1];
+        pose.vecVelocity[2] = rawPoses[tracker_target_idx].vVelocity.v[2];
+
+        // Add angular velocity for rotation prediction
+        pose.vecAngularVelocity[0] = rawPoses[tracker_target_idx].vAngularVelocity.v[0];
+        pose.vecAngularVelocity[1] = rawPoses[tracker_target_idx].vAngularVelocity.v[1];
+        pose.vecAngularVelocity[2] = rawPoses[tracker_target_idx].vAngularVelocity.v[2];
+
+        // Enable pose prediction (both position and rotation)
+        pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");//0.011; // 11ms prediction (adjust as needed)
+
+        vr::HmdQuaternion_t offset_local_rotation = EulerToQuatZYX(
+            GetFloatFromSettingsByKey(device + " offset local roll"),
+            GetFloatFromSettingsByKey(device + " offset local yaw"),
+            GetFloatFromSettingsByKey(device + " offset local pitch")
+        );
+
+        vr::HmdQuaternion_t offset_world_rotation = EulerToQuatZYX(
+            GetFloatFromSettingsByKey(device + " offset world roll"),
+            GetFloatFromSettingsByKey(device + " offset world yaw"),
+            GetFloatFromSettingsByKey(device + " offset world pitch")
+        );
+
+        vr::HmdQuaternion_t combined = QuatMul(offset_world_rotation, device_rotation);
+        pose.qRotation = QuatMul(combined, offset_local_rotation);
+
+        return pose;
+    }
+
+    std::lock_guard<std::mutex> lock(m_poseMutex);
+    pose.vecPosition[0] = m_poseDataCache.pos_x;
+    pose.vecPosition[1] = m_poseDataCache.pos_y;
+    pose.vecPosition[2] = m_poseDataCache.pos_z;
+    pose.qRotation.w = (m_poseDataCache.rot_w == 0) ? 1.0 : m_poseDataCache.rot_w;
+
     return pose;
 }
+//pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void CSampleControllerDriver::UpdateSkeletalInput(bool isGripClosed)
 {
@@ -272,6 +401,12 @@ void CSampleControllerDriver::RunFrame()
     UpdateSkeletalInput(isGripPressed);
 
     if (m_unObjectId != vr::k_unTrackedDeviceIndexInvalid) {
+        if (right) {
+            g_selectedIndex = GetIntFromSettingsByKey("cr index");
+        }
+        else {
+            g_selectedIndex = GetIntFromSettingsByKey("cl index");
+        }
         vr::VRServerDriverHost()->TrackedDevicePoseUpdated(m_unObjectId, GetPose(), sizeof(DriverPose_t));
     }
 }
