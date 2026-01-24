@@ -74,8 +74,8 @@ tldr i was bored and added some cool features
 
 	demonstration: webcam, joycon, vive wand
 
-	<a href="https://www.youtube.com/watch?v=JJEYXxnN9h8">
-	  <img src="https://img.youtube.com/vi/JJEYXxnN9h8/maxresdefault.jpg" width="600" alt="Watch the video">
+	<a href="https://www.youtube.com/watch?v=1IrDE8JJ0mk">
+	  <img src="https://img.youtube.com/vi/1IrDE8JJ0mk/maxresdefault.jpg" width="600" alt="Watch the video">
 	</a>
 
  - tracker emulation:
