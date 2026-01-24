@@ -711,11 +711,13 @@ def send_controller_data(is_right):
                     rot_w = final_transform['rot w']
 
                 else:
+                    final_c_transform = get_final_transform(device_name)
+
                     final_transform = get_hand_world_transform(device_name)
 
-                    pos_x = final_transform['pos x']
-                    pos_y = final_transform['pos y']
-                    pos_z = final_transform['pos z']
+                    pos_x = final_transform['pos x'] + final_c_transform['pos x']
+                    pos_y = final_transform['pos y'] + final_c_transform['pos y']
+                    pos_z = final_transform['pos z'] + final_c_transform['pos z']
 
                     rot_x = final_transform['rot x']
                     rot_y = final_transform['rot y']
@@ -2655,15 +2657,15 @@ webcam = create_group_horizontal([
 layout_controllers.addWidget(webcam)
 
 def start_stop_opengloves():
-    new_value = webcam.findChild(QCheckBox).isChecked()
-    settings_core.update_setting("opengloves",new_value)
-    if new_value:
-        settings_core.update_setting("cl update from server", webcam.findChildren(QSpinBox)[0].value())
-        settings_core.update_setting("cr update from server", webcam.findChildren(QSpinBox)[0].value())
+    enabled = webcam.findChild(QCheckBox).isChecked()
+    settings_core.update_setting("opengloves", enabled)
+
+    settings_core.update_setting("cr update from server", enabled)
+    settings_core.update_setting("cl update from server", enabled)
+
+    if enabled:
         start_opengloves()
     else:
-        settings_core.update_setting("cl update from server", webcam.findChildren(QSpinBox)[0].value())
-        settings_core.update_setting("cr update from server", webcam.findChildren(QSpinBox)[0].value())
         pass
 
 layout_controllers.addWidget(create_label({
