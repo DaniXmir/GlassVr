@@ -4,7 +4,7 @@ while steamvr isn't really designed for a "headset" like this, they work surpris
 
 showcase on youtube: https://www.youtube.com/watch?v=ySr_ktM-0Mo
 
-join the discord! https://discord.gg/WbEqvHKs
+join the discord! https://discord.gg/jyvWdKBpPj
 
 # Installing
 1. download the .rar in the Releases tab and extract it
