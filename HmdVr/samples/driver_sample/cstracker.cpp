@@ -147,92 +147,109 @@ vr::DriverPose_t CSampleTracker::GetPose()
     pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
     pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
 
-    bool updateFromServer = GetBoolFromSettingsByKey(device + " update from server");
-    if (updateFromServer) {
-        std::lock_guard<std::mutex> lock(m_poseMutex);
-        pose.vecPosition[0] = m_poseDataCache.pos_x;
-        pose.vecPosition[1] = m_poseDataCache.pos_y;
-        pose.vecPosition[2] = m_poseDataCache.pos_z;
-        if (m_poseDataCache.rot_w == 0 && m_poseDataCache.rot_x == 0) {
-            pose.qRotation.w = 1.0;
-        }
-        else {
-            pose.qRotation.w = m_poseDataCache.rot_w;
-            pose.qRotation.x = m_poseDataCache.rot_x;
-            pose.qRotation.y = m_poseDataCache.rot_y;
-            pose.qRotation.z = m_poseDataCache.rot_z;
-        }
-        return pose;
-    }
+    std::string posmode = GetStringFromSettingsByKey(device + "pos mode");
+    std::string rotmode = GetStringFromSettingsByKey(device + "rot mode");
 
-    int tracker_target_idx = GetIntFromSettingsByKey(device + " index");
     vr::TrackedDevicePose_t rawPoses[vr::k_unMaxTrackedDeviceCount];
     vr::VRServerDriverHost()->GetRawTrackedDevicePoses(0, rawPoses, vr::k_unMaxTrackedDeviceCount);
 
-    if (tracker_target_idx >= 0 && tracker_target_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_target_idx].bPoseIsValid)
-    {
-        auto& m = rawPoses[tracker_target_idx].mDeviceToAbsoluteTracking;
-        vr::HmdQuaternion_t device_rotation = GetRotationFromMatrix(m);
+    //pos here///////////////////////////////////////////////////////
+    if (posmode == "redirect") {
+        int tracker_pos_idx = GetIntFromSettingsByKey(device + "pos index");
 
-        float offset_local[3] = {
-            GetFloatFromSettingsByKey(device + " offset local x"),
-            GetFloatFromSettingsByKey(device + " offset local y"),
-            GetFloatFromSettingsByKey(device + " offset local z")
-        };
+        if (tracker_pos_idx >= 0 && tracker_pos_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_pos_idx].bPoseIsValid)
+        {
+            auto& m = rawPoses[tracker_pos_idx].mDeviceToAbsoluteTracking;
+            vr::HmdQuaternion_t device_rotation = GetRotationFromMatrix(m);
 
-        double rotated_local_offset[3];
-        RotateVectorByQuat(device_rotation, offset_local, rotated_local_offset);
+            float offset_local[3] = {
+                GetFloatFromSettingsByKey(device + " offset local x"),
+                GetFloatFromSettingsByKey(device + " offset local y"),
+                GetFloatFromSettingsByKey(device + " offset local z")
+            };
 
-        float offset_world[3] = {
-            GetFloatFromSettingsByKey(device + " offset world x"),
-            GetFloatFromSettingsByKey(device + " offset world y"),
-            GetFloatFromSettingsByKey(device + " offset world z")
-        };
+            double rotated_local_offset[3];
+            RotateVectorByQuat(device_rotation, offset_local, rotated_local_offset);
 
-        pose.vecPosition[0] = m.m[0][3] + rotated_local_offset[0] + offset_world[0];
-        pose.vecPosition[1] = m.m[1][3] + rotated_local_offset[1] + offset_world[1];
-        pose.vecPosition[2] = m.m[2][3] + rotated_local_offset[2] + offset_world[2];
+            float offset_world[3] = {
+                GetFloatFromSettingsByKey(device + " offset world x"),
+                GetFloatFromSettingsByKey(device + " offset world y"),
+                GetFloatFromSettingsByKey(device + " offset world z")
+            };
 
-        // Add velocity from raw pose for position prediction
-        pose.vecVelocity[0] = rawPoses[tracker_target_idx].vVelocity.v[0];
-        pose.vecVelocity[1] = rawPoses[tracker_target_idx].vVelocity.v[1];
-        pose.vecVelocity[2] = rawPoses[tracker_target_idx].vVelocity.v[2];
+            pose.vecPosition[0] = m.m[0][3] + rotated_local_offset[0] + offset_world[0];
+            pose.vecPosition[1] = m.m[1][3] + rotated_local_offset[1] + offset_world[1];
+            pose.vecPosition[2] = m.m[2][3] + rotated_local_offset[2] + offset_world[2];
 
-        // Add angular velocity for rotation prediction
-        pose.vecAngularVelocity[0] = rawPoses[tracker_target_idx].vAngularVelocity.v[0];
-        pose.vecAngularVelocity[1] = rawPoses[tracker_target_idx].vAngularVelocity.v[1];
-        pose.vecAngularVelocity[2] = rawPoses[tracker_target_idx].vAngularVelocity.v[2];
-
-        // Enable pose prediction (both position and rotation)
-        pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");//0.011; // 11ms prediction (adjust as needed)
-
-        vr::HmdQuaternion_t offset_local_rotation = EulerToQuatZYX(
-            GetFloatFromSettingsByKey(device + " offset local roll"),
-            GetFloatFromSettingsByKey(device + " offset local yaw"),
-            GetFloatFromSettingsByKey(device + " offset local pitch")
-        );
-
-        vr::HmdQuaternion_t offset_world_rotation = EulerToQuatZYX(
-            GetFloatFromSettingsByKey(device + " offset world roll"),
-            GetFloatFromSettingsByKey(device + " offset world yaw"),
-            GetFloatFromSettingsByKey(device + " offset world pitch")
-        );
-
-        vr::HmdQuaternion_t combined = QuatMul(offset_world_rotation, device_rotation);
-        pose.qRotation = QuatMul(combined, offset_local_rotation);
-
-        return pose;
+            pose.vecVelocity[0] = rawPoses[tracker_pos_idx].vVelocity.v[0];
+            pose.vecVelocity[1] = rawPoses[tracker_pos_idx].vVelocity.v[1];
+            pose.vecVelocity[2] = rawPoses[tracker_pos_idx].vVelocity.v[2];
+        }
+        else {
+            pose.vecPosition[0] = 0.0f;
+            pose.vecPosition[1] = 0.0f;
+            pose.vecPosition[2] = 0.0f;
+        }
+    }
+    else if (posmode == "test") {
+        //
+    }
+    else {
+        pose.vecPosition[0] = m_poseDataCache.pos_x;
+        pose.vecPosition[1] = m_poseDataCache.pos_y;
+        pose.vecPosition[2] = m_poseDataCache.pos_z;
     }
 
-    std::lock_guard<std::mutex> lock(m_poseMutex);
-    pose.vecPosition[0] = m_poseDataCache.pos_x;
-    pose.vecPosition[1] = m_poseDataCache.pos_y;
-    pose.vecPosition[2] = m_poseDataCache.pos_z;
-    pose.qRotation.w = (m_poseDataCache.rot_w == 0) ? 1.0 : m_poseDataCache.rot_w;
+    //rot here///////////////////////////////////////////////////////
+    if (rotmode == "redirect") {
+        int tracker_rot_idx = GetIntFromSettingsByKey(device + "rot index");
 
+        if (tracker_rot_idx >= 0 && tracker_rot_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_rot_idx].bPoseIsValid)
+        {
+            auto& m = rawPoses[tracker_rot_idx].mDeviceToAbsoluteTracking;
+            vr::HmdQuaternion_t device_rotation = GetRotationFromMatrix(m);
+
+            vr::HmdQuaternion_t offset_local_rotation = EulerToQuatZYX(
+                GetFloatFromSettingsByKey(device + " offset local roll"),
+                GetFloatFromSettingsByKey(device + " offset local yaw"),
+                GetFloatFromSettingsByKey(device + " offset local pitch")
+            );
+
+            vr::HmdQuaternion_t offset_world_rotation = EulerToQuatZYX(
+                GetFloatFromSettingsByKey(device + " offset world roll"),
+                GetFloatFromSettingsByKey(device + " offset world yaw"),
+                GetFloatFromSettingsByKey(device + " offset world pitch")
+            );
+
+            vr::HmdQuaternion_t combined = QuatMul(offset_world_rotation, device_rotation);
+            pose.qRotation = QuatMul(combined, offset_local_rotation);
+
+            pose.vecAngularVelocity[0] = rawPoses[tracker_rot_idx].vAngularVelocity.v[0];
+            pose.vecAngularVelocity[1] = rawPoses[tracker_rot_idx].vAngularVelocity.v[1];
+            pose.vecAngularVelocity[2] = rawPoses[tracker_rot_idx].vAngularVelocity.v[2];
+        }
+        else {
+            pose.qRotation.w = 1.0f;
+            pose.qRotation.x = 0.0f;
+            pose.qRotation.y = 0.0f;
+            pose.qRotation.z = 0.0f;
+        }
+    }
+    else if (rotmode == "test") {
+        //
+    }
+    else {
+        pose.qRotation.w = m_poseDataCache.rot_w;
+        pose.qRotation.x = m_poseDataCache.rot_x;
+        pose.qRotation.y = m_poseDataCache.rot_y;
+        pose.qRotation.z = m_poseDataCache.rot_z;
+    }
+
+    pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");
+
+    std::lock_guard<std::mutex> lock(m_poseMutex);
     return pose;
 }
-
 //pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void CSampleTracker::RunFrame()
