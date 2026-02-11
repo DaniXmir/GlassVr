@@ -27,6 +27,9 @@ fix(if needed): uninstall you'r gpu driver in device manager
 2) add 3840x1080@90
 3) click restart.exe
 
+also try downgrading you'r firmware if you can, i found that older firmwares can be more stable
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/hz2.png width="512">
+
 # Requirements
 - xr glasses or a monitors, for you'r eyes ofcourse
 - vr controller or vr tracker, to track you'r head
