@@ -24,7 +24,7 @@ there is a way to overclock the glasses to 3840x1080@90 but...
 WARNING: this method will make you'r gpu driver unable to use 2D mode so do it at you'r own risk,
 fix(if needed): uninstall you'r gpu driver in device manager
 1) download cru https://customresolutionutility.net/ nvidia's or amd's custom resolution won't work here
-2) add 3840x1080@90
+2) switch to 3D mode add 3840x1080@90
 3) click restart.exe
 
 also try downgrading you'r firmware if you can, i found that older firmwares can be more stable
