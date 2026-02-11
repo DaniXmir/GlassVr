@@ -51,6 +51,10 @@ if you end up 3D printing something, please share it online so other could use i
 
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="512">
 
+https://www.thingiverse.com/thing:7293001
+
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20260211_174231.jpg width="512">
+
 # Other features
 tldr i was bored and added some cool features
 
