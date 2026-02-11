@@ -31,10 +31,10 @@ also try downgrading you'r firmware if you can, i found that older firmwares can
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/hz2.png width="512">
 
 # Requirements
-- xr glasses or a monitors, for you'r eyes ofcourse
+- xr glasses or a monitor, for you'r eyes ofcourse
 - vr controller or vr tracker, to track you'r head
 
-base stations aren't required, they just the easiest to setup
+base stations aren't required, if you have any other vr tracker like vive ultimate, fluxpose etc.. they will also work
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
