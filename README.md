@@ -2,7 +2,7 @@
 glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even stereoscopic 3D in steamvr,
 while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it
 
-showcase on youtube: https://www.youtube.com/watch?v=ySr_ktM-0Mo
+showcase on youtube: https://www.youtube.com/watch?v=LaRQ5dUw4bU
 
 join the discord! https://discord.gg/jyvWdKBpPj
 
