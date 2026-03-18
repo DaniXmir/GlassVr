@@ -5,7 +5,7 @@ i originally made this driver to create a super light headset using my XR glasse
 
 these include:
  - headset emulation
- - index controller
+ - index controller emulation
  - tracker emulation
  - hand tracking
  - rotation emulation for all devices with gyro from x/d input controllers
