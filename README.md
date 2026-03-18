@@ -150,7 +150,7 @@ and add "activateMultipleDrivers" : true
 
 	i probably wont be adding support in the driver but you can use PSMoveService: https://github.com/psmoveservice/PSMoveService
 	
-	to get them in steanvr then copy their position and rotation to another device
+	to get them in steanvr then copy their position and rotation to your device
 
 6. I only have 2 controllers...
 
