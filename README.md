@@ -1,10 +1,23 @@
 # GlassVr
-glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even stereoscopic 3D in steamvr,
-while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it
+glassvr is an openvr driver that let you emulate a headset, controllers and trackers with various tracking modes
+
+i originally made this driver to create a super light headset use my XR glasses with a base station tracker for SteamVR but since i added a lot more features
+
+these include:
+ - headset emulation
+ - index controller
+ - tracker emulation
+ - hand tracking
+ - rotation emulation for all devices with gyro from x/d input controllers
+ - hmd rotation with 3dof from xr glasses imu
+ - split position and rotation emulation for all emulated devices allowing you to take position from one device and rotation from another
+ - copying device position and rotation and applying it to another with offsets
+ - static offsets for all emulated devices, usefull for 3dof only setups
+ - and more!
 
 showcase on youtube: https://www.youtube.com/watch?v=LaRQ5dUw4bU
 
-join the discord! https://discord.gg/jyvWdKBpPj
+also join the discord! https://discord.gg/jyvWdKBpPj
 
 # Installing
 1. download the .rar in the Releases tab and extract it
@@ -15,7 +28,7 @@ now when you launch steamvr you should see a window called "Headset Window" and 
 to uninstall, simply click on "uninstall" in the Driver tab
 
 note:
- - i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
+ - i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc(3dof from imu only works on viture glasses for now)
  - not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
