@@ -7,7 +7,7 @@ these include:
  - headset emulation
  - index controller emulation
  - tracker emulation
- - hand tracking
+ - hand tracking with a usb webcan(experimental)
  - rotation emulation for all devices with gyro from x/d input controllers
  - hmd rotation with 3dof from xr glasses imu
  - split position and rotation emulation for all emulated devices allowing you to take position from one device and rotation from another
