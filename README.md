@@ -105,31 +105,40 @@ and add "activateMultipleDrivers" : true
 # QNA
 1. will this work with my (insert company name here aka, viture, xreal etc) glasses?
 	
-	yes, the driver doesn't care which glasses you have, literally any monitor will work
+	to get an image yes the driver doesn't care which glasses you have, literally any monitor will work,
+	
+	for 3dof read 6
 
-2. i don't have base station, but i do have quest controllers, can i use them?
+2. can i use other devices like a phone instead of xr glasses?
 
-   maybe, if you could find a way to use the controllers without the headset in steamvr
+   yes, i should probably change the name lol
    
-3. I only have 2 controllers...
+3. can i use the builtin 3DOF imu for rotation only?
 
-   strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
+	for now only viture glasses are supported, for everything else check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
 
-4. can i use the builtin 3DOF imu?
+4. i don't have base station, can i use something else?
 
-	no... check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
+   a lot of people asked me about ps move or quest controllers, if they show in steamvr = they will work
+
+5. ps move?
+
+	plz read 4
+
+6. I only have 2 controllers...
+
+	strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
    
-5. linux?
+7. linux?
 	
 	in the future, maybe
 
-6. wireless?
+8. wireless?
 	
 	option 1. find a way to stream the "headset window" to your phone, maybe alvr or even Parsec?
 	
 	option 2. there are some "wireless hdmi 120hz" on amazon/aliexpress, but i dont know how good they actually are, especially for vr
 
-7. any more quetions?
+9. any more quetions?
     
 	ask them in the discord server: https://discord.gg/WbEqvHKs
-
