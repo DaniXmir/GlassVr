@@ -45,7 +45,7 @@ also try downgrading you'r firmware if you can, i found that older firmwares can
 
 # Requirements
 - xr glasses or a monitor, for you'r eyes ofcourse
-- vr controller or vr tracker, to track you'r head
+- vr controller or vr tracker, to track you'r head(only for 6dof)
 
 base stations aren't required, if you have any other vr tracker like vive ultimate, fluxpose etc.. they will also work
 
