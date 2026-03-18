@@ -1,7 +1,7 @@
 # GlassVr
 glassvr is an openvr driver that let you emulate a headset, controllers and trackers with various tracking modes
 
-i originally made this driver to create a super light headset use my XR glasses with a base station tracker for SteamVR but since i added a lot more features
+i originally made this driver to create a super light headset using my XR glasses with a base station tracker for SteamVR but since i added a lot more features
 
 these include:
  - headset emulation
