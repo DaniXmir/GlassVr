@@ -14,7 +14,8 @@ default_settings = {
     
     #fov///////////////////////////
 
-    "fov" : 90,
+    "fov" : 90.0,
+    "convergence" : 0.0,
 
     #90
     "outer mono" : 41.070,
@@ -205,6 +206,14 @@ default_settings = {
     "opengloves": False,
     "camera z": 0.025,
     "camera index": 0,
+
+    "markers":False,
+    "markers z" : 0.9,
+    "crpos marker id" : 98,
+    "crrot marker id" : 98,
+
+    "clpos marker id" : 40,
+    "clrot marker id" : 40,
 
     "trackers num": 0,
 }
