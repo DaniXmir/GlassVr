@@ -107,23 +107,37 @@ and add "activateMultipleDrivers" : true
 	
 	to get an image yes the driver doesn't care which glasses you have, literally any monitor will work,
 	
-	for 3dof read 6
-
-2. can i use other devices like a phone instead of xr glasses?
-
-   yes, i should probably change the name lol
+	for 3dof read 2
    
-3. can i use the builtin 3DOF imu for rotation only?
+2. can i use the builtin 3DOF imu for rotation only?
 
 	for now only viture glasses are supported, for everything else check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
 
+3. can i use other devices like a phone instead of xr glasses?
+
+   yes all emulated devices(hmd, controllers and hand tracking, trackers) will work with other devices and drivers,
+   
+   if you plan you use a phone as an hmd suggest using alvr and phonevr for less latency, the driver is designed for wired displays
+
+   alvr: https://github.com/alvr-org/ALVR
+   
+   PhoneVR: https://github.com/PhoneVR-Developers/PhoneVR
+   
+   i should also probably change the name lol
+   
 4. i don't have base station, can i use something else?
 
-   a lot of people asked me about ps move or quest controllers, if they show in steamvr = they will work
+   a lot of people asked me about ps move or quest controllers, 
+   
+   if they show in steamvr = position and rotation can be copyed and applyed with offsets to another device(even real devices with tracking overrides: https://github.com/ValveSoftware/openvr/wiki/TrackingOverrides)
 
 5. ps move?
 
 	plz read 4
+
+	i probably wont be adding support in the driver but you can use PSMoveService: https://github.com/psmoveservice/PSMoveService
+	
+	to get them in steanvr then copy their position and rotation to another device
 
 6. I only have 2 controllers...
 
@@ -135,9 +149,9 @@ and add "activateMultipleDrivers" : true
 
 8. wireless?
 	
-	option 1. find a way to stream the "headset window" to your phone, maybe alvr or even Parsec?
+	option 1. find a way to stream the "headset window" to your phone, maybe Parsec or even alvr
 	
-	option 2. there are some "wireless hdmi 120hz" on amazon/aliexpress, but i dont know how good they actually are, especially for vr
+	option 2. there are some "wireless hdmi 120hz" dongles on amazon/aliexpress but i dont know how good they actually are, especially for vr
 
 9. any more quetions?
     
