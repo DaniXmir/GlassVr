@@ -139,6 +139,7 @@
     <ClInclude Include="samples\driver_sample\cserverdriver_sample.h" />
     <ClInclude Include="samples\driver_sample\cwatchdogdriver_sample.h" />
     <ClInclude Include="samples\driver_sample\driverlog.h" />
+    <ClInclude Include="samples\viture.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="headers\openvr_api.cs" />
@@ -170,6 +171,7 @@
     <ClCompile Include="samples\driver_sample\cwatchdogdriver_sample.cpp" />
     <ClCompile Include="samples\driver_sample\driverlog.cpp" />
     <ClCompile Include="samples\driver_sample\driver_sample.cpp" />
+    <ClCompile Include="samples\viture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="samples\driver_sample\CMakeLists.txt" />

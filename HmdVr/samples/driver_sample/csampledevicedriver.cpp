@@ -40,6 +40,9 @@ void CSampleDeviceDriver::UpdateData(const PacketHmd& data)
 
 CSampleDeviceDriver::CSampleDeviceDriver()
 {
+    //viture-
+    m_pVitureDevice = nullptr;
+    //viture-
     m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
     m_ulPropertyContainer = vr::k_ulInvalidPropertyContainer;
 
@@ -62,10 +65,17 @@ CSampleDeviceDriver::CSampleDeviceDriver()
     m_flDisplayFrequency = RefreshRate;
 }
 
-CSampleDeviceDriver::~CSampleDeviceDriver()
-{
+//CSampleDeviceDriver::~CSampleDeviceDriver()
+//{
+//}
+//viture-
+CSampleDeviceDriver::~CSampleDeviceDriver() {
+    if (m_pVitureDevice) {
+        delete m_pVitureDevice;
+        m_pVitureDevice = nullptr;
+    }
 }
-
+//viture-
 EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
 {
     Stereoscopic = GetBoolFromSettingsByKey("stereoscopic");
@@ -104,7 +114,9 @@ EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
 
     m_bThreadRunning = true;
     m_pPipeThread = new std::thread(&CSampleDeviceDriver::PipeThreadThreadEntry, this);
-
+    //viture-
+    m_pVitureDevice = new Viture();
+    //viture-
     return VRInitError_None;
 }
 
@@ -117,6 +129,15 @@ void CSampleDeviceDriver::Deactivate()
         m_pPipeThread = nullptr;
     }
     m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
+
+    //viture-
+    if (m_pVitureDevice) {
+        delete m_pVitureDevice;
+        m_pVitureDevice = nullptr;
+    }
+    m_poseInitialized = false;  // ← add this
+    m_startupInverse = { 1, 0, 0, 0 };
+    //viture-
 }
 
 void CSampleDeviceDriver::EnterStandby()
@@ -455,8 +476,50 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
             pose.qRotation.z = 0.0f;
         }
     }
+    //viture-
+    else if (rotmode == "xr glasses") {
+        if (m_pVitureDevice && m_pVitureDevice->is_connected()) {
+
+            if (GetAsyncKeyState('0') & 0x8000) {
+                m_pVitureDevice->recenter();
+            }
+
+            float euler[3], quat[4], gyro[3];
+            m_pVitureDevice->get_imu_data(euler, quat, gyro);
+
+            pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
+            pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
+
+            vr::HmdQuaternion_t device_rotation;
+            device_rotation.x = quat[1];
+            device_rotation.y = -quat[0];
+            device_rotation.z = -quat[2];
+            device_rotation.w = quat[3];
+
+            vr::HmdQuaternion_t offset_local_rotation = EulerToQuatZYX(
+                GetFloatFromSettingsByKey(device + " offset local roll"),
+                GetFloatFromSettingsByKey(device + " offset local yaw"),
+                GetFloatFromSettingsByKey(device + " offset local pitch")
+            );
+
+            vr::HmdQuaternion_t offset_world_rotation = EulerToQuatZYX(
+                GetFloatFromSettingsByKey(device + " offset world roll"),
+                GetFloatFromSettingsByKey(device + " offset world yaw"),
+                GetFloatFromSettingsByKey(device + " offset world pitch")
+            );
+
+            vr::HmdQuaternion_t combined = QuatMul(offset_world_rotation, device_rotation);
+            pose.qRotation = QuatMul(combined, offset_local_rotation);
+
+            pose.vecAngularVelocity[0] = gyro[1];
+            pose.vecAngularVelocity[1] = -gyro[0];
+            pose.vecAngularVelocity[2] = -gyro[2];
+        }
+    }
+    //viture-
+
     else if (rotmode == "test") {
-        //
+        //get from server!
     }
     else {
         pose.qRotation.w = m_poseDataCache.rot_w;

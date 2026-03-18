@@ -42,6 +42,9 @@
     <ClInclude Include="headers\openvr_driver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="samples\viture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="samples\driver_sample\default.vrsettings" />
@@ -85,6 +88,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="samples\driver_sample\basics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\viture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
