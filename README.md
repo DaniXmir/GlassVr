@@ -9,7 +9,7 @@ these include:
  - tracker emulation
  - hand tracking with a usb webcan(experimental)
  - rotation emulation for all devices with gyro from x/d input controllers
- - hmd rotation with 3dof from xr glasses imu
+ - hmd rotation with 3dof from xr glasses imu(viture glasses only for now)
  - split position and rotation emulation for all emulated devices allowing you to take position from one device and rotation from another
  - copying device position and rotation and applying it to another with offsets
  - static offsets for all emulated devices, usefull for 3dof only setups
