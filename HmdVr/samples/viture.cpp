@@ -104,7 +104,6 @@ namespace {
         QuatNormalize(out);
     }
 
-    //claude gave long code, should delete this but am too scared to touch c++
 #if defined(_WIN32)
 #elif defined(__APPLE__)
     static bool getUSBProperty(io_service_t service, const char* key, uint16_t* outValue) {
