@@ -1,6 +1,6 @@
 # GlassVr
-glassvr is an openvr driver that let you emulate a headset, controllers and trackers with various tracking modes
-
+glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even stereoscopic 3D in steamvr,
+while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it,
 i originally made this driver to create a super light headset using my XR glasses with a base station tracker for SteamVR but since i added a lot more features
 
 these include:
@@ -8,8 +8,8 @@ these include:
  - index controller emulation
  - tracker emulation
  - hand tracking with a usb webcan(experimental)
- - rotation emulation for all devices with gyro from x/d input controllers
  - hmd rotation with 3dof from xr glasses imu(viture glasses only for now)
+ - rotation emulation for all devices with gyro from x/d input controllers
  - split position and rotation emulation for all emulated devices allowing you to take position from one device and rotation from another
  - copying device position and rotation and applying it to another with offsets
  - static offsets for all emulated devices, usefull for 3dof only setups
