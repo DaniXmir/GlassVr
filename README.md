@@ -3,6 +3,10 @@ glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even st
 while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it,
 i originally made this driver to create a super light headset using my XR glasses with a base station tracker for SteamVR but since i added a lot more features
 
+showcase on youtube: https://www.youtube.com/watch?v=LaRQ5dUw4bU
+
+also join the discord! https://discord.gg/jyvWdKBpPj
+
 these include:
  - headset emulation
  - index controller emulation
@@ -14,10 +18,6 @@ these include:
  - copying device position and rotation and applying it to another with offsets
  - static offsets for all emulated devices, usefull for 3dof only setups
  - and more!
-
-showcase on youtube: https://www.youtube.com/watch?v=LaRQ5dUw4bU
-
-also join the discord! https://discord.gg/jyvWdKBpPj
 
 # Installing
 1. download the .rar in the Releases tab and extract it
