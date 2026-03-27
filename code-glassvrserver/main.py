@@ -2,7 +2,7 @@
 #or
 #pyinstaller --noconfirm --windowed --uac-admin --collect-binaries "sdl2dll" --collect-all "sdl2" --collect-binaries "openvr" --collect-all "mediapipe" --collect-all "cv2" --hidden-import "sdl2dll" main.py
 
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpinBox, QDoubleSpinBox, QLineEdit, QTabWidget, QGridLayout, QCheckBox, QComboBox
+from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpinBox, QDoubleSpinBox, QLineEdit, QTabWidget, QGridLayout, QCheckBox, QComboBox, QScrollArea
 
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QPixmap, QIcon
@@ -361,6 +361,14 @@ def hmdpos_specific_widget(layout, combo):
             
             layout.addWidget(t)
 
+        case "offsets":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
+                }])
+            layout.addWidget(t)
+
 def create_hmdpos_widget():
     settings = settings_core.get_settings()
 
@@ -371,7 +379,7 @@ def create_hmdpos_widget():
             "type" : "combobox",
             "text": "hmd position mode",
             "default": settings.get(f'hmdpos mode', "redirect"),
-            "items": ["redirect"],# "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["redirect", "offsets"],# "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "func": lambda: hmdpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -440,6 +448,27 @@ def hmdrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
+        case "xr glasses":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "only viture glasses are supported for now(for 3dof rotation)",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
+                },{
+                    "type" : "button",
+                    "enabled" : True,
+                    "text" :"calibrate on viture site",
+                    "func"  : lambda: webbrowser.open("https://www.viture.com/firmware/calibration")
+                }])
+            layout.addWidget(t)
+
+        case "offsets":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
+                }])
+            layout.addWidget(t)
+
 def create_hmdrot_widget():
     settings = settings_core.get_settings()
 
@@ -450,7 +479,7 @@ def create_hmdrot_widget():
             "type" : "combobox",
             "text": "hmd rotation mode",
             "default": settings.get(f'hmdrot mode', "redirect"),
-            "items": ["redirect","gyro"],# "mouse"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["redirect", "offsets", "gyro", "xr glasses"],# "mouse"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "func": lambda: hmdrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -632,6 +661,25 @@ def get_new_transform(device="hmd", px=0.0, py=0.0, pz=0.0, rx=0.0, ry=0.0, rz=0
     
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+def euler_to_quat(pitch, roll, yaw):
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+
+    qw = cr * cp * cy + sr * sp * sy
+    qx = sr * cp * cy - cr * sp * sy
+    qy = cr * sp * cy + sr * cp * sy
+    qz = cr * cp * sy - sr * sp * cy
+
+    return {
+        "w": qw,
+        "x": qx,
+        "y": qy,
+        "z": qz
+    }
 
 HMD_PACK_FORMAT = '<9d'  # pos(3) + rot(4) + ipd + head_to_eye_dist
 CONTROLLER_PACK_FORMAT = '<12d6?'  # pos(3) + rot(4) + joy(2) + touch(2) + trigger + 5 buttons
@@ -677,6 +725,11 @@ def send_hmd_data():
                         case "redirect":
                             pass
 
+                        case "offsets":
+                            pos_x = settings["hmd offset world x"]
+                            pos_y = settings["hmd offset world y"]
+                            pos_z = settings["hmd offset world z"]
+
                         case "keyboard":
                             pass
 
@@ -692,6 +745,16 @@ def send_hmd_data():
                     match settings['hmdrot mode']:
                         case "redirect":
                             pass
+
+                        case "offsets":
+                            quat = euler_to_quat(settings["hmd offset world yaw"],
+                                                 settings["hmd offset world pitch"],
+                                                 settings["hmd offset world roll"])
+
+                            rot_x = quat["x"]
+                            rot_y = quat["y"]
+                            rot_z = quat["z"]
+                            rot_w = quat["w"]
 
                         case "mouse":
                             pass
@@ -828,6 +891,131 @@ def send_hmd_data():
 #             time.sleep(1)
 #predict next pose test/////////////////////////////////////////////////////
 
+# def get_hand_gyro_transform(device, controller_num):
+#     try:
+#         hand_prefix = 'r' if device == "cr" else 'l'
+#         current_time = time.time()
+#         state = controller_states[controller_num]
+#         settings = settings_core.get_settings()
+
+#         c_dict = controller_1_dict if controller_num == 1 else controller_2_dict
+#         if "gyro_quat" not in c_dict:
+#             raise ValueError("No gyro data")
+
+#         g_quat = c_dict["gyro_quat"]
+#         norm = g_quat['x']**2 + g_quat['y']**2 + g_quat['z']**2 + g_quat['w']**2
+#         gyro_rot = R.identity() if norm < 0.0001 else R.from_quat([g_quat['x'], g_quat['y'], g_quat['z'], g_quat['w']])
+
+#         depth = hand_data[f'{hand_prefix} pos z']
+#         tracking_active = depth != 0
+
+#         if tracking_active:
+#             mod_x = settings.get('camera z', 0.05)
+#             mod_y = settings.get('camera z', 0.05)
+#             mod_z = settings.get('camera z', 0.05)
+#             outer_stereo = settings.get('outer stereo', 41.070)
+#             inner_stereo = settings.get('inner stereo', 41.070)
+#             top_stereo = settings.get('top stereo', 26.120)
+#             bottom_stereo = settings.get('bottom stereo', 26.120)
+
+#             fov_horizontal = outer_stereo + inner_stereo
+#             fov_vertical = top_stereo + bottom_stereo
+
+#             hmd_pos = (trackers_arr[0]['pos x'], trackers_arr[0]['pos y'], trackers_arr[0]['pos z'])
+#             rot = R.from_matrix(trackers_arr[0]['rotation matrix'])
+#             hmd_rot = R.from_quat(rot.as_quat())
+
+#             screen_x = 1.0 - hand_data[f'{hand_prefix} pos x']
+#             screen_y = 1.0 - hand_data[f'{hand_prefix} pos y']
+
+#             normalized_x = (screen_x - 0.5) * 2.0
+#             normalized_y = (screen_y - 0.5) * 2.0
+
+#             fov_h_rad = np.radians(fov_horizontal / 2)
+#             fov_v_rad = np.radians(fov_vertical / 2)
+
+#             camera_relative_pos = np.array([
+#                 depth * np.tan(fov_h_rad) * normalized_x,
+#                 -depth * np.tan(fov_v_rad) * normalized_y,
+#                 -depth
+#             ])
+
+#             world_relative_pos = hmd_rot.apply(camera_relative_pos)
+#             world_relative_pos_fixed = -world_relative_pos
+
+#             world_pos = hmd_pos + np.array([
+#                 world_relative_pos_fixed[0] * mod_x,
+#                 world_relative_pos_fixed[1] * mod_y,
+#                 world_relative_pos_fixed[2] * mod_z
+#             ])
+
+#             if state["active"]:
+#                 dt = current_time - state["last_time"]
+#                 if dt > 0.005:
+#                     new_vel = (world_pos - state["pos"]) / dt
+#                     speed = np.linalg.norm(new_vel)
+#                     if speed > 5.0:
+#                         new_vel = (new_vel / speed) * 5.0
+#                     state["vel"] = state["vel"] * 0.6 + new_vel * 0.4
+
+#             hand_rot_local_full = R.from_quat([
+#                 hand_data[f'{hand_prefix} rot x'],
+#                 hand_data[f'{hand_prefix} rot y'],
+#                 hand_data[f'{hand_prefix} rot z'],
+#                 hand_data[f'{hand_prefix} rot w']
+#             ])
+#             angles = hand_rot_local_full.as_euler('ZYX', degrees=False)
+#             if device == "cl":
+#                 isolated_angles = [-angles[1], angles[2], angles[0]]
+#             else:
+#                 isolated_angles = [-angles[1], -angles[2], -angles[0]]
+#             hand_rot_local = R.from_euler('ZYX', isolated_angles, degrees=False)
+
+#             offset_yaw = settings.get(f'{device} offset world yaw', 0.0)
+#             offset_pitch = settings.get(f'{device} offset world pitch', 0.0)
+#             offset_roll = settings.get(f'{device} offset world roll', 0.0)
+#             offset_rotation = R.from_euler('ZYX', [offset_yaw, offset_pitch, offset_roll], degrees=False)
+
+#             optical_rot = hmd_rot * hand_rot_local * offset_rotation
+
+#             if not state["active"] or state["lost_time"] != 0:
+#                 state["offset_quat"] = optical_rot * gyro_rot.inv()
+
+#             state["pos"] = world_pos
+#             state["last_time"] = current_time
+#             state["active"] = True
+#             state["lost_time"] = 0
+
+#             final_pos = world_pos
+#             final_rot = state["offset_quat"] * gyro_rot
+
+#         else:
+#             if not state["active"]:
+#                 raise ValueError("Tracking never initialized")
+
+#             if state["lost_time"] == 0:
+#                 state["lost_time"] = current_time
+
+#             dt = current_time - state["last_time"]
+
+#             final_rot = state["offset_quat"] * gyro_rot
+#             final_pos = state["pos"] + state["vel"] * dt
+
+#             state["pos"] = final_pos
+#             state["last_time"] = current_time
+
+#         final_quat = final_rot.as_quat()
+#         return {
+#             "pos x": final_pos[0], "pos y": final_pos[1], "pos z": final_pos[2],
+#             "rot x": final_quat[0], "rot y": final_quat[1], "rot z": final_quat[2], "rot w": final_quat[3]
+#         }
+
+#     except Exception as e:
+#         return {
+#             "pos x": 0.0, "pos y": 0.0, "pos z": 0.0,
+#             "rot x": 0.0, "rot y": 0.0, "rot z": 0.0, "rot w": 1.0
+#         }
+
 def get_hand_world_transform(device):
     try:
         hand_prefix = 'r' if device == "cr" else 'l'
@@ -959,6 +1147,11 @@ def send_controller_data(is_right):
                 rot_w = final_transform['rot w']
                 try:
                     match settings[f'{device_name}pos mode']:
+                        case "offsets":
+                            pos_x = float(settings.get(f"{device_name} offset world x", 0.0))
+                            pos_y = float(settings.get(f"{device_name} offset world y", 0.0))
+                            pos_z = float(settings.get(f"{device_name} offset world z", 0.0))
+
                         case "hand tracking":
                             if settings_core.get_settings()['opengloves'] != False:
                                 final_c_transform = get_final_transform(device_name)
@@ -973,16 +1166,53 @@ def send_controller_data(is_right):
                                 pos_x = final_transform['pos x']
                                 pos_y = final_transform['pos y']
                                 pos_z = final_transform['pos z']
+                        # case "hand+gyro":
+                        #     if settings_core.get_settings()['opengloves'] != False:
+                        #         final_transform = get_hand_gyro_transform(device_name,1)
+
+                        #         pos_x = final_transform['pos x']
+                        #         pos_y = final_transform['pos y']
+                        #         pos_z = final_transform['pos z']
+                        #     else:
+                        #         final_transform = get_hand_gyro_transform(device_name,1)
+                        #         pos_x = final_transform['pos x']
+                        #         pos_y = final_transform['pos y']
+                        #         pos_z = final_transform['pos z']
+                        # case "marker":
+                        #         #m = get_marker_transform(settings[device_name + "pos marker id"])
+                        #         #get_new_transform(device_name, m["pos x"], m["pos y"], m["pos z"], m["rot x"], m["rot y"], m["rot z"], m["rot w"])
+                        #         final_transform = get_marker_world_transform(device_name, settings[device_name + "pos marker id"])
+
+                        #         pos_x = final_transform['pos x']
+                        #         pos_y = final_transform['pos y']
+                        #         pos_z = final_transform['pos z']
+                        # case "marker+gyro":
+                        #         final_transform = get_marker_gyro_transform(device_name, settings[device_name + "pos marker id"], 1)
+
+                        #         pos_x = final_transform['pos x']
+                        #         pos_y = final_transform['pos y']
+                        #         pos_z = final_transform['pos z']
                         case _:
                             final_transform = get_final_transform(device_name)
 
                             pos_x = final_transform['pos x']
                             pos_y = final_transform['pos y']
                             pos_z = final_transform['pos z']
+
                 except:
                     pass
                 try:
                     match settings[f'{device_name}rot mode']:
+                        case "offsets":
+                            quat = euler_to_quat(settings[f"{device_name} offset world yaw"],
+                                                 settings[f"{device_name} offset world pitch"],
+                                                 settings[f"{device_name} offset world roll"])
+
+                            rot_x = quat["x"]
+                            rot_y = quat["y"]
+                            rot_z = quat["z"]
+                            rot_w = quat["w"]
+
                         case "hand tracking":
                             if settings_core.get_settings()['opengloves'] != False:
                                 final_c_transform = get_final_transform(device_name)
@@ -1000,6 +1230,35 @@ def send_controller_data(is_right):
                                 rot_y = final_transform['rot y']
                                 rot_z = final_transform['rot z']
                                 rot_w = final_transform['rot w']
+                        # case "hand+gyro":
+                        #     if settings_core.get_settings()['opengloves'] != False:
+                        #         final_transform = get_hand_gyro_transform(device_name,1)
+                        #         rot_x = final_transform['rot x']
+                        #         rot_y = final_transform['rot y']
+                        #         rot_z = final_transform['rot z']
+                        #         rot_w = final_transform['rot w']
+
+                        #     else:
+                        #         final_transform = get_hand_gyro_transform(device_name,1)
+
+                        #         rot_x = final_transform['rot x']
+                        #         rot_y = final_transform['rot y']
+                        #         rot_z = final_transform['rot z']
+                        #         rot_w = final_transform['rot w']
+                        # case "marker":
+                        #         final_transform = get_marker_world_transform(device_name, settings[device_name + "pos marker id"])
+
+                        #         rot_x = final_transform['rot x']
+                        #         rot_y = final_transform['rot y']
+                        #         rot_z = final_transform['rot z']
+                        #         rot_w = final_transform['rot w']
+                        # case "marker+gyro":
+                        #         final_transform = get_marker_gyro_transform(device_name, settings[device_name + "pos marker id"], 1)
+
+                        #         rot_x = final_transform['rot x']
+                        #         rot_y = final_transform['rot y']
+                        #         rot_z = final_transform['rot z']
+                        #         rot_w = final_transform['rot w']
                         case "gyro":
                             if settings[f'{device_name} gyro index'] == 0:
                                 transform = get_new_transform(device_name,pos_x,pos_y,pos_z,
@@ -1052,7 +1311,7 @@ def send_controller_data(is_right):
                     joy_y = -get_mapped_action(f'{side} joy y')
                     touch_x = get_mapped_action(f'{side} touch x')
                     touch_y = -get_mapped_action(f'{side} touch y')
-                
+
                 buffer = CONTROLLER_PACKER.pack(
                     float(pos_x), float(pos_y), float(pos_z),      # 3
                     float(rot_w), float(rot_x), float(rot_y), float(rot_z), # 4
@@ -1110,6 +1369,11 @@ def send_tracker_data(tracker_id):
                         case "redirect":
                             pass
 
+                        case "offsets":
+                            pos_x = settings[f"{tracker_id}tracker offset world x"]
+                            pos_y = settings[f"{tracker_id}tracker offset world y"]
+                            pos_z = settings[f"{tracker_id}tracker offset world z"]
+
                         case "hip emulation":
                             pass
 
@@ -1125,6 +1389,16 @@ def send_tracker_data(tracker_id):
                     match settings.get(f"{tracker_id}trackerrot mode", "redirect"):
                         case "redirect":
                             pass
+
+                        case "offsets":
+                            quat = euler_to_quat(settings[f"{tracker_id}tracker offset world yaw"],
+                                                 settings[f"{tracker_id}tracker offset world pitch"],
+                                                 settings[f"{tracker_id}tracker offset world roll"])
+
+                            rot_x = quat["x"]
+                            rot_y = quat["y"]
+                            rot_z = quat["z"]
+                            rot_w = quat["w"]
 
                         case "gyro":
                             if settings.get(f'{tracker_id}tracker gyro index',0) == 0:
@@ -1562,7 +1836,7 @@ def quat_slerp(q1, q2, t):
         "y": s1 * q1["y"] + s2 * q2["y"],
         "z": s1 * q1["z"] + s2 * q2["z"]
     }
-
+#reset gyro////////////////////////////////////////////////////////////////////
 def reset_rotation(controller_num=None):
     global controller_1_dict, controller_2_dict
     
@@ -1585,6 +1859,20 @@ def reset_rotation(controller_num=None):
         if "gyro_quat" in controller_2_dict:
             controller_2_dict["gyro_quat"] = hmd_quat_dict.copy()
             controller_2_dict["last_good_quat"] = hmd_quat_dict.copy()
+
+# def reset_controller_to_marker(controller_num, marker_id, device):
+#     global controller_1_dict, controller_2_dict
+
+#     optical = get_marker_world_transform(device, marker_id)
+#     optical_rot = R.from_quat([optical["rot x"], optical["rot y"], optical["rot z"], optical["rot w"]])
+#     q = optical_rot.as_quat()
+#     marker_quat_dict = {"x": q[0], "y": q[1], "z": q[2], "w": q[3]}
+
+#     c_dict = controller_1_dict if controller_num == 1 else controller_2_dict
+#     if "gyro_quat" in c_dict:
+#         c_dict["gyro_quat"] = marker_quat_dict.copy()
+#         c_dict["last_good_quat"] = marker_quat_dict.copy()
+#reset gyro////////////////////////////////////////////////////////////////////
 
 def start_calibration(controller_num=None):
     global controller_1_dict, controller_2_dict
@@ -2320,64 +2608,55 @@ first_label = create_label({
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
 
-if __name__ == '__main__':
-    if settings_core.get_settings()['opengloves']:
-        start_opengloves()
-
-    start_controller_mapping()
-
-    start_send_data()
-    start_update_vrlabel()
-
-def change_FOV_on_check(group):
-    settings = settings_core.get_settings()
+# def change_FOV_on_check(group):
+#     settings = settings_core.get_settings()
     
-    if group != None:
-        check = group.findChild(QCheckBox)
+#     if group != None:
+#         check = group.findChild(QCheckBox)
         
-        settings_core.update_setting("stereoscopic", check.isChecked())
+#         settings_core.update_setting("stereoscopic", check.isChecked())
 
-        settings['stereoscopic'] = check.isChecked()
+#         settings['stereoscopic'] = check.isChecked()
 
-    spinboxes = fov_group.findChildren(QDoubleSpinBox)
+    # spinboxes = fov_group.findChildren(QDoubleSpinBox)
 
-    if settings['stereoscopic']:
-        fov_label.findChild(QLabel).setText("---------FOV(using Stereo)---------")
+    # if settings['stereoscopic']:
+    #     fov_label.findChild(QLabel).setText("---------FOV(using Stereo)---------")
         
-        spinboxes[0].setValue(settings['outer stereo'])
-        spinboxes[1].setValue(settings['inner stereo'])
-        spinboxes[2].setValue(settings['top stereo'])
-        spinboxes[3].setValue(settings['bottom stereo'])
+    #     spinboxes[0].setValue(settings['outer stereo'])
+    #     spinboxes[1].setValue(settings['inner stereo'])
+    #     spinboxes[2].setValue(settings['top stereo'])
+    #     spinboxes[3].setValue(settings['bottom stereo'])
 
-    else:
-        fov_label.findChild(QLabel).setText("---------FOV(using Mono)---------")
+    # else:
+    #     fov_label.findChild(QLabel).setText("---------FOV(using Mono)---------")
 
-        spinboxes[0].setValue(settings['outer mono'])
-        spinboxes[1].setValue(settings['inner mono'])
-        spinboxes[2].setValue(settings['top mono'])
-        spinboxes[3].setValue(settings['bottom mono'])
+    #     spinboxes[0].setValue(settings['outer mono'])
+    #     spinboxes[1].setValue(settings['inner mono'])
+    #     spinboxes[2].setValue(settings['top mono'])
+    #     spinboxes[3].setValue(settings['bottom mono'])
 
 
-def update_FOV():
-    settings = settings_core.get_settings()
+# def update_FOV():
+#     settings = settings_core.get_settings()
     
-    spinboxes = fov_group.findChildren(QDoubleSpinBox)
+    # spinboxes = fov_group.findChildren(QDoubleSpinBox)
 
-    if settings['stereoscopic']:
-        fov_label.findChild(QLabel).setText("---------FOV(using Stereo)---------")
+    # if settings['stereoscopic']:
+    #     fov_label.findChild(QLabel).setText("---------FOV(using Stereo)---------")
         
-        settings_core.update_setting('outer stereo', spinboxes[0].value())
-        settings_core.update_setting('inner stereo', spinboxes[1].value())
-        settings_core.update_setting('top stereo', spinboxes[2].value())
-        settings_core.update_setting('bottom stereo', spinboxes[3].value())
+        # settings_core.update_setting('outer stereo', spinboxes[0].value())
+        # settings_core.update_setting('inner stereo', spinboxes[1].value())
+        # settings_core.update_setting('top stereo', spinboxes[2].value())
+        # settings_core.update_setting('bottom stereo', spinboxes[3].value())
 
-    else:
-        fov_label.findChild(QLabel).setText("---------FOV(using Mono)---------")
+    # else:
+    #     fov_label.findChild(QLabel).setText("---------FOV(using Mono)---------")
 
-        settings_core.update_setting('outer mono', spinboxes[0].value())
-        settings_core.update_setting('inner mono', spinboxes[1].value())
-        settings_core.update_setting('top mono', spinboxes[2].value())
-        settings_core.update_setting('bottom mono', spinboxes[3].value())
+        # settings_core.update_setting('outer mono', spinboxes[0].value())
+        # settings_core.update_setting('inner mono', spinboxes[1].value())
+        # settings_core.update_setting('top mono', spinboxes[2].value())
+        # settings_core.update_setting('bottom mono', spinboxes[3].value())
 
 layout_main.addWidget(create_label({
     "text" : "---------Resolution---------", 
@@ -2423,7 +2702,7 @@ misc_group1 = create_group_checkbox([
     {
         "text" : "Stereoscopic(SBS)", 
         "default" : settings_core.get_settings()['stereoscopic'], 
-        "func" : lambda: change_FOV_on_check(misc_group1)
+        "func" : lambda: settings_core.update_setting("stereoscopic", misc_group1.findChildren(QCheckBox)[0].isChecked())
     },
     {
         "text" : "Fullscreen", 
@@ -2438,91 +2717,159 @@ misc = create_group_doublespinbox([
         "text" : "IPD", 
         "min":-999999999, 
         "max":999999999, 
-        "default":settings_core.get_settings()['ipd'], 
-        "steps" : 0.001, 
-        "func" : lambda: settings_core.update_setting("ipd", misc.findChildren(QDoubleSpinBox)[0].value()) 
+        "default":settings_core.get_settings()['ipd'] * 1000, 
+        "steps" : 1.0,
+        "func" : lambda: settings_core.update_setting("ipd", misc.findChildren(QDoubleSpinBox)[0].value() * 0.001)
     },
     {
         "text" : "Distance from tracker to eyes", 
         "min":-999999999, 
         "max":999999999, 
         "default":settings_core.get_settings()['head to eye dist'], 
-        "steps" : 0.001, 
+        "steps" : 0.1, 
         "func" : lambda: settings_core.update_setting("head to eye dist", misc.findChildren(QDoubleSpinBox)[1].value()) 
     }
 ])
 layout_main.addWidget(misc)
 
-fov_label = create_label({
-    "text" : "---------FOV(using Mono)---------", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-})
-layout_main.addWidget(fov_label)
+# fov_label = create_label({
+#     "text" : "---------3D and FOV---------", 
+#     "alignment" : Qt.AlignmentFlag.AlignCenter
+# })
+# layout_main.addWidget(fov_label)
 
 #/////////////////////////////////////////////////////
+# def set_fov(type, botton):
+#     settings = settings_core.get_settings()
+#     if settings['stereoscopic']:
+#         settings_core.update_setting(f"{type} stereo", float(botton.text().removeprefix(type)))
+#     else:
+#         settings_core.update_setting(f"{type} mono", float(botton.text().removeprefix(type)))
+
+    # change_FOV_on_check(misc_group1)
+
+# def calculate_vr_fov():
+#     settings = settings_core.get_settings()
+#     diagonal_fov_deg = recommended_label.findChild(QDoubleSpinBox).value()
+#     settings_core.update_setting("fov",diagonal_fov_deg)
+#     width = settings['resolution x']
+#     height = settings['resolution y']
+
+#     diag_rad = math.radians(diagonal_fov_deg)
+
+#     aspect = width / height
+    
+#     tan_half_diag = math.tan(diag_rad / 2)
+#     tan_half_v = tan_half_diag / math.sqrt(aspect**2 + 1)
+#     tan_half_h = aspect * tan_half_v
+    
+#     h_fov_deg = math.degrees(math.atan(tan_half_h) * 2)/2
+#     v_fov_deg = math.degrees(math.atan(tan_half_v) * 2)/2
+
+#     recommended_label.findChildren(QPushButton)[0].setText(f"outer {h_fov_deg:.2f}")
+#     recommended_label.findChildren(QPushButton)[1].setText(f"inner {h_fov_deg:.2f}")
+#     recommended_label.findChildren(QPushButton)[2].setText(f"top {v_fov_deg:.2f}")
+#     recommended_label.findChildren(QPushButton)[3].setText(f"bottom {v_fov_deg:.2f}")
+
 def calculate_vr_fov():
+    settings_core.update_setting("convergence", recommended_label.findChildren(QDoubleSpinBox)[0].value())
+    settings_core.update_setting("fov", recommended_label.findChildren(QDoubleSpinBox)[1].value())
+
     settings = settings_core.get_settings()
-    diagonal_fov_deg = recommended_label.findChild(QDoubleSpinBox).value()
-    settings_core.update_setting("fov",diagonal_fov_deg)
+
+    diagonal_fov_deg = settings.get("fov", 0.0)
+    convergence_deg = settings.get('convergence', 0.0)
+
     width = settings['resolution x']
     height = settings['resolution y']
 
     diag_rad = math.radians(diagonal_fov_deg)
-
     aspect = width / height
     
     tan_half_diag = math.tan(diag_rad / 2)
     tan_half_v = tan_half_diag / math.sqrt(aspect**2 + 1)
     tan_half_h = aspect * tan_half_v
     
-    h_fov_deg = math.degrees(math.atan(tan_half_h) * 2)/2
-    v_fov_deg = math.degrees(math.atan(tan_half_v) * 2)/2
+    h_half_fov = math.degrees(math.atan(tan_half_h))
+    v_half_fov = math.degrees(math.atan(tan_half_v))
 
-    recommended_label.findChildren(QPushButton)[0].setText(f"outer {h_fov_deg:.2f}")
-    recommended_label.findChildren(QPushButton)[1].setText(f"inner {h_fov_deg:.2f}")
-    recommended_label.findChildren(QPushButton)[2].setText(f"top {v_fov_deg:.2f}")
-    recommended_label.findChildren(QPushButton)[3].setText(f"bottom {v_fov_deg:.2f}")
+    outer_fov_deg = h_half_fov + convergence_deg
+    inner_fov_deg = h_half_fov - convergence_deg
+    
+    top_fov_deg = v_half_fov
+    bottom_fov_deg = v_half_fov
 
-def set_fov(type, botton):
-    settings = settings_core.get_settings()
-    if settings['stereoscopic']:
-        settings_core.update_setting(f"{type} stereo", float(botton.text().removeprefix(type)))
-    else:
-        settings_core.update_setting(f"{type} mono", float(botton.text().removeprefix(type)))
+    outer_fov_deg = max(0.0, outer_fov_deg)
+    inner_fov_deg = max(0.0, inner_fov_deg)
 
-    change_FOV_on_check(misc_group1)
+    settings_core.update_setting("outer stereo", outer_fov_deg)
+    settings_core.update_setting("inner stereo", inner_fov_deg)
+    settings_core.update_setting("top stereo", top_fov_deg)
+    settings_core.update_setting("bottom stereo", bottom_fov_deg)
+    settings_core.update_setting("outer mono", outer_fov_deg)
+    settings_core.update_setting("inner mono", inner_fov_deg)
+    settings_core.update_setting("top mono", top_fov_deg)
+    settings_core.update_setting("bottom mono", bottom_fov_deg)
 
-recommended_label = create_group_horizontal([{
-        "type" : "label",
-        "text" : "Recommended(click to set):", 
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {
-        "type" : "button", 
-        "text" : "outer", 
-        "enabled" : True,
-        "func"  : lambda: set_fov("outer",recommended_label.findChildren(QPushButton)[0])
-    },
-    {
-        "type" : "button", 
-        "text" : "inner", 
-        "enabled" : True,
-        "func"  : lambda: set_fov("inner",recommended_label.findChildren(QPushButton)[1])
-    },    {
-        "type" : "button", 
-        "text" : "top", 
-        "enabled" : True,
-        "func"  : lambda: set_fov("top",recommended_label.findChildren(QPushButton)[2])
-    },
-    {
-        "type" : "button", 
-        "text" : "bottom", 
-        "enabled" : True,
-        "func"  : lambda: set_fov("bottom",recommended_label.findChildren(QPushButton)[3])
-    },
+    # buttons = recommended_label.findChildren(QPushButton)
+    # if len(buttons) >= 4:
+    #     buttons[0].setText(f"outer {outer_fov_deg:.2f}")
+    #     buttons[1].setText(f"inner {inner_fov_deg:.2f}")
+    #     buttons[2].setText(f"top {top_fov_deg:.2f}")
+    #     buttons[3].setText(f"bottom {bottom_fov_deg:.2f}")
+
+# recommended_label = create_group_horizontal([{
+#         "type" : "label",
+#         "text" : "Recommended(click to set):", 
+#         "alignment" : Qt.AlignmentFlag.AlignCenter
+#     },
+#     {
+#         "type" : "button", 
+#         "text" : "outer", 
+#         "enabled" : True,
+#         "func"  : lambda: set_fov("outer",recommended_label.findChildren(QPushButton)[0])
+#     },
+#     {
+#         "type" : "button", 
+#         "text" : "inner", 
+#         "enabled" : True,
+#         "func"  : lambda: set_fov("inner",recommended_label.findChildren(QPushButton)[1])
+#     },    {
+#         "type" : "button", 
+#         "text" : "top", 
+#         "enabled" : True,
+#         "func"  : lambda: set_fov("top",recommended_label.findChildren(QPushButton)[2])
+#     },
+#     {
+#         "type" : "button", 
+#         "text" : "bottom", 
+#         "enabled" : True,
+#         "func"  : lambda: set_fov("bottom",recommended_label.findChildren(QPushButton)[3])
+#     },
+#     {
+#         "type" : "doublespinbox",
+#         "text" : "for FOV =",
+#         "min":-999999999,
+#         "max":999999999,
+#         "default": settings_core.get_settings()['fov'],
+#         "steps" : 0.01,
+#         "func"  : lambda: calculate_vr_fov()
+#     }])
+
+# layout_main.addWidget(recommended_label)
+
+recommended_label = create_group_horizontal([
     {
         "type" : "doublespinbox",
-        "text" : "for FOV =",
+        "text" : "convergence",
+        "min":-999999999,
+        "max":999999999,
+        "default": settings_core.get_settings()['convergence'],
+        "steps" : 0.01,
+        "func"  : lambda: calculate_vr_fov()
+    },{
+        "type" : "doublespinbox",
+        "text" : "FOV",
         "min":-999999999,
         "max":999999999,
         "default": settings_core.get_settings()['fov'],
@@ -2532,54 +2879,54 @@ recommended_label = create_group_horizontal([{
 
 layout_main.addWidget(recommended_label)
 
-calculate_vr_fov()
+# calculate_vr_fov()
 #/////////////////////////////////////////////////////
 
-fov_group = create_group_doublespinbox([
-    {
-        "text" : "Outer", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default": settings_core.get_settings()['outer stereo'] \
-           if settings_core.get_settings()["stereoscopic"] \
-           else settings_core.get_settings()['outer mono'],
-        "steps" : 0.01,
-        "func"  : lambda: update_FOV()
-    },
-    {
-        "text" : "Inner", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default": settings_core.get_settings()['inner stereo'] \
-           if settings_core.get_settings()["stereoscopic"] \
-           else settings_core.get_settings()['inner mono'],
-        "steps" : 0.01,
-        "func"  : lambda: update_FOV()
-    },
-    {
-        "text" : "Top", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default": settings_core.get_settings()['top stereo'] \
-           if settings_core.get_settings()["stereoscopic"] \
-           else settings_core.get_settings()['top mono'],
-        "steps" : 0.01,
-        "func"  : lambda: update_FOV()
-    },
-    {
-        "text" : "Bottom", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default": settings_core.get_settings()['bottom stereo'] \
-           if settings_core.get_settings()["stereoscopic"] \
-           else settings_core.get_settings()['bottom mono'],
-        "steps" : 0.01,
-        "func"  : lambda: update_FOV()
-    }
-])
-layout_main.addWidget(fov_group)
+# fov_group = create_group_doublespinbox([
+#     {
+#         "text" : "Outer", 
+#         "min":-999999999, 
+#         "max":999999999, 
+#         "default": settings_core.get_settings()['outer stereo'] \
+#            if settings_core.get_settings()["stereoscopic"] \
+#            else settings_core.get_settings()['outer mono'],
+#         "steps" : 0.01,
+#         "func"  : lambda: update_FOV()
+#     },
+#     {
+#         "text" : "Inner", 
+#         "min":-999999999, 
+#         "max":999999999, 
+#         "default": settings_core.get_settings()['inner stereo'] \
+#            if settings_core.get_settings()["stereoscopic"] \
+#            else settings_core.get_settings()['inner mono'],
+#         "steps" : 0.01,
+#         "func"  : lambda: update_FOV()
+#     },
+#     {
+#         "text" : "Top", 
+#         "min":-999999999, 
+#         "max":999999999, 
+#         "default": settings_core.get_settings()['top stereo'] \
+#            if settings_core.get_settings()["stereoscopic"] \
+#            else settings_core.get_settings()['top mono'],
+#         "steps" : 0.01,
+#         "func"  : lambda: update_FOV()
+#     },
+#     {
+#         "text" : "Bottom", 
+#         "min":-999999999, 
+#         "max":999999999, 
+#         "default": settings_core.get_settings()['bottom stereo'] \
+#            if settings_core.get_settings()["stereoscopic"] \
+#            else settings_core.get_settings()['bottom mono'],
+#         "steps" : 0.01,
+#         "func"  : lambda: update_FOV()
+#     }
+# ])
+# layout_main.addWidget(fov_group)
 
-change_FOV_on_check(misc_group1)
+# change_FOV_on_check(misc_group1)
 
 layout_main.addWidget(create_label({
     "text" : "---------Offsets---------", 
@@ -2899,7 +3246,7 @@ layout_driver.addWidget(create_button({
     }))
 config = create_group_horizontal([{
         "type" : "button", 
-        "text" : "open config location", 
+        "text" : "open config", 
         "enabled" : True,
         "func"  : lambda: os.startfile(settings_core.get_path())#.removesuffix("\settings.json"))
     },
@@ -2908,6 +3255,18 @@ config = create_group_horizontal([{
      "alignment" : Qt.AlignmentFlag.AlignCenter
     }])
 layout_driver.addWidget(config)
+
+config2 = create_group_horizontal([{
+        "type" : "button", 
+        "text" : "open steamvr.vrsettings", 
+        "enabled" : True,
+        "func"  : lambda: os.startfile(settings_core.get_settings()["vrsettings path"] + "\steamvr.vrsettings")#.removesuffix("\settings.json"))
+    },
+    {"type" : "label",
+     "text" : settings_core.get_settings()["vrsettings path"],
+     "alignment" : Qt.AlignmentFlag.AlignCenter
+    }])
+layout_driver.addWidget(config2)
 
 #credits/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 def get_public_ip():
@@ -3065,7 +3424,7 @@ def create_credits():
     create_group = QWidget()
     layout_credits1 = QVBoxLayout(create_group)
 
-    label = QLabel("DaniXmir")
+    label = QLabel("Made by: DaniXmir")
     label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
     layout_credits1.addWidget(label)
 
@@ -3096,28 +3455,81 @@ def create_credits():
     group_links = QWidget()
     layout_link = QHBoxLayout(group_links)
     
-    link = '<a href=https://github.com/DaniXmir/GlassVr> https://github.com/DaniXmir/GlassVr </a>'
-    label1 = QLabel("project github:" + link)
+    link = '<a href="https://github.com/DaniXmir/GlassVr" style="color: #4da6ff;">github!</a>'
+    label1 = QLabel("open the project on " + link)
     label1.setTextFormat(Qt.TextFormat.RichText)
     label1.setOpenExternalLinks(True)
     label1.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
     layout_link.addWidget(label1)
-    #layout_credits1.addWidget(label)
 
-    link = '<a href=https://discord.gg/jyvWdKBpPj> https://discord.gg/jyvWdKBpPj </a>'
-    label2 = QLabel("discord server:" + link)
+    link = '<a href="https://discord.gg/jyvWdKBpPj" style="color: #4da6ff;">discord server!</a>'
+    label2 = QLabel("join the " + link)
     label2.setTextFormat(Qt.TextFormat.RichText)
     label2.setOpenExternalLinks(True)
     label2.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
     layout_link.addWidget(label2)
-    #layout_credits1.addWidget(label)
 
     layout_credits1.addWidget(group_links)
 
     return create_group
-
-
 layout_credits.addWidget(create_credits())
+
+def create_credits_section(title, software_list, max_cols=3):
+    container = QWidget()
+    layout = QGridLayout(container)
+
+    title_label = create_label({
+        "text" : title,
+        "alignment" : Qt.AlignmentFlag.AlignCenter
+    })
+    layout.addWidget(title_label, 0, 0, 1, max_cols)
+
+    for index, software in enumerate(software_list):
+        row = (index // max_cols) + 1
+        col = index % max_cols
+        
+        name = software['name']
+        auth = software['auth']
+        
+        if "link" in software:
+            link_url = software["link"]
+            display_text = f'<a href="{link_url}" style="color: #4da6ff;">{name}</a><br>by {auth}'
+            
+            lbl = QLabel(display_text)
+            lbl.setTextFormat(Qt.TextFormat.RichText)
+            lbl.setOpenExternalLinks(True)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        else:
+            display_text = f"{name}\nby {auth}"
+            
+            lbl = create_label({
+                "text" : display_text,
+                "alignment" : Qt.AlignmentFlag.AlignCenter
+            })
+            
+        layout.addWidget(lbl, row, col)
+        
+    return container
+
+extra_names = [
+    {"name": "openvr", "auth": "ValveSoftware", "link": "https://github.com/ValveSoftware/openvr"},
+    {"name": "pyopenvr", "auth": "cmbruns", "link": "https://github.com/cmbruns/pyopenvr"},
+    {"name": "MediaPipe", "auth": "Google Inc", "link": "https://github.com/google-ai-edge/mediapipe"},
+    {"name": "OpenCV", "auth": "OpenCV.org", "link": "https://opencv.org/"},
+    {"name": "SDL2", "auth": "libsdl.org", "link": "https://www.libsdl.org/"},
+    {"name": "viture sdk", "auth": "VITURE Inc", "link" : "https://www.viture.com/developer"},
+]
+
+software_section = create_credits_section("Software Used:", extra_names)
+layout_credits.addWidget(software_section)
+
+special_thanks_list = [
+    {"name": "OpenVR-driver-for-DIY", "auth": "r57zone", "link": "https://github.com/r57zone/OpenVR-driver-for-DIY"}
+]
+
+special_section = create_credits_section("Special Thanks:", special_thanks_list)
+layout_credits.addWidget(special_section)
+
 #credits/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #controllers/////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3213,6 +3625,26 @@ def crpos_specific_widget(layout, combo):
             
             layout.addWidget(t)
 
+        case "marker":
+            t = create_group_horizontal([{
+            "type" : "spinbox", 
+            "text" :"controller index", 
+            "min":0, 
+            "max":999999999, 
+            "default": settings_core.get_settings().get(f'cr gyro index',0), 
+            "steps" : 1,
+            "func"  : lambda: settings_core.update_setting("cr gyro index", t.findChildren(QSpinBox)[0].value())
+                }])
+            layout.addWidget(t)
+
+        case "offsets":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
+                }])
+            layout.addWidget(t)
+
 def create_crpos_widget():
     settings = settings_core.get_settings()
 
@@ -3223,7 +3655,7 @@ def create_crpos_widget():
             "type" : "combobox",
             "text": "right position mode",
             "default": settings.get(f'crpos mode', "redirect"),
-            "items": ["redirect", "hand tracking"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["redirect", "offsets", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "func": lambda: crpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -3301,6 +3733,26 @@ def crrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
+        case "marker":
+            t = create_group_horizontal([{
+            "type" : "spinbox", 
+            "text" :"controller index", 
+            "min":0, 
+            "max":999999999, 
+            "default": settings_core.get_settings().get(f'cr gyro index',0), 
+            "steps" : 1,
+            "func"  : lambda: settings_core.update_setting("cr gyro index", t.findChildren(QSpinBox)[0].value())
+                }])
+            layout.addWidget(t)      
+
+        case "offsets":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
+                }])
+            layout.addWidget(t)
+
 def create_crrot_widget():
     settings = settings_core.get_settings()
 
@@ -3311,7 +3763,7 @@ def create_crrot_widget():
             "type" : "combobox",
             "text": "right rotation mode",
             "default": settings.get(f'crrot mode', "redirect"),
-            "items": ["redirect", "hand tracking", "gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["redirect", "offsets", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro",#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "func": lambda: crrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -3383,6 +3835,26 @@ def clpos_specific_widget(layout, combo):
             
             layout.addWidget(t)
 
+        case "marker":
+            t = create_group_horizontal([{
+            "type" : "spinbox", 
+            "text" :"controller index", 
+            "min":0, 
+            "max":999999999, 
+            "default": settings_core.get_settings().get(f'cr gyro index',0), 
+            "steps" : 1,
+            "func"  : lambda: settings_core.update_setting("cr gyro index", t.findChildren(QSpinBox)[0].value())
+                }])
+            layout.addWidget(t)
+
+        case "offsets":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
+                }])
+            layout.addWidget(t)
+
 def create_clpos_widget():
     settings = settings_core.get_settings()
 
@@ -3393,7 +3865,7 @@ def create_clpos_widget():
             "type" : "combobox",
             "text": "left position mode",
             "default": settings.get(f'clpos mode', "redirect"),
-            "items": ["redirect", "hand tracking"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["redirect", "offsets", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "func": lambda: clpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -3458,6 +3930,18 @@ def clrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
+        case "marker":
+            t = create_group_horizontal([{
+            "type" : "spinbox", 
+            "text" :"controller index", 
+            "min":0, 
+            "max":999999999, 
+            "default": settings_core.get_settings().get(f'cr gyro index',0), 
+            "steps" : 1,
+            "func"  : lambda: settings_core.update_setting("cr gyro index", t.findChildren(QSpinBox)[0].value())
+                }])
+            layout.addWidget(t)
+
         case "gyro":
             t = create_group_horizontal([{
                     "type" : "spinbox", 
@@ -3467,6 +3951,14 @@ def clrot_specific_widget(layout, combo):
                     "default": settings_core.get_settings().get(f'cl gyro index',0), 
                     "steps" : 1,
                     "func"  : lambda: settings_core.update_setting("cl gyro index", t.findChildren(QSpinBox)[0].value())
+                }])
+            layout.addWidget(t)
+
+        case "offsets":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
                 }])
             layout.addWidget(t)
 
@@ -3480,7 +3972,7 @@ def create_clrot_widget():
             "type" : "combobox",
             "text": "left rotation mode",
             "default": settings.get(f'clrot mode', "redirect"),
-            "items": ["redirect", "hand tracking", "gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["redirect", "offsets", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "func": lambda: clrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -3496,14 +3988,14 @@ layout_controllers.addWidget(create_clrot_widget())
 
 def apply_hand_offsets(device):
     if device == "cr":
-        settings_core.update_setting(f"{device} offset world yaw", 2.560)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(2.560)
+        settings_core.update_setting(f"{device} offset world yaw", 2.910)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(2.910)
 
-        settings_core.update_setting(f"{device} offset world pitch", -0.280)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(-0.280)
+        settings_core.update_setting(f"{device} offset world pitch", -0.130)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(-0.130)
 
-        settings_core.update_setting(f"{device} offset world roll", 2.060)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(-0.280)
+        settings_core.update_setting(f"{device} offset world roll", 2.090)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(2.090)
 
     else:
         settings_core.update_setting(f"{device} offset world yaw", 3.860)
@@ -3682,7 +4174,7 @@ refresh_ui_values()
 
 #//////////////////////////////////////////////////////////
 label5 = create_label({
-    "text" : "---------Hand Tracking(experimental, restart to take effect)---------", 
+    "text" : "---------camera(super experimental!!!)---------", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
 layout_controllers.addWidget(label5)
@@ -3690,7 +4182,7 @@ layout_controllers.addWidget(label5)
 webcam = create_group_horizontal([
     {
         "type" : "checkbox", 
-        "text" : "enable, also forward webcam data to open gloves via named pipe(finger, splay, button mapping)",
+        "text" : "enable hand tracking, also forward webcam data to open gloves via named pipe(finger, splay, button mapping)",
         "default" : settings_core.get_settings()['opengloves'], 
         "func" : lambda: start_stop_opengloves()
     },
@@ -3714,6 +4206,296 @@ def start_stop_opengloves():
         start_opengloves()
     else:
         pass
+
+#camera markers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# webcam2 = create_group_horizontal([
+#     {
+#         "type" : "checkbox", 
+#         "text" : "enable markers",
+#         "default" : settings_core.get_settings()['markers'], 
+#         "func" : lambda: start_stop_markers()
+#     }#,
+#     # {
+#     #     "type" : "spinbox", 
+#     #     "text" :"camera index", 
+#     #     "min":0, 
+#     #     "max":999999999, 
+#     #     "default": settings_core.get_settings()['camera index'], 
+#     #     "steps" : 1,
+#     #     "func"  : lambda: settings_core.update_setting("camera index", webcam2.findChildren(QSpinBox)[0].value())
+#     # },
+# ])
+# layout_controllers.addWidget(webcam2)
+
+# def start_stop_markers():
+#     enabled = webcam2.findChild(QCheckBox).isChecked()
+#     settings_core.update_setting("markers", enabled)
+
+#     if enabled:
+#         start_markers()
+#     else:
+#         pass
+
+# markers_active = False
+# def start_markers():
+#     global markers_active, marker_thread
+
+#     if not markers_active:
+#         if not markers_active:
+#             markers_active = True
+#             marker_thread = threading.Thread(target=markers_loop, daemon=True)
+#             marker_thread.start()
+
+# focal_length = 800
+# center = (320, 240)
+# marker_size = 0.10
+
+# camera_matrix = np.array([
+#     [focal_length, 0, center[0]],
+#     [0, focal_length, center[1]],
+#     [0, 0, 1]
+# ], dtype="double")
+# dist_coeffs = np.zeros((4,1))
+
+# marker_3d_edges = np.array([
+#     [-marker_size/2,  marker_size/2, 0],
+#     [ marker_size/2,  marker_size/2, 0],
+#     [ marker_size/2, -marker_size/2, 0],
+#     [-marker_size/2, -marker_size/2, 0]
+# ], dtype="double")
+
+# # dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+# dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
+
+# parameters = cv2.aruco.DetectorParameters()
+# parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+# parameters.adaptiveThreshWinSizeMin = 3
+# parameters.adaptiveThreshWinSizeMax = 23
+
+# detector = cv2.aruco.ArucoDetector(dictionary, parameters)
+
+# cap = cv2.VideoCapture(0)
+# cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+# cap.set(cv2.CAP_PROP_EXPOSURE, -6)
+
+# latest_markers = [] 
+# data_lock = threading.Lock()
+
+# def markers_loop():
+#     global latest_markers, data_lock 
+    
+#     while True:
+#         ret, frame = cap.read()
+#         if not ret: break
+        
+#         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#         corners, ids, _ = detector.detectMarkers(gray)
+        
+#         all_markers_data = [] 
+        
+#         if ids is not None:
+#             for i in range(len(ids)):
+#                 # 1. Calculate Pose
+#                 success, rvec, tvec = cv2.solvePnP(
+#                     marker_3d_edges, corners[i][0], camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_IPPE_SQUARE
+#                 )
+                
+#                 if success:
+#                     # 2. Prepare Data
+#                     rot_matrix, _ = cv2.Rodrigues(rvec)
+#                     quat = R.from_matrix(rot_matrix).as_quat() 
+                    
+#                     marker_dict = {
+#                         "id": int(ids[i][0]),
+#                         "pos x": round(float(tvec[0][0]), 3),
+#                         "pos y": round(float(tvec[1][0]), 3),
+#                         "pos z": round(float(tvec[2][0]), 3),
+#                         "rot x": round(float(quat[0]), 3),
+#                         "rot y": round(float(quat[1]), 3),
+#                         "rot z": round(float(quat[2]), 3),
+#                         "rot w": round(float(quat[3]), 3)
+#                     }
+#                     all_markers_data.append(marker_dict)
+
+#                     top_left = tuple(corners[i][0][0].astype(int))
+                    
+#                     line_height = 18
+#                     for j, (key, value) in enumerate(marker_dict.items()):
+#                         text = f"{key}: {value}"
+#                         y_pos = top_left[1] - 15 + (j * line_height)
+                        
+#                         cv2.putText(frame, text, (top_left[0] + 5, y_pos), 
+#                                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 2)
+#                         cv2.putText(frame, text, (top_left[0] + 5, y_pos), 
+#                                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+
+#                     cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec, tvec, 0.05)
+
+#         with data_lock:
+#             latest_markers = all_markers_data
+
+#         cv2.imshow('6DoF Multi-Marker Tracking', frame)
+#         if cv2.waitKey(1) & 0xFF == ord('q'):
+#             break
+
+#     cap.release()
+#     cv2.destroyAllWindows()
+
+# def get_marker_transform(target_id=0):
+#     global latest_markers, data_lock
+
+#     fallback = {
+#         "id": target_id,
+#         "pos x": 0.0, "pos y": 0.0, "pos z": 0.0,
+#         "rot x": 0.0, "rot y": 0.0, "rot z": 0.0, "rot w": 0.0
+#     }
+
+#     with data_lock:
+#         for marker in latest_markers:
+#             if marker["id"] == target_id:
+#                 return marker
+                
+#     return fallback
+
+# def get_marker_world_transform(device, marker_id):
+#     try:
+#         marker = get_marker_transform(marker_id)
+#         if marker["pos z"] == 0:
+#             raise ValueError("Marker not visible")
+
+#         settings = settings_core.get_settings()
+
+#         hmd_pos = np.array([
+#             trackers_arr[0]['pos x'],
+#             trackers_arr[0]['pos y'],
+#             trackers_arr[0]['pos z']
+#         ])
+        
+#         if 'rotation matrix' in trackers_arr[0]:
+#             hmd_rot = R.from_matrix(trackers_arr[0]['rotation matrix'])
+#         else:
+#             hmd_rot = R.from_quat([
+#                 trackers_arr[0]['rot x'], trackers_arr[0]['rot y'], 
+#                 trackers_arr[0]['rot z'], trackers_arr[0]['rot w']
+#             ])
+
+#         camera_relative_pos = np.array([
+#             marker["pos x"],
+#             -marker["pos y"], 
+#             -marker["pos z"]
+#         ])
+
+#         world_relative_pos = hmd_rot.apply(camera_relative_pos)
+        
+#         mod_x = settings.get('markers x', 1.0)
+#         mod_y = settings.get('markers y', 1.0)
+#         mod_z = settings.get('markers z', 1.0)
+
+#         world_pos = hmd_pos + (world_relative_pos * np.array([mod_x, mod_y, mod_z]))
+
+#         marker_rot_raw = R.from_quat([
+#             marker['rot x'], marker['rot y'], 
+#             marker['rot z'], marker['rot w']
+#         ])
+
+#         euler = marker_rot_raw.as_euler('xyz', degrees=False)
+        
+#         marker_rot_corrected = R.from_euler('xyz', [euler[0], -euler[1], -euler[2]], degrees=False)
+
+#         off_y = settings.get(f'{device} offset world yaw', 0.0)
+#         off_p = settings.get(f'{device} offset world pitch', 0.0)
+#         off_r = settings.get(f'{device} offset world roll', 0.0)
+#         offset_rotation = R.from_euler('ZYX', [off_y, off_p, off_r], degrees=False)
+        
+#         world_rot = hmd_rot * marker_rot_corrected * offset_rotation
+#         final_quat = world_rot.as_quat()
+
+#         return {
+#             "pos x": world_pos[0], "pos y": world_pos[1], "pos z": world_pos[2],
+#             "rot x": final_quat[0], "rot y": final_quat[1], "rot z": final_quat[2], "rot w": final_quat[3]
+#         }
+
+#     except Exception:
+#         return {"pos x": 0.0, "pos y": 0.0, "pos z": 0.0, "rot x": 0.0, "rot y": 0.0, "rot z": 0.0, "rot w": 1.0}
+
+# controller_states = {
+#     1: {"active": False, "pos": np.zeros(3), "vel": np.zeros(3), "rot": R.identity(), 
+#         "offset_quat": R.identity(), "last_time": 0.0, "lost_time": 0},
+#     2: {"active": False, "pos": np.zeros(3), "vel": np.zeros(3), "rot": R.identity(), 
+#         "offset_quat": R.identity(), "last_time": 0.0, "lost_time": 0},
+# }
+
+# def get_marker_gyro_transform(device, marker_id, controller_num):
+#     global controller_states, trackers_arr, controller_1_dict, controller_2_dict
+#     try:
+#         current_time = time.time()
+#         state = controller_states[controller_num]
+#         settings = settings_core.get_settings()
+
+#         c_dict = controller_1_dict if controller_num == 1 else controller_2_dict
+#         if "gyro_quat" not in c_dict:
+#             raise ValueError("No gyro data")
+
+#         g_quat = c_dict["gyro_quat"]
+#         norm = g_quat['x']**2 + g_quat['y']**2 + g_quat['z']**2 + g_quat['w']**2
+#         gyro_rot = R.identity() if norm < 0.0001 else R.from_quat([g_quat['x'], g_quat['y'], g_quat['z'], g_quat['w']])
+
+#         marker = get_marker_transform(marker_id)
+#         tracking_active = marker["pos z"] != 0
+
+#         if tracking_active:
+#             optical = get_marker_world_transform(device, marker_id)
+#             world_pos = np.array([optical["pos x"], optical["pos y"], optical["pos z"]])
+
+#             if state["active"]:
+#                 dt = current_time - state["last_time"]
+#                 if dt > 0.005:
+#                     new_vel = (world_pos - state["pos"]) / dt
+#                     speed = np.linalg.norm(new_vel)
+#                     if speed > 5.0:
+#                         new_vel = (new_vel / speed) * 5.0
+#                     state["vel"] = state["vel"] * 0.6 + new_vel * 0.4
+
+#             if not state["active"] or state["lost_time"] != 0:
+#                 optical_rot = R.from_quat([optical["rot x"], optical["rot y"], optical["rot z"], optical["rot w"]])
+#                 state["offset_quat"] = optical_rot * gyro_rot.inv()
+
+#             state["pos"] = world_pos
+#             state["last_time"] = current_time
+#             state["active"] = True
+#             state["lost_time"] = 0
+
+#             final_pos = world_pos
+#             final_rot = state["offset_quat"] * gyro_rot
+
+#         else:
+#             if not state["active"]:
+#                 raise ValueError("Tracking never initialized")
+
+#             if state["lost_time"] == 0:
+#                 state["lost_time"] = current_time
+
+#             dt = current_time - state["last_time"]
+
+#             final_rot = state["offset_quat"] * gyro_rot
+#             final_pos = state["pos"] + state["vel"] * dt
+
+#             state["pos"] = final_pos
+#             state["last_time"] = current_time
+
+#         final_quat = final_rot.as_quat()
+#         return {
+#             "pos x": final_pos[0], "pos y": final_pos[1], "pos z": final_pos[2],
+#             "rot x": final_quat[0], "rot y": final_quat[1], "rot z": final_quat[2], "rot w": final_quat[3]
+#         }
+
+#     except Exception as e:
+#         return {
+#             "pos x": 0.0, "pos y": 0.0, "pos z": 0.0,
+#             "rot x": 0.0, "rot y": 0.0, "rot z": 0.0, "rot w": 1.0
+#         }
+
+#camera markers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 layout_controllers.addWidget(create_label({
     "text" : "---------Right offsets---------",
@@ -4035,6 +4817,14 @@ def trackerpos_specific_widget(index, layout, combo):
             }])
             layout.addWidget(t)
 
+        case "offsets":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
+                }])
+            layout.addWidget(t)
+
 def trackerrot_specific_widget(index, layout, combo):
     settings_core.update_setting(f'{index}trackerrot mode', combo.currentText()) 
 
@@ -4099,6 +4889,14 @@ def trackerrot_specific_widget(index, layout, combo):
                 }])
             layout.addWidget(t)
 
+        case "offsets":
+            t = create_group_horizontal([{
+                    "type" : "label",
+                    "text" : "",
+                    "alignment" : Qt.AlignmentFlag.AlignCenter,
+                }])
+            layout.addWidget(t)
+
 def create_tracker_widget(index = 0):
     settings = settings_core.get_settings()
 
@@ -4116,7 +4914,7 @@ def create_tracker_widget(index = 0):
             "type" : "combobox",
             "text": f'{index} position mode',
             "default": settings.get(f'{index}trackerpos mode', "redirect"),
-            "items": ["redirect"],# "hip emulation"], add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["redirect", "offsets"],# "hip emulation"], add later////////////////////////////////////////////////////////////////////////////////////////
             "func": lambda: trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))#lambda: settings_core.update_setting(f'{index}tracker mode', combo_extra.findChild(QComboBox).currentText())
         })
     layout_extrapos.addWidget(combopos_extra)
@@ -4129,7 +4927,7 @@ def create_tracker_widget(index = 0):
             "type" : "combobox",
             "text": f'{index} rotation mode',
             "default": settings.get(f'{index}trackerrot mode', "redirect"),
-            "items": ["redirect", "gyro"],# "hip emulation"], add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["redirect", "offsets", "gyro"],# "hip emulation"], add later////////////////////////////////////////////////////////////////////////////////////////
             "func": lambda: trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))#lambda: settings_core.update_setting(f'{index}tracker mode', combo_extra.findChild(QComboBox).currentText())
         })
     layout_extrarot.addWidget(comborot_extra)
@@ -4268,27 +5066,45 @@ layout_devices = QVBoxLayout(tab_devices)
 
 devices_arr = []
 
+# def create_trackers_display():
+#     settings_core.update_setting("trackers num", tracker_num.findChild(QSpinBox).value())
+#     settings = settings_core.get_settings()
+
+#     devices_arr.clear()
+#     if settings['trackers num'] == 0:
+#         clear_layout(layout_devices)
+#     else:
+#         for n in range(settings['trackers num']):
+#             devices_arr.append(create_tracker_widget(n))
+
+#         clear_layout(layout_devices)
+#         for n in devices_arr:
+#             layout_devices.addWidget(n)
+
 def create_trackers_display():
     settings_core.update_setting("trackers num", tracker_num.findChild(QSpinBox).value())
     settings = settings_core.get_settings()
-
     devices_arr.clear()
-    if settings['trackers num'] == 0:
-        clear_layout(layout_devices)
-    else:
+    clear_layout(layout_devices)
+
+    if settings['trackers num'] > 0:
         for n in range(settings['trackers num']):
             devices_arr.append(create_tracker_widget(n))
 
-        clear_layout(layout_devices)
-        for n in devices_arr:
-            layout_devices.addWidget(n)
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        for widget in devices_arr:
+            container_layout.addWidget(widget)
 
-# layout_trackers.addWidget(create_label({"text" : "---------aaa---------",
-#                                         "alignment" : Qt.AlignmentFlag.AlignCenter
-# }))
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(container)
+
+        layout_devices.addWidget(scroll_area)
 
 tracker_num = create_spinbox({
-        "text" : "tracker number", 
+        "text" : "tracker number",
         "min":0, 
         "max":999999999, 
         "default":settings_core.get_settings()['trackers num'], 
@@ -4313,13 +5129,40 @@ tracker_title_label1 = create_label({
 })
 group_layout.addWidget(tracker_title_label1)
 
+# trackers_label1 = create_label({
+#     "text" : "0 found", 
+#     "alignment" : Qt.AlignmentFlag.AlignCenter
+# })
+# group_layout.addWidget(trackers_label1)
+
+#////////////////////////////////////////////////////
+scroll = QScrollArea()
+scroll.setWidgetResizable(True)
+
+container = QWidget()
+layout = QVBoxLayout(container)
+
 trackers_label1 = create_label({
     "text" : "0 found", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-group_layout.addWidget(trackers_label1)
+layout.addWidget(trackers_label1)
 
+scroll.setWidget(container)
+
+group_layout.addWidget(scroll)
 #////////////////////////////////////////////////////
+
+if __name__ == '__main__':
+    if settings_core.get_settings()['opengloves']:
+        start_opengloves()
+    # if settings_core.get_settings()['markers']:
+    #     start_markers()
+
+    start_controller_mapping()
+
+    start_send_data()
+    start_update_vrlabel()
 
 tabs.addTab(tab_main, "Hmd")
 tabs.addTab(tab_controllers, "Controllers")

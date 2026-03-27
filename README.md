@@ -1,10 +1,23 @@
 # GlassVr
 glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even stereoscopic 3D in steamvr,
-while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it
+while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it,
+i originally made this driver to create a super light headset using my XR glasses with a base station tracker for SteamVR but since i added a lot more features
 
 showcase on youtube: https://www.youtube.com/watch?v=LaRQ5dUw4bU
 
-join the discord! https://discord.gg/jyvWdKBpPj
+also join the discord! https://discord.gg/jyvWdKBpPj
+
+these include:
+ - headset emulation
+ - index controller emulation
+ - tracker emulation
+ - hand tracking with a usb webcan(experimental)
+ - hmd rotation with 3dof from xr glasses imu(viture glasses only for now)
+ - rotation emulation for all devices with gyro from x/d input controllers
+ - split position and rotation emulation for all emulated devices allowing you to take position from one device and rotation from another
+ - copying device position and rotation and applying it to another with offsets
+ - static offsets for all emulated devices, usefull for 3dof only setups
+ - and more!
 
 # Installing
 1. download the .rar in the Releases tab and extract it
@@ -15,7 +28,7 @@ now when you launch steamvr you should see a window called "Headset Window" and 
 to uninstall, simply click on "uninstall" in the Driver tab
 
 note:
- - i only tested the driver on my vitrue pro xr but it should work no problem on other glasses like xreal etc
+ - 3dof from imu only works on viture glasses for now
  - not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
 hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
@@ -32,9 +45,9 @@ also try downgrading you'r firmware if you can, i found that older firmwares can
 
 # Requirements
 - xr glasses or a monitor, for you'r eyes ofcourse
-- vr controller or vr tracker, to track you'r head
+- vr controller or vr tracker, to track you'r head(only for 6dof)
 
-base stations aren't required, if you have any other vr tracker like vive ultimate, fluxpose etc.. they will also work
+base stations aren't required, if you have any other vr tracker like vive ultimate, ps move etc.. they will also work
 
 # Optinal Hardware
 - 2 additional controllers, one for each hand
@@ -105,31 +118,54 @@ and add "activateMultipleDrivers" : true
 # QNA
 1. will this work with my (insert company name here aka, viture, xreal etc) glasses?
 	
-	yes, the driver doesn't care which glasses you have, literally any monitor will work
-
-2. i don't have base station, but i do have quest controllers, can i use them?
-
-   maybe, if you could find a way to use the controllers without the headset in steamvr
+	to get an image yes the driver doesn't care which glasses you have, literally any monitor will work,
+	
+	for 3dof read 2
    
-3. I only have 2 controllers...
+2. can i use the builtin 3DOF imu for rotation only?
 
-   strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
+	for now only viture glasses are supported, for everything else check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
 
-4. can i use the builtin 3DOF imu?
+3. can i use other devices like a phone instead of xr glasses?
 
-	no... check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
+   yes all emulated devices(hmd, controllers and hand tracking, trackers) will work with other devices and drivers,
    
-5. linux?
+   if you plan you use a phone as an hmd suggest using alvr and phonevr for less latency, the driver is designed for wired displays
+
+   alvr: https://github.com/alvr-org/ALVR
+   
+   PhoneVR: https://github.com/PhoneVR-Developers/PhoneVR
+   
+   i should also probably change the name lol
+   
+4. i don't have base station, can i use something else?
+
+   a lot of people asked me about ps move or quest controllers, 
+   
+   if they show in steamvr = position and rotation can be copyed and applyed with offsets to another device(even real devices with tracking overrides: https://github.com/ValveSoftware/openvr/wiki/TrackingOverrides)
+
+5. ps move?
+
+	plz read 4
+
+	i probably wont be adding support in the driver but you can use PSMoveService: https://github.com/psmoveservice/PSMoveService
+	
+	to get them in steanvr then copy their position and rotation to your device
+
+6. I only have 2 controllers...
+
+	strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
+   
+7. linux?
 	
 	in the future, maybe
 
-6. wireless?
+8. wireless?
 	
-	option 1. find a way to stream the "headset window" to your phone, maybe alvr or even Parsec?
+	option 1. find a way to stream the "headset window" to your phone, maybe Parsec or even alvr
 	
-	option 2. there are some "wireless hdmi 120hz" on amazon/aliexpress, but i dont know how good they actually are, especially for vr
+	option 2. there are some "wireless hdmi 120hz" dongles on amazon/aliexpress but i dont know how good they actually are, especially for vr
 
-7. any more quetions?
+9. any more quetions?
     
 	ask them in the discord server: https://discord.gg/WbEqvHKs
-
