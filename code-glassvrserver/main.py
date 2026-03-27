@@ -661,7 +661,7 @@ def get_new_transform(device="hmd", px=0.0, py=0.0, pz=0.0, rx=0.0, ry=0.0, rz=0
     
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-def euler_to_quat(yaw, pitch, roll):
+def euler_to_quat(pitch, roll, yaw):
     cr = math.cos(roll * 0.5)
     sr = math.sin(roll * 0.5)
     cp = math.cos(pitch * 0.5)
@@ -1148,9 +1148,9 @@ def send_controller_data(is_right):
                 try:
                     match settings[f'{device_name}pos mode']:
                         case "offsets":
-                            pos_x = settings[f"{device_name} offset world x"]
-                            pos_y = settings[f"{device_name} offset world y"]
-                            pos_z = settings[f"{device_name} offset world z"]
+                            pos_x = float(settings.get(f"{device_name} offset world x", 0.0))
+                            pos_y = float(settings.get(f"{device_name} offset world y", 0.0))
+                            pos_z = float(settings.get(f"{device_name} offset world z", 0.0))
 
                         case "hand tracking":
                             if settings_core.get_settings()['opengloves'] != False:
@@ -1198,6 +1198,7 @@ def send_controller_data(is_right):
                             pos_x = final_transform['pos x']
                             pos_y = final_transform['pos y']
                             pos_z = final_transform['pos z']
+
                 except:
                     pass
                 try:
@@ -1310,7 +1311,7 @@ def send_controller_data(is_right):
                     joy_y = -get_mapped_action(f'{side} joy y')
                     touch_x = get_mapped_action(f'{side} touch x')
                     touch_y = -get_mapped_action(f'{side} touch y')
-                
+
                 buffer = CONTROLLER_PACKER.pack(
                     float(pos_x), float(pos_y), float(pos_z),      # 3
                     float(rot_w), float(rot_x), float(rot_y), float(rot_z), # 4
@@ -2716,16 +2717,16 @@ misc = create_group_doublespinbox([
         "text" : "IPD", 
         "min":-999999999, 
         "max":999999999, 
-        "default":settings_core.get_settings()['ipd'], 
-        "steps" : 0.001, 
-        "func" : lambda: settings_core.update_setting("ipd", misc.findChildren(QDoubleSpinBox)[0].value()) 
+        "default":settings_core.get_settings()['ipd'] * 1000, 
+        "steps" : 1.0,
+        "func" : lambda: settings_core.update_setting("ipd", misc.findChildren(QDoubleSpinBox)[0].value() * 0.001)
     },
     {
         "text" : "Distance from tracker to eyes", 
         "min":-999999999, 
         "max":999999999, 
         "default":settings_core.get_settings()['head to eye dist'], 
-        "steps" : 0.001, 
+        "steps" : 0.1, 
         "func" : lambda: settings_core.update_setting("head to eye dist", misc.findChildren(QDoubleSpinBox)[1].value()) 
     }
 ])
@@ -3987,14 +3988,14 @@ layout_controllers.addWidget(create_clrot_widget())
 
 def apply_hand_offsets(device):
     if device == "cr":
-        settings_core.update_setting(f"{device} offset world yaw", 2.560)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(2.560)
+        settings_core.update_setting(f"{device} offset world yaw", 2.910)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(2.910)
 
-        settings_core.update_setting(f"{device} offset world pitch", -0.280)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(-0.280)
+        settings_core.update_setting(f"{device} offset world pitch", -0.130)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(-0.130)
 
-        settings_core.update_setting(f"{device} offset world roll", 2.060)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(-0.280)
+        settings_core.update_setting(f"{device} offset world roll", 2.090)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(2.090)
 
     else:
         settings_core.update_setting(f"{device} offset world yaw", 3.860)
