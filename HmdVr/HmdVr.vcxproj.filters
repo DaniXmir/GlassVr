@@ -42,7 +42,16 @@
     <ClInclude Include="headers\openvr_driver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="samples\viture.h">
+    <ClInclude Include="samples\driver_sample\viture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="samples\driver_sample\cstracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="samples\driver_sample\settings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="samples\driver_sample\hand_simulation.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -90,7 +99,16 @@
     <ClCompile Include="samples\driver_sample\basics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="samples\viture.cpp">
+    <ClCompile Include="samples\driver_sample\viture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\cstracker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\settings.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="samples\driver_sample\hand_simulation.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,3 +1,4 @@
+#pragma once
 #ifndef CSAMPLECONTROLLERDRIVER_H
 #define CSAMPLECONTROLLERDRIVER_H
 
@@ -8,6 +9,8 @@
 #include <mutex>
 #include <windows.h>
 
+#include "hand_simulation.h"
+
 #pragma pack(push, 1)
 struct PacketController {
     double pos_x, pos_y, pos_z;
@@ -15,6 +18,9 @@ struct PacketController {
     double joy_x, joy_y;
     double touch_x, touch_y;
     double trigger;
+
+    double flexions[20];
+    double splays[5];
 
     bool a;
     bool b;
@@ -53,7 +59,7 @@ private:
     HANDLE m_hPipe = INVALID_HANDLE_VALUE;
     std::mutex m_poseMutex;
 
-    void UpdateSkeletalInput(bool isGripClosed);
+    void UpdateSkeletalInput(PacketController& packet);
 
     vr::TrackedDeviceIndex_t m_unObjectId;
     vr::PropertyContainerHandle_t m_ulPropertyContainer;
@@ -67,6 +73,8 @@ private:
     int32_t right;
 
     PacketController m_poseDataCache;
+
+    MyHandSimulation m_handSimulation;
 };
 
 #endif

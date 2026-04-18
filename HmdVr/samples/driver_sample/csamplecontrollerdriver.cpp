@@ -1,13 +1,9 @@
-//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-// help plz!!!!!!!!!!! skeletal input is bugged
-//https://github.com/LucidVR/opengloves-driver/blob/develop/driver/src/device/drivers/knuckle_device_driver.cpp
-//https://github.com/SDraw/driver_leap/blob/master/driver_leap/Devices/Controller/CLeapIndexController.cpp
-//https://github.com/spayne/soft_knuckles/blob/master/soft_knuckles_device.cpp
-//https://github.com/HadesVR/HadesVR/blob/main/Software/Driver/src/samples/driver_HadesVR/src/driver_main.cpp
 #include "csamplecontrollerdriver.h"
 #include "settings.h" 
 #include <math.h>
 #include <string>
+
+#define DEG_TO_RAD(x) ((x) * (3.14159265358979f / 180.f))
 
 using namespace vr;
 
@@ -91,7 +87,7 @@ vr::EVRInitError CSampleControllerDriver::Activate(vr::TrackedDeviceIndex_t unOb
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/grip/value", &m_HAnalog[7], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
 
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/index", &m_HAnalog[8], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
-    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/middle", &m_HAnalog[8], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
+    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/middle", &m_HAnalog[9], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/ring", &m_HAnalog[8], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/pinky", &m_HAnalog[8], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
 
@@ -103,7 +99,7 @@ vr::EVRInitError CSampleControllerDriver::Activate(vr::TrackedDeviceIndex_t unOb
             "/input/skeleton/left",
             "/skeleton/hand/left",
             "/pose/raw",
-            vr::VRSkeletalTracking_Partial,
+            vr::VRSkeletalTracking_Full,
             nullptr,
             0U,
             &m_HSkeletal
@@ -115,7 +111,7 @@ vr::EVRInitError CSampleControllerDriver::Activate(vr::TrackedDeviceIndex_t unOb
             "/input/skeleton/right",
             "/skeleton/hand/right",
             "/pose/raw",
-            vr::VRSkeletalTracking_Partial,
+            vr::VRSkeletalTracking_Full,
             nullptr,
             0U,
             &m_HSkeletal
@@ -170,7 +166,7 @@ void CSampleControllerDriver::DebugRequest(const char* pchRequest, char* pchResp
 //pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static uint32_t g_foundTrackers[vr::k_unMaxTrackedDeviceCount];
 static uint32_t g_trackerCount = 0;
-static int g_selectedIndex = 0;//GetIntFromSettingsByKey("hmd index");
+static int g_selectedIndex = 0;
 
 static void UpdateTrackers() {
     g_trackerCount = 0;
@@ -338,42 +334,38 @@ vr::DriverPose_t CSampleControllerDriver::GetPose()
     std::lock_guard<std::mutex> lock(m_poseMutex);
     return pose;
 }
-//pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//pos here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void CSampleControllerDriver::UpdateSkeletalInput(bool isGripClosed)
+void CSampleControllerDriver::UpdateSkeletalInput(PacketController& packet)
 {
-    VRBoneTransform_t boneTransforms[31];
+    vr::VRBoneTransform_t boneTransforms[31];
 
-    for (int i = 0; i < 31; i++) {
-        boneTransforms[i].position.v[0] = 0.0f;
-        boneTransforms[i].position.v[1] = 0.0f;
-        boneTransforms[i].position.v[2] = 0.0f;
-        boneTransforms[i].position.v[3] = 1.0f;
+    MyFingerCurls curls = {
+        (float)packet.flexions[0],//thumb
+        (float)packet.flexions[4],//index
+        (float)packet.flexions[8],//middle
+        (float)packet.flexions[12],//ring
+        (float)packet.flexions[16]//pinky
+    };
 
-        boneTransforms[i].orientation.w = 1.0f;
-        boneTransforms[i].orientation.x = 0.0f;
-        boneTransforms[i].orientation.y = 0.0f;
-        boneTransforms[i].orientation.z = 0.0f;
-    }
+    MyFingerSplays splays = {
+        (float)packet.splays[0],
+        (float)packet.splays[1],
+        (float)packet.splays[2],
+        (float)packet.splays[3],
+        (float)packet.splays[4]
+    };
 
-    float curlAngle = isGripClosed ? 1.2f : 0.0f;
+    vr::ETrackedControllerRole role = (right == 1)
+        ? vr::TrackedControllerRole_RightHand
+        : vr::TrackedControllerRole_LeftHand;
 
-    for (int finger = 0; finger < 5; finger++) {
-        int baseIndex = 2 + (finger * 4);
-        for (int joint = 0; joint < 3; joint++) {
-            int boneIndex = baseIndex + joint + 1;
-            if (boneIndex < 31) {
-                float angle = curlAngle * (joint + 1) / 3.0f;
-                boneTransforms[boneIndex].orientation.w = cos(angle / 2.0f);
-                boneTransforms[boneIndex].orientation.x = sin(angle / 2.0f);
-                boneTransforms[boneIndex].orientation.y = 0.0f;
-                boneTransforms[boneIndex].orientation.z = 0.0f;
-            }
-        }
-    }
+    m_handSimulation.ComputeSkeletonTransforms(role, curls, splays, boneTransforms);
 
-    vr::VRDriverInput()->UpdateSkeletonComponent(m_HSkeletal, vr::VRSkeletalMotionRange_WithController, boneTransforms, 31);
-    vr::VRDriverInput()->UpdateSkeletonComponent(m_HSkeletal, vr::VRSkeletalMotionRange_WithoutController, boneTransforms, 31);
+    vr::VRDriverInput()->UpdateSkeletonComponent(
+        m_HSkeletal, vr::VRSkeletalMotionRange_WithController, boneTransforms, 31);
+    vr::VRDriverInput()->UpdateSkeletonComponent(
+        m_HSkeletal, vr::VRSkeletalMotionRange_WithoutController, boneTransforms, 31);
 }
 
 void CSampleControllerDriver::RunFrame()
@@ -416,7 +408,7 @@ void CSampleControllerDriver::RunFrame()
     vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[6], gripValue, 0);
     vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[7], gripValue, 0);
 
-    UpdateSkeletalInput(isGripPressed);
+    UpdateSkeletalInput(m_poseDataCache);
 
     if (m_unObjectId != vr::k_unTrackedDeviceIndexInvalid) {
         if (right) {

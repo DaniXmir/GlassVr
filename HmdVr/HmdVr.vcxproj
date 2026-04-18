@@ -137,9 +137,12 @@
     <ClInclude Include="samples\driver_sample\csamplecontrollerdriver.h" />
     <ClInclude Include="samples\driver_sample\csampledevicedriver.h" />
     <ClInclude Include="samples\driver_sample\cserverdriver_sample.h" />
+    <ClInclude Include="samples\driver_sample\cstracker.h" />
     <ClInclude Include="samples\driver_sample\cwatchdogdriver_sample.h" />
     <ClInclude Include="samples\driver_sample\driverlog.h" />
-    <ClInclude Include="samples\viture.h" />
+    <ClInclude Include="samples\driver_sample\hand_simulation.h" />
+    <ClInclude Include="samples\driver_sample\settings.h" />
+    <ClInclude Include="samples\driver_sample\viture.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="headers\openvr_api.cs" />
@@ -168,10 +171,13 @@
     <ClCompile Include="samples\driver_sample\csamplecontrollerdriver.cpp" />
     <ClCompile Include="samples\driver_sample\csampledevicedriver.cpp" />
     <ClCompile Include="samples\driver_sample\cserverdriver_sample.cpp" />
+    <ClCompile Include="samples\driver_sample\cstracker.cpp" />
     <ClCompile Include="samples\driver_sample\cwatchdogdriver_sample.cpp" />
     <ClCompile Include="samples\driver_sample\driverlog.cpp" />
     <ClCompile Include="samples\driver_sample\driver_sample.cpp" />
-    <ClCompile Include="samples\viture.cpp" />
+    <ClCompile Include="samples\driver_sample\hand_simulation.cpp" />
+    <ClCompile Include="samples\driver_sample\settings.cpp" />
+    <ClCompile Include="samples\driver_sample\viture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="samples\driver_sample\CMakeLists.txt" />
