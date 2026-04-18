@@ -13,7 +13,6 @@ default_settings = {
     "stereoscopic" : False,
     
     #fov///////////////////////////
-
     "fov" : 90.0,
     "convergence" : 0.0,
 
@@ -46,9 +45,6 @@ default_settings = {
     "hmdpos mode" : "redirect",
     "hmdrot mode" : "redirect",
 
-    # "hmdpos update from server" : False,
-    # "hmdrot update from server" : False,
-
     "hmd offset world x": 0.0,
     "hmd offset world y": 0.0,
     "hmd offset world z": 0.0,
@@ -72,9 +68,6 @@ default_settings = {
     "crpos mode" : "redirect",
     "crrot mode" : "redirect",
 
-    # "crpos update from server" : False,
-    # "crrot update from server" : False,
-
     "cr offset world x": 0.0,
     "cr offset world y": 0.0,
     "cr offset world z": 0.0,
@@ -95,9 +88,6 @@ default_settings = {
     "clpos mode" : "redirect",
     "clrot mode" : "redirect",
 
-    # "clpos update from server" : False,
-    # "clrot update from server" : False,
-
     "cl offset world x": 0.0,
     "cl offset world y": 0.0,
     "cl offset world z": 0.0,
@@ -112,90 +102,45 @@ default_settings = {
     "cl offset local pitch": 0.0,
     "cl offset local roll": 0.0,
 
-    "controller index 1" : 0,
-    "controller index 2" : 1,
+    "cr_a" : "",
+    "cr_b" : "",
+    "cr_trigger" : "",
+    "cr_grip" : "",
+    "cr_menu" : "",
 
-    "0a": "right grip",
-    "0b": "right b",
-    "0x": "reset gyro",
-    "0y": "right a",
-    "0dpup": "none",
-    "0dpdown": "none",
-    "0dpleft": "none",
-    "0dpright": "none",
-    "0leftshoulder": "right grip",
-    "0rightshoulder": "right grip",
-    "0lefttrigger": "none",
-    "0righttrigger": "none",
-    "0leftstick": "right joy button",
-    "0rightstick": "none",
-    "0leftx": "right joy y",
-    "0lefty": "right joy x",
-    "0rightx": "none",
-    "0righty": "none",
-    "0back": "none",
-    "0start": "right menu",
-    "0guide": "none",
-    "0misc1": "none",
-    "0touchpad": "none",
-    "0paddle1": "right touch modifier",
-    "0paddle2": "none",
-    "0paddle3": "right trigger",
-    "0paddle4": "none",
+    "cr_joy up" : "",
+    "cr_joy down" : "",
+    "cr_joy left" : "",
+    "cr_joy right" : "",
+    "cr_joy click" : "",
 
-    "1a": "left a",
-    "1b": "left b",
-    "1x": "reset gyro",
-    "1y": "left grip",
-    "1dpup": "none",
-    "1dpdown": "none",
-    "1dpleft": "none",
-    "1dpright": "none",
-    "1leftshoulder": "left grip",
-    "1rightshoulder": "left grip",
-    "1lefttrigger": "none",
-    "1righttrigger": "none",
-    "1leftstick": "left joy button",
-    "1rightstick": "none",
-    "1leftx": "left joy y",
-    "1lefty": "left joy x",
-    "1rightx": "none",
-    "1righty": "none",
-    "1back": "none",
-    "1start": "left menu",
-    "1guide": "none",
-    "1misc1": "none",
-    "1touchpad": "none",
-    "1paddle1": "none",
-    "1paddle2": "left touch modifier",
-    "1paddle3": "none",
-    "1paddle4": "left trigger",
+    "cr_touch up" : "",
+    "cr_touch down" : "",
+    "cr_touch left" : "",
+    "cr_touch right" : "",
+    "cr_touch click" : "",
 
-    "joy1 invert x": True,
-    "joy1 invert y": False,
-    "joy2 invert x": False,
-    "joy2 invert y": True,
+    "cl_a" : "",
+    "cl_b" : "",
+    "cl_trigger" : "",
+    "cl_grip" : "",
+    "cl_menu" : "",
 
-    "hmd gyro index": 0,
-    "cl gyro index": 1,
-    "cr gyro index": 0,
+    "cl_joy up" : "",
+    "cl_joy down" : "",
+    "cl_joy left" : "",
+    "cl_joy right" : "",
+    "cl_joy click" : "",
 
-    "gyro1 invert x": False,
-    "gyro1 invert y": False,
-    "gyro1 invert z": True,
-    "gyro2 invert x": True,
-    "gyro2 invert y": False,
-    "gyro2 invert z": False,
+    "cl_touch up" : "",
+    "cl_touch down" : "",
+    "cl_touch left" : "",
+    "cl_touch right" : "",
+    "cl_touch click" : "",
 
-    "gyro1 index x": 2,
-    "gyro1 index y": 1,
-    "gyro1 index z": 0,
-    "gyro2 index x": 2,
-    "gyro2 index y": 1,
-    "gyro2 index z": 0,
-
-    "gyro1 sensitivity": 1000.0,
-    "gyro2 sensitivity": 1000.0,
+    "hmd gyro id": "",
+    "cl gyro id": "",
+    "cr gyro id": "",
 
     "bluetooth skip correction": False,
 
@@ -203,17 +148,24 @@ default_settings = {
     "enable cr": False,
     "enable cl": False,
 
-    "opengloves": False,
-    "camera z": 0.025,
+    #hand tracking///////////////////////////
+    "hand tracking": False,
+    "curl" : True,
+    "splay" : True,
+    "index=trigger" : False,
+    "other=grip" : False,
     "camera index": 0,
+    "camera offset x": 0.0,
+    "camera offset y": 0.0,
+    "camera offset z": 0.0,
 
-    "markers":False,
-    "markers z" : 0.9,
-    "crpos marker id" : 98,
-    "crrot marker id" : 98,
+    # "markers": False,
+    # "markers z" : 0.9,
+    # "crpos marker id" : 98,
+    # "crrot marker id" : 98,
 
-    "clpos marker id" : 40,
-    "clrot marker id" : 40,
+    # "clpos marker id" : 40,
+    # "clrot marker id" : 40,
 
     "trackers num": 0,
 }
@@ -228,7 +180,6 @@ def get_path():
     try:
         os.makedirs(settings_dir, exist_ok=True)
     except OSError as e:
-        #print(e)
         pass
         
     return file_path
@@ -264,7 +215,6 @@ def get_settings():
         return current_settings
         
     except (json.JSONDecodeError, OSError) as e:
-        #print(e)
         return default_settings
 
 def update_setting(key, new_value):
@@ -278,4 +228,19 @@ def update_setting(key, new_value):
 
     except Exception as e:
         pass
-        #print(e)
+
+def update_nested(dict_name, new_data):
+    #example: update_nested("a4-53-85-4a-e7-18", {"index_x": 2, "invert_x": True})
+    #if the same example is use on update_setting, it will override the dict instead of update it
+    settings = get_settings()
+
+    if dict_name not in settings or not isinstance(settings[dict_name], dict):
+        settings[dict_name] = {}
+
+    settings[dict_name].update(new_data)
+
+    try:
+        with open(file_path, 'w') as f:
+            json.dump(settings, f, indent=4)
+    except Exception as e:
+        pass

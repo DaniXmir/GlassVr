@@ -1,11 +1,9 @@
-#pyinstaller --noconfirm --windowed --collect-binaries "sdl2dll" --collect-all "sdl2" --collect-binaries "openvr" --collect-all "mediapipe" --collect-all "cv2" --hidden-import "sdl2dll" main.py
-#or
-#pyinstaller --noconfirm --windowed --uac-admin --collect-binaries "sdl2dll" --collect-all "sdl2" --collect-binaries "openvr" --collect-all "mediapipe" --collect-all "cv2" --hidden-import "sdl2dll" main.py
-
+#pyinstaller --noconfirm --windowed --collect-binaries "sdl3dll" --collect-all "sdl3" --collect-binaries "openvr" --collect-all "mediapipe" --collect-all "cv2" --hidden-import "sdl3dll" main.py
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpinBox, QDoubleSpinBox, QLineEdit, QTabWidget, QGridLayout, QCheckBox, QComboBox, QScrollArea
 
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QPixmap, QIcon
+from PyQt6.QtCore import Qt, QSize, QObject, pyqtSignal, QTimer
+
+from PyQt6.QtGui import QPixmap, QIcon, QKeySequence
 
 import shutil
 import psutil
@@ -26,10 +24,13 @@ import cv2
 import mediapipe as mp
 import cv2.aruco as aruco
 
+import cvzone
+from cvzone.HandTrackingModule import HandDetector
+
 import time
-from sdl2 import *
-from sdl2.ext import Resources
-import keyboard
+
+import sdl3 as SDL
+from sdl3 import *
 
 import ctypes
 import webbrowser
@@ -41,9 +42,11 @@ import pywintypes
 
 import settings_core
 
+from collections import deque
+
 from PyInstaller.utils.hooks import collect_dynamic_libs
 
-binaries = collect_dynamic_libs('sdl2dll')
+binaries = collect_dynamic_libs('sdl3dll')
 
 app = QApplication([])#sys.argv)
 
@@ -53,7 +56,7 @@ window_layout = QHBoxLayout(window)
 tabs = QTabWidget()
 #window.setWindowTitle("PuffinVR")
 window.setWindowTitle("GlassVR")
-#window.resize(1150, 1100)
+
 window.resize(900, 900)
 
 #ui core/////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,13 +80,13 @@ def create_label(dict):
     group_widget = QWidget()
     group_layout = QHBoxLayout(group_widget)
 
-    label = QLabel(dict['text'])
-    label.setAlignment(dict['alignment'])
+    label = QLabel(dict.get('text',""))
+    label.setAlignment(dict.get('alignment',Qt.AlignmentFlag.AlignCenter))
     group_layout.addWidget(label)
 
     return group_widget
 
-def create_group_label(arr = []):#[{"text" : "hi"},{},{}]
+def create_group_label(arr = []):
     if arr:
         group_widget = QWidget()
         group_layout = QHBoxLayout(group_widget)
@@ -97,16 +100,16 @@ def create_button(dict):
     group_widget = QWidget()
     group_layout = QHBoxLayout(group_widget)
 
-    button = QPushButton(dict['text'])
+    button = QPushButton(dict.get('text',""))
     if 'func' in dict:
         button.clicked.connect(lambda: dict['func']())
-    button.setEnabled(dict['enabled'])
+    button.setEnabled(dict.get('enabled',True))
 
     group_layout.addWidget(button)
 
     return group_widget
 
-def create_group_button(arr = []):#[{"text" : "hi"},{},{}]
+def create_group_button(arr = []):
     if arr:
         group_widget = QWidget()
         group_layout = QHBoxLayout(group_widget)
@@ -126,12 +129,12 @@ def create_checkbox(dict):
     checkbox = QCheckBox()
     checkbox.setChecked(dict['default'])
     if 'func' in dict:
-        checkbox.clicked.connect(lambda: dict['func']())#dict))
+        checkbox.clicked.connect(lambda: dict['func']())
     group_layout.addWidget(checkbox)
 
     return group_widget
 
-def create_group_checkbox(arr = []):#[{"text" : "hi"},{},{}]
+def create_group_checkbox(arr = []):
     if arr:
         group_widget = QWidget()
         group_layout = QHBoxLayout(group_widget)
@@ -141,7 +144,7 @@ def create_group_checkbox(arr = []):#[{"text" : "hi"},{},{}]
 
         return group_widget
 
-def create_spinbox(dict):#text = "", min = -1, max = -1, default = 0):
+def create_spinbox(dict):
     group_widget = QWidget()
     group_layout = QHBoxLayout(group_widget)
 
@@ -159,7 +162,7 @@ def create_spinbox(dict):#text = "", min = -1, max = -1, default = 0):
 
     return group_widget
 
-def create_group_spinbox(arr = []):#[{"text" : "hi"},{},{}]
+def create_group_spinbox(arr = []):
     if arr:
         group_widget = QWidget()
         group_layout = QHBoxLayout(group_widget)
@@ -169,7 +172,7 @@ def create_group_spinbox(arr = []):#[{"text" : "hi"},{},{}]
 
         return group_widget
 
-def create_doublespinbox(dict):#text = "", min = -1, max = -1, default = 0):
+def create_doublespinbox(dict):
     group_widget = QWidget()
     group_layout = QHBoxLayout(group_widget)
 
@@ -188,7 +191,7 @@ def create_doublespinbox(dict):#text = "", min = -1, max = -1, default = 0):
 
     return group_widget
 
-def create_group_doublespinbox(arr = []):#[{"text" : "hi"},{},{}]
+def create_group_doublespinbox(arr = []):
     if arr:
         group_widget = QWidget()
         group_layout = QHBoxLayout(group_widget)
@@ -198,7 +201,7 @@ def create_group_doublespinbox(arr = []):#[{"text" : "hi"},{},{}]
 
         return group_widget
     
-def create_lineedit(dict):#text = "", min = -1, max = -1, default = 0):
+def create_lineedit(dict):
     group_widget = QWidget()
     group_layout = QHBoxLayout(group_widget)
 
@@ -214,7 +217,7 @@ def create_lineedit(dict):#text = "", min = -1, max = -1, default = 0):
 
     return group_widget
 
-def create_group_lineedit(arr = []):#[{"text" : "hi"},{},{}]
+def create_group_lineedit(arr = []):
     if arr:
         group_widget = QWidget()
         group_layout = QHBoxLayout(group_widget)
@@ -250,15 +253,19 @@ def create_group_horizontal(arr = []):
         return group_widget
     
 def create_image(dict = {}):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    image_path = os.path.join(script_dir, "assets", "fix.png")
+    if getattr(sys, 'frozen', False):
+        script_dir = os.path.dirname(sys.executable)
+    else:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+    image_path = os.path.join(script_dir, "assets", dict.get("path", "fix"))
 
     image_label = QLabel()
-    image = QPixmap(image_path)#"D:/UltimateFolder0/Gallery-Y/projects/GlassVr/code-glassvrserver/fix.png")
-    scaled_pixmap = image.scaled(100, 100, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    image = QPixmap(image_path)
+    scaled_pixmap = image.scaled(dict.get("size x", 100), dict.get("size y", 100), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     image_label.setPixmap(scaled_pixmap)
-    image_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
-    return image_label
+    image_label.setAlignment(dict.get('alignment',Qt.AlignmentFlag.AlignCenter))
+
+    return image_label 
 
 def create_combobox(dict):
     group_widget = QWidget()
@@ -300,7 +307,459 @@ def create_group_combobox(arr = [], direction = "h"):
         return group_widget
 #ui core/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-# main/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#controller handler v3/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+class _Signals(QObject):
+    controller_connected = pyqtSignal()
+
+signals = _Signals()
+
+SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_WII", b"1")
+SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_COMBINE_JOY_CONS", b"0")
+SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_PS4", b"1")
+SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_PS5", b"1")
+SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_PS4_RUMBLE", b"1")
+SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_XBOX_ELITE", b"1")
+SDL_SetHint(b"SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", b"1")
+
+SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD)
+
+WIIMOTE_VID    = 0x057E
+WIIMOTE_PIDS   = [0x0306, 0x0330]
+SDL_TRUE       = 1
+SDL_FALSE      = 0
+
+CALIBRATION_SAMPLES = 200
+DEFAULT_THRESHOLD   = 0.02
+DEADZONE            = 0.1
+ALPHA               = 0.98
+
+controllers_dict = {}#{id here(aa-bb-cc-dd-ee) : {"btn1" : false, "axis" " -1 to 1"}}
+controllers_lock = threading.Lock()
+running          = True
+
+def get_default_state(device_type="unknown", handle=None, unique_id=""):
+    return {
+        "id":             unique_id,
+        "type":           device_type,
+        "handle":         handle,
+        "active":         True,
+        "gyro_quat":      {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+        "last_good_quat": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+        "last_ts":        0,
+        "gyro_bias": {
+            "wx": 0.0, "wy": 0.0, "wz": 0.0,
+            "ax": 0.0, "ay": 0.0, "az": 0.0,
+            "tx": DEFAULT_THRESHOLD, "ty": DEFAULT_THRESHOLD, "tz": DEFAULT_THRESHOLD,
+            "samples": 0
+        }
+    }
+
+def get_controller(c_id):
+    return controllers_dict.get(c_id, get_default_state())
+
+def get_gyro(c_id):
+    ctrl = controllers_dict.get(c_id)
+    if ctrl is None:
+        return {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}
+    return ctrl["gyro_quat"].copy()
+
+def get_all_controllers():
+    with controllers_lock:
+        return list(controllers_dict.values())
+
+def normalize_quat(q):
+    mag = math.sqrt(q["x"]**2 + q["y"]**2 + q["z"]**2 + q["w"]**2)
+    if mag == 0: return {"x": 0, "y": 0, "z": 0, "w": 1}
+    return {k: q[k] / mag for k in "xyzw"}
+
+def normalize_vec3(v):
+    mag = math.sqrt(v["x"]**2 + v["y"]**2 + v["z"]**2)
+    if mag == 0: return {"x": 0, "y": 0, "z": 1}
+    return {k: v[k] / mag for k in "xyz"}
+
+def quat_multiply(q1, q2):
+    return {
+        "w": q1["w"]*q2["w"] - q1["x"]*q2["x"] - q1["y"]*q2["y"] - q1["z"]*q2["z"],
+        "x": q1["w"]*q2["x"] + q1["x"]*q2["w"] + q1["y"]*q2["z"] - q1["z"]*q2["y"],
+        "y": q1["w"]*q2["y"] - q1["x"]*q2["z"] + q1["y"]*q2["w"] + q1["z"]*q2["x"],
+        "z": q1["w"]*q2["z"] + q1["x"]*q2["y"] - q1["y"]*q2["x"] + q1["z"]*q2["w"],
+    }
+
+def quat_from_two_vectors(v1, v2):
+    v1, v2 = normalize_vec3(v1), normalize_vec3(v2)
+    cross = {
+        "x": v1["y"]*v2["z"] - v1["z"]*v2["y"],
+        "y": v1["z"]*v2["x"] - v1["x"]*v2["z"],
+        "z": v1["x"]*v2["y"] - v1["y"]*v2["x"],
+    }
+    dot = sum(v1[k]*v2[k] for k in "xyz")
+    if dot < -0.999999:
+        axis = normalize_vec3({"x": 1, "y": 0, "z": 0} if abs(v1["x"]) < 0.6 else {"x": 0, "y": 1, "z": 0})
+        axis = normalize_vec3({
+            "x": v1["y"]*axis["z"] - v1["z"]*axis["y"],
+            "y": v1["z"]*axis["x"] - v1["x"]*axis["z"],
+            "z": v1["x"]*axis["y"] - v1["y"]*axis["x"],
+        })
+        return {"w": 0, **axis}
+    return normalize_quat({"w": 1.0 + dot, **cross})
+
+def quat_slerp(q1, q2, t):
+    dot = sum(q1[k]*q2[k] for k in "wxyz")
+    if dot > 0.9995:
+        return normalize_quat({k: q1[k] + t*(q2[k] - q1[k]) for k in "wxyz"})
+    if dot < 0:
+        q2  = {k: -q2[k] for k in "wxyz"}
+        dot = -dot
+    dot     = max(-1.0, min(1.0, dot))
+    theta_0 = math.acos(dot)
+    theta   = theta_0 * t
+    sin_t   = math.sin(theta)
+    sin_t0  = math.sin(theta_0)
+    s1 = math.cos(theta) - dot * sin_t / sin_t0
+    s2 = sin_t / sin_t0
+    return {k: s1*q1[k] + s2*q2[k] for k in "wxyz"}
+
+def _hmd_quat_dict():
+    q = R.from_matrix(trackers_arr[0]["rotation matrix"]).as_quat()
+    return {"x": q[0], "y": q[1], "z": q[2], "w": q[3]}
+
+def reset_gyro(target_id=None, to_zero=False):
+    if to_zero:
+        target_quat = {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
+    else:
+        target_quat = _hmd_quat_dict().copy()
+
+    with controllers_lock:
+        for c_id, ctrl in controllers_dict.items():
+            if target_id is None or c_id == target_id:
+                if "gyro_quat" in ctrl:
+                    ctrl["gyro_quat"]      = target_quat.copy()
+                    ctrl["last_good_quat"] = target_quat.copy()
+
+def start_calibration(target_id=None):
+    with controllers_lock:
+        for c_id, ctrl in controllers_dict.items():
+            if target_id is None or c_id == target_id:
+                if "gyro_bias" in ctrl:
+                    ctrl["gyro_bias"] = {
+                        "wx": 0.0, "wy": 0.0, "wz": 0.0,
+                        "ax": 0.0, "ay": 0.0, "az": 0.0,
+                        "tx": DEFAULT_THRESHOLD, "ty": DEFAULT_THRESHOLD, "tz": DEFAULT_THRESHOLD,
+                        "samples":    0,
+                        "calibrating": True
+                    }
+
+def process_sdl_gyro(c_id, raw_data, timestamp_ns):
+    target = controllers_dict.get(c_id)
+    if target is None:
+        return
+
+    all_settings = settings_core.get_settings()
+    conf = all_settings.get(c_id, {})
+
+    idx_x = conf.get("index_x", 0)
+    idx_y = conf.get("index_y", 1)
+    idx_z = conf.get("index_z", 2)
+    sens  = conf.get("sensitivity", 1.0)
+
+    rx = raw_data[idx_x] * (-1 if conf.get("invert_x") else 1)
+    ry = raw_data[idx_y] * (-1 if conf.get("invert_y") else 1)
+    rz = raw_data[idx_z] * (-1 if conf.get("invert_z") else 1)
+
+    bias = target["gyro_bias"]
+
+    if not bias.get("loaded") and not bias.get("calibrating"):
+        saved = conf.get("calibration")
+        if saved:
+            bias["wx"] = saved["wx"]
+            bias["wy"] = saved["wy"]
+            bias["wz"] = saved["wz"]
+        bias["loaded"] = True
+
+    if bias.get("calibrating"):
+        n = bias["samples"]
+        bias["wx"] = (bias["wx"] * n + rx) / (n + 1)
+        bias["wy"] = (bias["wy"] * n + ry) / (n + 1)
+        bias["wz"] = (bias["wz"] * n + rz) / (n + 1)
+        bias["samples"] += 1
+
+        if bias["samples"] >= CALIBRATION_SAMPLES:
+            bias["calibrating"] = False
+            bias["loaded"]      = True
+            settings_core.update_nested(c_id, {
+                "calibration": {
+                    "wx": bias["wx"],
+                    "wy": bias["wy"],
+                    "wz": bias["wz"],
+                }
+            })
+        return
+
+    vx = (rx - bias["wx"]) * sens
+    vy = (ry - bias["wy"]) * sens
+    vz = (rz - bias["wz"]) * sens
+
+    if target.get("last_ts", 0) == 0:
+        target["last_ts"] = timestamp_ns
+        return
+
+    dt = (timestamp_ns - target["last_ts"]) / 1_000_000_000.0
+    target["last_ts"] = timestamp_ns
+
+    q  = target["gyro_quat"]
+    qw, qx, qy, qz = q["w"], q["x"], q["y"], q["z"]
+
+    new_qw = qw + 0.5 * (-qx*vx - qy*vy - qz*vz) * dt
+    new_qx = qx + 0.5 * ( qw*vx + qy*vz - qz*vy) * dt
+    new_qy = qy + 0.5 * ( qw*vy - qx*vz + qz*vx) * dt
+    new_qz = qz + 0.5 * ( qw*vz + qx*vy - qy*vx) * dt
+
+    mag = math.sqrt(new_qw**2 + new_qx**2 + new_qy**2 + new_qz**2)
+    if mag > 0:
+        target["gyro_quat"] = {
+            "w": new_qw / mag,
+            "x": new_qx / mag,
+            "y": new_qy / mag,
+            "z": new_qz / mag,
+        }
+
+def run_sdl_event_loop():
+    sdl_id_map = {}
+
+    while running:
+        event = SDL.SDL_Event()
+        while SDL.SDL_PollEvent(ctypes.byref(event)):
+
+            #connected
+            if event.type == SDL_EVENT_JOYSTICK_ADDED:
+                device_index = event.jdevice.which
+                joy_handle   = SDL.SDL_OpenJoystick(device_index)
+
+                if joy_handle:
+                    instance_id = SDL.SDL_GetJoystickID(joy_handle)
+                    name        = SDL.SDL_GetJoystickName(joy_handle).decode("utf-8", "replace")
+                    guid        = SDL.SDL_GetJoystickGUID(joy_handle)
+                    guid_str    = "".join([f"{guid.data[i]:02x}" for i in range(16)])
+                    serial      = SDL.SDL_GetJoystickSerial(joy_handle)
+                    unique_id   = serial.decode("utf-8") if serial else guid_str
+
+                    gamepad_handle      = SDL.SDL_OpenGamepad(device_index)
+                    gamepad_instance_id = None
+                    if gamepad_handle:
+                        SDL.SDL_SetGamepadSensorEnabled(gamepad_handle, SDL.SDL_SENSOR_GYRO,  SDL_TRUE)
+                        SDL.SDL_SetGamepadSensorEnabled(gamepad_handle, SDL.SDL_SENSOR_ACCEL, SDL_TRUE)
+                        gamepad_instance_id = SDL.SDL_GetGamepadID(gamepad_handle)
+
+                    with controllers_lock:
+                        if unique_id in controllers_dict:
+                            controllers_dict[unique_id]["joystick_handle"] = joy_handle
+                            controllers_dict[unique_id]["gamepad_handle"]  = gamepad_handle
+                            controllers_dict[unique_id]["active"]          = True
+                            controllers_dict[unique_id]["last_ts"]         = 0
+                        else:
+                            state = get_default_state(name, joy_handle, unique_id)
+                            state["joystick_handle"] = joy_handle
+                            state["gamepad_handle"]  = gamepad_handle
+                            controllers_dict[unique_id] = state
+
+                    sdl_id_map[instance_id] = unique_id
+                    if gamepad_instance_id is not None:
+                        sdl_id_map[gamepad_instance_id] = unique_id
+
+                    signals.controller_connected.emit()
+
+            #gyro
+            elif event.type == SDL_EVENT_GAMEPAD_SENSOR_UPDATE:
+                c_id = sdl_id_map.get(event.gsensor.which)
+                if c_id and event.gsensor.sensor == SDL.SDL_SENSOR_GYRO:
+                    process_sdl_gyro(c_id, list(event.gsensor.data), event.gsensor.sensor_timestamp)
+
+            #disconnect
+            elif event.type == SDL_EVENT_JOYSTICK_REMOVED:
+                instance_id = event.jdevice.which
+                c_id        = sdl_id_map.get(instance_id)
+                if c_id:
+                    with controllers_lock:
+                        ctrl = controllers_dict.get(c_id, {})
+                        if ctrl.get("gamepad_handle"):
+                            SDL.SDL_CloseGamepad(ctrl["gamepad_handle"])
+                        ctrl["joystick_handle"] = None
+                        ctrl["gamepad_handle"]  = None
+                        ctrl["active"]          = False
+                    keys_to_remove = [k for k, v in sdl_id_map.items() if v == c_id]
+                    for k in keys_to_remove:
+                        del sdl_id_map[k]
+
+            #btn
+            elif event.type in [SDL_EVENT_JOYSTICK_BUTTON_DOWN, SDL_EVENT_JOYSTICK_BUTTON_UP]:
+                c_id = sdl_id_map.get(event.jbutton.which)
+                if c_id:
+                    key      = f"btn_{event.jbutton.button}"
+                    is_down  = bool(event.jbutton.down)
+                    ctrl     = controllers_dict.get(c_id, {})
+                    old_state = ctrl.copy()
+                    ctrl[key] = is_down
+                    detect_input_change(c_id, {key: is_down}, old_state)
+
+            #axes
+            elif event.type == SDL_EVENT_JOYSTICK_AXIS_MOTION:
+                c_id = sdl_id_map.get(event.jaxis.which)
+                if c_id:
+                    key     = f"axis_{event.jaxis.axis}"
+                    val     = event.jaxis.value / 32767.0
+                    ctrl    = controllers_dict.get(c_id, {})
+                    old_val = ctrl.get(key, 0.0)
+                    ctrl[key] = val
+                    detect_input_change(c_id, {key: val}, {key: old_val})
+
+            #hat
+            elif event.type == SDL_EVENT_JOYSTICK_HAT_MOTION:
+                c_id = sdl_id_map.get(event.jhat.which)
+                if c_id:
+                    key     = f"hat_{event.jhat.hat}"
+                    val     = event.jhat.value
+                    ctrl    = controllers_dict.get(c_id, {})
+                    old_val = ctrl.get(key, 0)
+                    ctrl[key] = val
+                    detect_input_change(c_id, {key: val}, {key: old_val})
+
+        time.sleep(0.001)
+
+def run_hardware_poller():
+    while running:
+        try:
+            with controllers_lock:
+                items = list(controllers_dict.items())
+            for c_id, ctrl in items:
+                if ctrl.get("gamepad_handle"):
+                    new_data = poll_hardware(ctrl["gamepad_handle"])
+                    detect_input_change(c_id, new_data, ctrl)
+                    ctrl.update(new_data)
+        except Exception:
+            pass
+        time.sleep(0.001)
+
+def start_controller_mapping():
+    global running
+    running = True
+
+    threads = [
+        threading.Thread(target=run_sdl_event_loop,   daemon=True, name="SDL_Event_Manager"),
+        threading.Thread(target=run_hardware_poller,   daemon=True, name="Hardware_Poller"),
+    ]
+    for t in threads:
+        t.start()
+    return threads
+
+def poll_hardware(c):
+    def axis(a):
+        v = SDL.SDL_GetGamepadAxis(c, a) / 32767.0
+        if abs(v) < DEADZONE: return 0.0
+        return (v - (DEADZONE if v > 0 else -DEADZONE)) / (1.0 - DEADZONE)
+
+    def btn(b): return bool(SDL.SDL_GetGamepadButton(c, b))
+
+    return {
+        "a":             btn(SDL.SDL_GAMEPAD_BUTTON_SOUTH),
+        "b":             btn(SDL.SDL_GAMEPAD_BUTTON_EAST),
+        "x":             btn(SDL.SDL_GAMEPAD_BUTTON_WEST),
+        "y":             btn(SDL.SDL_GAMEPAD_BUTTON_NORTH),
+        "back":          btn(SDL.SDL_GAMEPAD_BUTTON_BACK),
+        "start":         btn(SDL.SDL_GAMEPAD_BUTTON_START),
+        "guide":         btn(SDL.SDL_GAMEPAD_BUTTON_GUIDE),
+        "dpup":          btn(SDL.SDL_GAMEPAD_BUTTON_DPAD_UP),
+        "dpdown":        btn(SDL.SDL_GAMEPAD_BUTTON_DPAD_DOWN),
+        "dpleft":        btn(SDL.SDL_GAMEPAD_BUTTON_DPAD_LEFT),
+        "dpright":       btn(SDL.SDL_GAMEPAD_BUTTON_DPAD_RIGHT),
+        "leftshoulder":  btn(SDL.SDL_GAMEPAD_BUTTON_LEFT_SHOULDER),
+        "rightshoulder": btn(SDL.SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER),
+        "leftstick":     btn(SDL.SDL_GAMEPAD_BUTTON_LEFT_STICK),
+        "rightstick":    btn(SDL.SDL_GAMEPAD_BUTTON_RIGHT_STICK),
+        "paddle_1":      btn(SDL.SDL_GAMEPAD_BUTTON_LEFT_PADDLE1),
+        "paddle_2":      btn(SDL.SDL_GAMEPAD_BUTTON_LEFT_PADDLE2),
+        "paddle_3":      btn(SDL.SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1),
+        "paddle_4":      btn(SDL.SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2),
+        "touchpad":      btn(SDL.SDL_GAMEPAD_BUTTON_TOUCHPAD),
+        "misc1":         btn(SDL.SDL_GAMEPAD_BUTTON_MISC1),
+        "leftx":         axis(SDL.SDL_GAMEPAD_AXIS_LEFTX),
+        "lefty":         axis(SDL.SDL_GAMEPAD_AXIS_LEFTY),
+        "rightx":        axis(SDL.SDL_GAMEPAD_AXIS_RIGHTX),
+        "righty":        axis(SDL.SDL_GAMEPAD_AXIS_RIGHTY),
+        "lefttrigger":   axis(SDL.SDL_GAMEPAD_AXIS_LEFT_TRIGGER),
+        "righttrigger":  axis(SDL.SDL_GAMEPAD_AXIS_RIGHT_TRIGGER),
+    }
+
+def detect_input_change(c_id, new_data, old_state):
+    global current_binding_btn
+
+    if current_binding_btn is None:
+        return
+
+    for key, value in new_data.items():
+        if key.startswith("btn_") and value is True:
+            current_binding_btn.finish_binding(f"SDL_{c_id}_{key}")
+            return
+        if key.startswith("hat_") and value != 0:
+            current_binding_btn.finish_binding(f"SDL_{c_id}_{key}_{value}")
+            return
+        if key.startswith("axis_") and abs(value) > 0.7:
+            direction = "1.0" if value > 0 else "-1.0"
+            current_binding_btn.finish_binding(f"SDL_{c_id}_{key}_{direction}")
+            return
+
+def eval_binding(bind_data):
+    if isinstance(bind_data, dict):
+        buttons = bind_data.get("buttons", [])
+        invert = bind_data.get("invert", False)
+
+        max_val = 0.0
+        for btn_string in buttons:
+            val = eval_binding(btn_string)
+            if val > max_val:
+                max_val = val
+
+        return 1.0 - max_val if invert else max_val
+
+    if not bind_data or bind_data == "[Unbound]": 
+        return 0.0
+
+    parts = bind_data.split("_", 2)
+
+    if parts[0] == "SDL" and len(parts) == 3:
+        try:
+            c_id = parts[1]
+            remainder = parts[2]
+            c_dict = controllers_dict.get(c_id)
+            if c_dict is None: return 0.0
+
+            if "axis" in remainder:
+                r = remainder.split("_")
+                key_name = "_".join(r[:-1])
+                target_dir = float(r[-1])
+                current = float(c_dict.get(key_name, 0.0))
+                return max(0.0, current * target_dir)
+
+            if "hat" in remainder:
+                r = remainder.split("_")
+                key_name = "_".join(r[:-1])
+                target_bit = int(r[-1])
+                current = int(c_dict.get(key_name, 0))
+                return 1.0 if (current & target_bit) else 0.0
+
+            val = c_dict.get(remainder, 0.0)
+            return 1.0 if val is True or val > 0.5 else 0.0
+        except Exception:
+            return 0.0
+
+    if parts[0] in ["Key", "Mouse"]:
+        vk = get_vk_code(bind_data)
+        return 1.0 if (vk and is_key_pressed_globally(vk)) else 0.0
+
+    return 0.0
+
+#controller handler v3/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#main/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 tab_main = QWidget()
 layout_main = QVBoxLayout(tab_main)
 layout_main.setSpacing(0)
@@ -325,7 +784,7 @@ def hmdpos_specific_widget(layout, combo):
             widget.deleteLater()
 
     mode = combo.currentText()
-    #settings = settings_core.get_settings()
+    settings = settings_core.get_settings()
 
     match mode:
         case "redirect":
@@ -334,32 +793,32 @@ def hmdpos_specific_widget(layout, combo):
                     "text" :"Redirect Index", 
                     "min":0, 
                     "max":999999999, 
-                    "default": settings_core.get_settings()['hmdpos index'], 
+                    "default": settings['hmdpos index'], 
                     "steps" : 1,
                     "func"  : lambda: settings_core.update_setting("hmdpos index", t.findChildren(QSpinBox)[0].value())
                 }])
             
             layout.addWidget(t)
-        case "keyboard":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"test1", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings()['hmdpos index'], 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("hmdpos index", t.findChildren(QSpinBox)[0].value())
-                },{
-                    "type" : "spinbox", 
-                    "text" :"test2", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings()['hmdpos index'], 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("hmdpos index", t.findChildren(QSpinBox)[0].value())
-                }])
+        # case "keyboard":
+        #     t = create_group_horizontal([{
+        #             "type" : "spinbox", 
+        #             "text" :"test1", 
+        #             "min":0,
+        #             "max":999999999, 
+        #             "default": settings['hmdpos index'], 
+        #             "steps" : 1,
+        #             "func"  : lambda: settings_core.update_setting("hmdpos index", t.findChildren(QSpinBox)[0].value())
+        #         },{
+        #             "type" : "spinbox", 
+        #             "text" :"test2", 
+        #             "min":0, 
+        #             "max":999999999, 
+        #             "default": settings['hmdpos index'], 
+        #             "steps" : 1,
+        #             "func"  : lambda: settings_core.update_setting("hmdpos index", t.findChildren(QSpinBox)[0].value())
+        #         }])
             
-            layout.addWidget(t)
+        #     layout.addWidget(t)
 
         case "offsets":
             t = create_group_horizontal([{
@@ -401,7 +860,7 @@ def hmdrot_specific_widget(layout, combo):
             widget.deleteLater()
 
     mode = combo.currentText()
-    #settings = settings_core.get_settings()
+    settings = settings_core.get_settings()
 
     match mode:
         case "redirect":
@@ -410,7 +869,7 @@ def hmdrot_specific_widget(layout, combo):
                     "text" :"Redirect Index", 
                     "min":0, 
                     "max":999999999, 
-                    "default": settings_core.get_settings()['hmdrot index'], 
+                    "default": settings['hmdrot index'], 
                     "steps" : 1,
                     "func"  : lambda: settings_core.update_setting("hmdrot index", t.findChildren(QSpinBox)[0].value())
                 }])
@@ -422,7 +881,7 @@ def hmdrot_specific_widget(layout, combo):
                     "text" :"test1", 
                     "min":0, 
                     "max":999999999, 
-                    "default": settings_core.get_settings()['hmdrot index'], 
+                    "default": settings['hmdrot index'], 
                     "steps" : 1,
                     "func"  : lambda: settings_core.update_setting("hmdrot index", t.findChildren(QSpinBox)[0].value())
                 },{
@@ -430,23 +889,22 @@ def hmdrot_specific_widget(layout, combo):
                     "text" :"test2", 
                     "min":0, 
                     "max":999999999, 
-                    "default": settings_core.get_settings()['hmdrot index'], 
+                    "default": settings['hmdrot index'], 
                     "steps" : 1,
                     "func"  : lambda: settings_core.update_setting("hmdrot index", t.findChildren(QSpinBox)[0].value())
                 }])
             layout.addWidget(t)
-
+            
         case "gyro":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"controller index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings().get(f'hmd gyro index',0), 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("hmd gyro index", t.findChildren(QSpinBox)[0].value())
-                }])
-            layout.addWidget(t)
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "gyro id",
+                    "default": settings["hmd gyro id"],
+                    "items": list(controllers_dict),
+                    "func": lambda: settings_core.update_setting("hmd gyro id", combo_extra.findChildren(QComboBox)[0].currentText())
+                })
+            
+            layout.addWidget(combo_extra)
 
         case "xr glasses":
             t = create_group_horizontal([{
@@ -513,6 +971,7 @@ def check_hardware_key_exists(hardware_name):
     
     return hardware_name in settings.values()
 
+#deprecated dont use! should delete later!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def get_final_transform(device = "hmd", override = None):
     settings = settings_core.get_settings()
 
@@ -604,8 +1063,11 @@ def get_final_transform(device = "hmd", override = None):
                 "rot x" : 0.0, "rot y" : 0.0, "rot z" : 0.0, "rot w" : 1.0
             })
 
-#this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#use this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def get_new_transform(device="hmd", px=0.0, py=0.0, pz=0.0, rx=0.0, ry=0.0, rz=0.0, rw=0.0):
+    #get the final position of the emulated device with offsets applied,
+    #device: from what settings to take offsets
+    #other arguments: are what the current pos and rot of the emulated device, example: to copy x from tracker, pass trackers_arr[tracker_pos_idx]['pos x'] to px
     settings = settings_core.get_settings()
     
     try:
@@ -681,9 +1143,9 @@ def euler_to_quat(pitch, roll, yaw):
         "z": qz
     }
 
-HMD_PACK_FORMAT = '<9d'  # pos(3) + rot(4) + ipd + head_to_eye_dist
-CONTROLLER_PACK_FORMAT = '<12d6?'  # pos(3) + rot(4) + joy(2) + touch(2) + trigger + 5 buttons
-TRACKER_PACK_FORMAT = '<7d'  # id + pos(3) + rot(4)
+HMD_PACK_FORMAT = '<9d'
+CONTROLLER_PACK_FORMAT = '=37d 6?'
+TRACKER_PACK_FORMAT = '<7d'
 
 HMD_PACKER = struct.Struct(HMD_PACK_FORMAT)
 CONTROLLER_PACKER = struct.Struct(CONTROLLER_PACK_FORMAT)
@@ -760,23 +1222,13 @@ def send_hmd_data():
                             pass
 
                         case "gyro":
-                            if settings[f'hmd gyro index'] == 0:
-                                transform = get_new_transform("hmd",pos_x,pos_y,pos_z,
-                                                            controller_1_dict['gyro_quat']['x'],
-                                                            controller_1_dict['gyro_quat']['y'],
-                                                            controller_1_dict['gyro_quat']['z'],
-                                                            controller_1_dict['gyro_quat']['w'])
-                                rot_x = transform['rot x']
-                                rot_y = transform['rot y']
-                                rot_z = transform['rot z']
-                                rot_w = transform['rot w']
-                            else:
-                                transform = get_new_transform("hmd",pos_x,pos_y,pos_z,
-                                                            controller_2_dict['gyro_quat']['x'],
-                                                            controller_2_dict['gyro_quat']['y'],
-                                                            controller_2_dict['gyro_quat']['z'],
-                                                            controller_2_dict['gyro_quat']['w'])
-                                
+                            quat = get_gyro(settings["hmd gyro id"])
+
+                            rot_x = quat["x"]
+                            rot_y = quat["y"]
+                            rot_z = quat["z"]
+                            rot_w = quat["w"]
+
                         case _:
                             final_transform = get_final_transform("hmd")
 
@@ -799,14 +1251,12 @@ def send_hmd_data():
                     win32file.WriteFile(handle, buffer)
                 except pywintypes.error as e:
                     if e.winerror in [109, 232]:
-                        #print(e)
                         break
                     raise
                 
                 time.sleep(0.001)
                 
         except Exception as e:
-            #print(e)
             pass
 
         finally:
@@ -817,285 +1267,62 @@ def send_hmd_data():
                 except: pass
             time.sleep(1)
 
-#predict next pose test/////////////////////////////////////////////////////
-# def send_hmd_data():
-#     last_pose = None
-#     last_time = None
-    
-#     while True:
-#         handle = None
-#         try:
-#             handle = create_pipe(PIPE_HMD)
-#             win32pipe.ConnectNamedPipe(handle, None)
-            
-#             while True:
-#                 settings = settings_core.get_settings()
-#                 current_time = time.time()
-                
-#                 hmd_final_transform = get_final_transform("hmd")
-                
-#                 if last_pose and last_time:
-#                     dt = current_time - last_time
-#                     if dt > 0:
-#                         vel_x = (hmd_final_transform['pos x'] - last_pose['pos x']) / dt
-#                         vel_y = (hmd_final_transform['pos y'] - last_pose['pos y']) / dt
-#                         vel_z = (hmd_final_transform['pos z'] - last_pose['pos z']) / dt
-                        
-#                         prediction_time = 0.008
-#                         hmd_pos_x = hmd_final_transform['pos x'] + vel_x * prediction_time
-#                         hmd_pos_y = hmd_final_transform['pos y'] + vel_y * prediction_time
-#                         hmd_pos_z = hmd_final_transform['pos z'] + vel_z * prediction_time
-#                     else:
-#                         hmd_pos_x = hmd_final_transform['pos x']
-#                         hmd_pos_y = hmd_final_transform['pos y']
-#                         hmd_pos_z = hmd_final_transform['pos z']
-#                 else:
-#                     hmd_pos_x = hmd_final_transform['pos x']
-#                     hmd_pos_y = hmd_final_transform['pos y']
-#                     hmd_pos_z = hmd_final_transform['pos z']
-                
-#                 last_pose = hmd_final_transform.copy()
-#                 last_time = current_time
-                
-#                 hmd_rot_x = hmd_final_transform['rot x']
-#                 hmd_rot_y = hmd_final_transform['rot y']
-#                 hmd_rot_z = hmd_final_transform['rot z']
-#                 hmd_rot_w = hmd_final_transform['rot w']
-#                 hmd_ipd = settings.get('ipd', 0.0)
-#                 hmd_head_to_eye_dist = settings.get('head to eye dist', 0.0)
-                
-#                 buffer = HMD_PACKER.pack(
-#                     hmd_pos_x, hmd_pos_y, hmd_pos_z,
-#                     hmd_rot_w, hmd_rot_x, hmd_rot_y, hmd_rot_z,
-#                     hmd_ipd, hmd_head_to_eye_dist
-#                 )
-                
-#                 try:
-#                     win32file.WriteFile(handle, buffer)
-#                 except pywintypes.error as e:
-#                     if e.winerror in [109, 232]:
-#                         print("HMD pipe disconnected. Reconnecting...")
-#                         break
-#                     raise
-                
-#                 time.sleep(0)
-                
-#         except Exception as e:
-#             print(f"HMD pipe error: {e}")
-#         finally:
-#             if handle:
-#                 try:
-#                     win32pipe.DisconnectNamedPipe(handle)
-#                     win32file.CloseHandle(handle)
-#                 except: pass
-#             time.sleep(1)
-#predict next pose test/////////////////////////////////////////////////////
-
-# def get_hand_gyro_transform(device, controller_num):
-#     try:
-#         hand_prefix = 'r' if device == "cr" else 'l'
-#         current_time = time.time()
-#         state = controller_states[controller_num]
-#         settings = settings_core.get_settings()
-
-#         c_dict = controller_1_dict if controller_num == 1 else controller_2_dict
-#         if "gyro_quat" not in c_dict:
-#             raise ValueError("No gyro data")
-
-#         g_quat = c_dict["gyro_quat"]
-#         norm = g_quat['x']**2 + g_quat['y']**2 + g_quat['z']**2 + g_quat['w']**2
-#         gyro_rot = R.identity() if norm < 0.0001 else R.from_quat([g_quat['x'], g_quat['y'], g_quat['z'], g_quat['w']])
-
-#         depth = hand_data[f'{hand_prefix} pos z']
-#         tracking_active = depth != 0
-
-#         if tracking_active:
-#             mod_x = settings.get('camera z', 0.05)
-#             mod_y = settings.get('camera z', 0.05)
-#             mod_z = settings.get('camera z', 0.05)
-#             outer_stereo = settings.get('outer stereo', 41.070)
-#             inner_stereo = settings.get('inner stereo', 41.070)
-#             top_stereo = settings.get('top stereo', 26.120)
-#             bottom_stereo = settings.get('bottom stereo', 26.120)
-
-#             fov_horizontal = outer_stereo + inner_stereo
-#             fov_vertical = top_stereo + bottom_stereo
-
-#             hmd_pos = (trackers_arr[0]['pos x'], trackers_arr[0]['pos y'], trackers_arr[0]['pos z'])
-#             rot = R.from_matrix(trackers_arr[0]['rotation matrix'])
-#             hmd_rot = R.from_quat(rot.as_quat())
-
-#             screen_x = 1.0 - hand_data[f'{hand_prefix} pos x']
-#             screen_y = 1.0 - hand_data[f'{hand_prefix} pos y']
-
-#             normalized_x = (screen_x - 0.5) * 2.0
-#             normalized_y = (screen_y - 0.5) * 2.0
-
-#             fov_h_rad = np.radians(fov_horizontal / 2)
-#             fov_v_rad = np.radians(fov_vertical / 2)
-
-#             camera_relative_pos = np.array([
-#                 depth * np.tan(fov_h_rad) * normalized_x,
-#                 -depth * np.tan(fov_v_rad) * normalized_y,
-#                 -depth
-#             ])
-
-#             world_relative_pos = hmd_rot.apply(camera_relative_pos)
-#             world_relative_pos_fixed = -world_relative_pos
-
-#             world_pos = hmd_pos + np.array([
-#                 world_relative_pos_fixed[0] * mod_x,
-#                 world_relative_pos_fixed[1] * mod_y,
-#                 world_relative_pos_fixed[2] * mod_z
-#             ])
-
-#             if state["active"]:
-#                 dt = current_time - state["last_time"]
-#                 if dt > 0.005:
-#                     new_vel = (world_pos - state["pos"]) / dt
-#                     speed = np.linalg.norm(new_vel)
-#                     if speed > 5.0:
-#                         new_vel = (new_vel / speed) * 5.0
-#                     state["vel"] = state["vel"] * 0.6 + new_vel * 0.4
-
-#             hand_rot_local_full = R.from_quat([
-#                 hand_data[f'{hand_prefix} rot x'],
-#                 hand_data[f'{hand_prefix} rot y'],
-#                 hand_data[f'{hand_prefix} rot z'],
-#                 hand_data[f'{hand_prefix} rot w']
-#             ])
-#             angles = hand_rot_local_full.as_euler('ZYX', degrees=False)
-#             if device == "cl":
-#                 isolated_angles = [-angles[1], angles[2], angles[0]]
-#             else:
-#                 isolated_angles = [-angles[1], -angles[2], -angles[0]]
-#             hand_rot_local = R.from_euler('ZYX', isolated_angles, degrees=False)
-
-#             offset_yaw = settings.get(f'{device} offset world yaw', 0.0)
-#             offset_pitch = settings.get(f'{device} offset world pitch', 0.0)
-#             offset_roll = settings.get(f'{device} offset world roll', 0.0)
-#             offset_rotation = R.from_euler('ZYX', [offset_yaw, offset_pitch, offset_roll], degrees=False)
-
-#             optical_rot = hmd_rot * hand_rot_local * offset_rotation
-
-#             if not state["active"] or state["lost_time"] != 0:
-#                 state["offset_quat"] = optical_rot * gyro_rot.inv()
-
-#             state["pos"] = world_pos
-#             state["last_time"] = current_time
-#             state["active"] = True
-#             state["lost_time"] = 0
-
-#             final_pos = world_pos
-#             final_rot = state["offset_quat"] * gyro_rot
-
-#         else:
-#             if not state["active"]:
-#                 raise ValueError("Tracking never initialized")
-
-#             if state["lost_time"] == 0:
-#                 state["lost_time"] = current_time
-
-#             dt = current_time - state["last_time"]
-
-#             final_rot = state["offset_quat"] * gyro_rot
-#             final_pos = state["pos"] + state["vel"] * dt
-
-#             state["pos"] = final_pos
-#             state["last_time"] = current_time
-
-#         final_quat = final_rot.as_quat()
-#         return {
-#             "pos x": final_pos[0], "pos y": final_pos[1], "pos z": final_pos[2],
-#             "rot x": final_quat[0], "rot y": final_quat[1], "rot z": final_quat[2], "rot w": final_quat[3]
-#         }
-
-#     except Exception as e:
-#         return {
-#             "pos x": 0.0, "pos y": 0.0, "pos z": 0.0,
-#             "rot x": 0.0, "rot y": 0.0, "rot z": 0.0, "rot w": 1.0
-#         }
-
 def get_hand_world_transform(device):
     try:
         hand_prefix = 'r' if device == "cr" else 'l'
         
         settings = settings_core.get_settings()
-
-        mod_x = settings.get('camera z', 0.05)#0.05
-        mod_y = settings.get('camera z', 0.05)#0.05
-        mod_z = settings.get('camera z', 0.05)
-
-        outer_stereo = settings.get('outer stereo', 41.070)
-        inner_stereo = settings.get('inner stereo', 41.070)
-        top_stereo = settings.get('top stereo', 26.120)
+        cam_offset_x = settings.get('camera offset x', 0.0)
+        cam_offset_y = settings.get('camera offset y', 0.0)
+        cam_offset_z = settings.get('camera offset z', 0.0)
+        outer_stereo  = settings.get('outer stereo',  41.070)
+        inner_stereo  = settings.get('inner stereo',  41.070)
+        top_stereo    = settings.get('top stereo',    26.120)
         bottom_stereo = settings.get('bottom stereo', 26.120)
-        
+
         fov_horizontal = outer_stereo + inner_stereo
-        fov_vertical = top_stereo + bottom_stereo
+        fov_vertical   = top_stereo  + bottom_stereo
 
-        hmd_pos = (trackers_arr[0]['pos x'],trackers_arr[0]['pos y'],trackers_arr[0]['pos z'])
+        hmd_pos = np.array([
+            trackers_arr[0]['pos x'],
+            trackers_arr[0]['pos y'],
+            trackers_arr[0]['pos z']
+        ])
+        hmd_rot = R.from_matrix(trackers_arr[0]['rotation matrix'])
 
-        rot = R.from_matrix(trackers_arr[0]['rotation matrix'])
-        hmd_rot = R.from_quat(rot.as_quat())
+        screen_x = hand_data[f'{hand_prefix} pos x']
+        screen_y = hand_data[f'{hand_prefix} pos y']
+        depth    = abs(hand_data[f'{hand_prefix} pos z'])
 
-        screen_x = 1.0 - hand_data[f'{hand_prefix} pos x']
-        screen_y = 1.0 - hand_data[f'{hand_prefix} pos y']
-        depth = hand_data[f'{hand_prefix} pos z']
-        
-        normalized_x = (screen_x - 0.5) * 2.0
-        normalized_y = (screen_y - 0.5) * 2.0
-        
+        ndc_x = (screen_x - 0.5) * 2.0
+        ndc_y = (screen_y - 0.5) * 2.0
+
         fov_h_rad = np.radians(fov_horizontal / 2)
-        fov_v_rad = np.radians(fov_vertical / 2)
-        
-        camera_relative_pos = np.array([
-            depth * np.tan(fov_h_rad) * normalized_x,
-            -depth * np.tan(fov_v_rad) * normalized_y,
+        fov_v_rad = np.radians(fov_vertical   / 2)
+
+        cam_pos = np.array([
+            depth * np.tan(fov_h_rad) * ndc_x,
+            depth * np.tan(fov_v_rad) * ndc_y,
             -depth
         ])
-        
-        world_relative_pos = hmd_rot.apply(camera_relative_pos)
-        
-        world_relative_pos_fixed = np.array([
-            -world_relative_pos[0],
-            -world_relative_pos[1],
-            -world_relative_pos[2]
-        ])
 
-        world_pos = hmd_pos + np.array([
-            world_relative_pos_fixed[0] * mod_x,
-            world_relative_pos_fixed[1] * mod_y,
-            world_relative_pos_fixed[2] * mod_z
-        ])
-        
-        #////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        hand_rot_local_full = R.from_quat([
+        cam_mount = np.array([cam_offset_x, cam_offset_y, cam_offset_z])
+        world_pos = hmd_pos + hmd_rot.apply(cam_mount + cam_pos)
+
+        hand_rot_local = R.from_quat([
             hand_data[f'{hand_prefix} rot x'],
             hand_data[f'{hand_prefix} rot y'],
             hand_data[f'{hand_prefix} rot z'],
             hand_data[f'{hand_prefix} rot w']
         ])
 
-        angles = hand_rot_local_full.as_euler('ZYX', degrees=False)
-
-        if device == "cl":
-            isolated_angles = [-angles[1], angles[2], angles[0]] 
-        else:
-            isolated_angles = [-angles[1], -angles[2], -angles[0]] 
-
-        hand_rot_local = R.from_euler('ZYX', isolated_angles, degrees=False)
-
-        offset_yaw = settings.get(f'{device} offset world yaw', 0.0)
+        offset_yaw   = settings.get(f'{device} offset world yaw',   0.0)
         offset_pitch = settings.get(f'{device} offset world pitch', 0.0)
-        offset_roll = settings.get(f'{device} offset world roll', 0.0)
+        offset_roll  = settings.get(f'{device} offset world roll',  0.0)
+        offset_rot   = R.from_euler('ZYX', [offset_yaw, offset_pitch, offset_roll], degrees=False)
 
-        offset_rotation = R.from_euler('ZYX', [offset_yaw, offset_pitch, offset_roll], degrees=False)
-        hand_rot_with_offset = hand_rot_local * offset_rotation
-
-        world_rot = hmd_rot * hand_rot_with_offset
+        world_rot  = hmd_rot * hand_rot_local * offset_rot
         final_quat = world_rot.as_quat()
-        #////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         return {
             "pos x": world_pos[0],
@@ -1106,9 +1333,8 @@ def get_hand_world_transform(device):
             "rot z": final_quat[2],
             "rot w": final_quat[3]
         }
-        
+
     except Exception as e:
-        #print(e)
         return {
             "pos x": 0.0,
             "pos y": 0.0,
@@ -1122,6 +1348,86 @@ def get_hand_world_transform(device):
 #best offsets/////////////////////////////////////////////////////////////////////////////////////////////////////////
 #right 2.560 -0.280 2.060
 #left 3.860 0.190 1.990
+
+def is_key_pressed_globally(vk_code):
+    return (ctypes.windll.user32.GetAsyncKeyState(vk_code) & 0x8000) != 0
+
+def get_vk_code(bind_str):
+    import ctypes
+
+    if bind_str.startswith("Mouse_"):
+        mouse_map = {
+            "Mouse_Left": 0x01, "Mouse_Right": 0x02, "Mouse_Middle": 0x04,
+            "Mouse_M4": 0x05, "Mouse_M5": 0x06, "Mouse_Back": 0x05, "Mouse_Forward": 0x06,
+        }
+        return mouse_map.get(bind_str)
+
+    if bind_str.startswith("Key_"):
+        name = bind_str[4:]
+
+        if len(name) == 1:
+            res = ctypes.windll.user32.VkKeyScanA(ctypes.c_char(name.encode()))
+            if res != -1 and (res & 0xFF) != 0xFF:
+                return res & 0xFF
+
+        if name.startswith("F") and name[1:].isdigit():
+            fnum = int(name[1:])
+            if 1 <= fnum <= 24:
+                return 0x6F + fnum
+
+        numpad = {
+            "Numpad0": 0x60, "Numpad1": 0x61, "Numpad2": 0x62, "Numpad3": 0x63,
+            "Numpad4": 0x64, "Numpad5": 0x65, "Numpad6": 0x66, "Numpad7": 0x67,
+            "Numpad8": 0x68, "Numpad9": 0x69, "NumpadMultiply": 0x6A,
+            "NumpadAdd": 0x6B, "NumpadSubtract": 0x6D, "NumpadDecimal": 0x6E,
+            "NumpadDivide": 0x6F, "NumpadEnter": 0x0D,
+        }
+        if name in numpad:
+            return numpad[name]
+
+        if not hasattr(get_vk_code, "_vk_name_map"):
+            vk_name_map = {}
+            buf = ctypes.create_string_buffer(64)
+            for vk in range(1, 256):
+                scan = ctypes.windll.user32.MapVirtualKeyA(vk, 0)  # VK -> scan
+                if scan == 0:
+                    continue
+                lparam = scan << 16
+                if vk in (0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,
+                          0x2D,0x2E,0x5B,0x5C,0x5D,0x2C,0x13):
+                    lparam |= (1 << 24)
+                res = ctypes.windll.user32.GetKeyNameTextA(lparam, buf, 64)
+                if res > 0:
+                    key_name = buf.value.decode(errors="ignore").strip()
+                    vk_name_map[key_name.upper()] = vk
+                    vk_name_map[key_name.upper().replace(" ", "")] = vk
+                    vk_name_map[key_name.upper().replace(" ", "_")] = vk
+            get_vk_code._vk_name_map = vk_name_map
+
+        upper = name.upper()
+        vk_map = get_vk_code._vk_name_map
+        if upper in vk_map:
+            return vk_map[upper]
+
+        fallback = {
+            "SPACE": 0x20, "RETURN": 0x0D, "ENTER": 0x0D, "ESCAPE": 0x1B,
+            "ESC": 0x1B, "TAB": 0x09, "BACKSPACE": 0x08, "DELETE": 0x2E,
+            "INSERT": 0x2D, "HOME": 0x24, "END": 0x23, "PAGEUP": 0x21,
+            "PAGEDOWN": 0x22, "LEFT": 0x25, "UP": 0x26, "RIGHT": 0x27,
+            "DOWN": 0x28, "SHIFT": 0x10, "CONTROL": 0x11, "CTRL": 0x11,
+            "ALT": 0x12, "LSHIFT": 0xA0, "RSHIFT": 0xA1, "LCONTROL": 0xA2,
+            "RCONTROL": 0xA3, "LCTRL": 0xA2, "RCTRL": 0xA3, "LALT": 0xA4,
+            "RALT": 0xA5, "LWIN": 0x5B, "RWIN": 0x5C, "CAPSLOCK": 0x14,
+            "NUMLOCK": 0x90, "SCROLLLOCK": 0x91, "PRINTSCREEN": 0x2C,
+            "PAUSE": 0x13, "MENU": 0x5D, "APPS": 0x5D,
+            "MINUS": 0xBD, "EQUAL": 0xBB, "BRACKETLEFT": 0xDB,
+            "BRACKETRIGHT": 0xDD, "BACKSLASH": 0xDC, "SEMICOLON": 0xBA,
+            "APOSTROPHE": 0xDE, "COMMA": 0xBC, "PERIOD": 0xBE,
+            "SLASH": 0xBF, "GRAVE": 0xC0,
+        }
+        return fallback.get(upper)
+
+    return None
 
 def send_controller_data(is_right):
     pipe_name = PIPE_RIGHT if is_right else PIPE_LEFT
@@ -1153,45 +1459,18 @@ def send_controller_data(is_right):
                             pos_z = float(settings.get(f"{device_name} offset world z", 0.0))
 
                         case "hand tracking":
-                            if settings_core.get_settings()['opengloves'] != False:
-                                final_c_transform = get_final_transform(device_name)
+                            if settings_core.get_settings()['hand tracking'] != False:
                                 final_transform = get_hand_world_transform(device_name)
 
-                                pos_x = final_transform['pos x']# + final_c_transform['pos x']
-                                pos_y = final_transform['pos y']# + final_c_transform['pos y']
-                                pos_z = final_transform['pos z']# + final_c_transform['pos z']
+                                pos_x = final_transform['pos x']
+                                pos_y = final_transform['pos y']
+                                pos_z = final_transform['pos z']
                             else:
                                 final_transform = get_final_transform(device_name)
 
                                 pos_x = final_transform['pos x']
                                 pos_y = final_transform['pos y']
                                 pos_z = final_transform['pos z']
-                        # case "hand+gyro":
-                        #     if settings_core.get_settings()['opengloves'] != False:
-                        #         final_transform = get_hand_gyro_transform(device_name,1)
-
-                        #         pos_x = final_transform['pos x']
-                        #         pos_y = final_transform['pos y']
-                        #         pos_z = final_transform['pos z']
-                        #     else:
-                        #         final_transform = get_hand_gyro_transform(device_name,1)
-                        #         pos_x = final_transform['pos x']
-                        #         pos_y = final_transform['pos y']
-                        #         pos_z = final_transform['pos z']
-                        # case "marker":
-                        #         #m = get_marker_transform(settings[device_name + "pos marker id"])
-                        #         #get_new_transform(device_name, m["pos x"], m["pos y"], m["pos z"], m["rot x"], m["rot y"], m["rot z"], m["rot w"])
-                        #         final_transform = get_marker_world_transform(device_name, settings[device_name + "pos marker id"])
-
-                        #         pos_x = final_transform['pos x']
-                        #         pos_y = final_transform['pos y']
-                        #         pos_z = final_transform['pos z']
-                        # case "marker+gyro":
-                        #         final_transform = get_marker_gyro_transform(device_name, settings[device_name + "pos marker id"], 1)
-
-                        #         pos_x = final_transform['pos x']
-                        #         pos_y = final_transform['pos y']
-                        #         pos_z = final_transform['pos z']
                         case _:
                             final_transform = get_final_transform(device_name)
 
@@ -1214,15 +1493,13 @@ def send_controller_data(is_right):
                             rot_w = quat["w"]
 
                         case "hand tracking":
-                            if settings_core.get_settings()['opengloves'] != False:
-                                final_c_transform = get_final_transform(device_name)
+                            if settings_core.get_settings()['hand tracking'] != False:
                                 final_transform = get_hand_world_transform(device_name)
 
                                 rot_x = final_transform['rot x']
                                 rot_y = final_transform['rot y']
                                 rot_z = final_transform['rot z']
                                 rot_w = final_transform['rot w']
-
                             else:
                                 final_transform = get_final_transform(device_name)
 
@@ -1230,59 +1507,15 @@ def send_controller_data(is_right):
                                 rot_y = final_transform['rot y']
                                 rot_z = final_transform['rot z']
                                 rot_w = final_transform['rot w']
-                        # case "hand+gyro":
-                        #     if settings_core.get_settings()['opengloves'] != False:
-                        #         final_transform = get_hand_gyro_transform(device_name,1)
-                        #         rot_x = final_transform['rot x']
-                        #         rot_y = final_transform['rot y']
-                        #         rot_z = final_transform['rot z']
-                        #         rot_w = final_transform['rot w']
 
-                        #     else:
-                        #         final_transform = get_hand_gyro_transform(device_name,1)
-
-                        #         rot_x = final_transform['rot x']
-                        #         rot_y = final_transform['rot y']
-                        #         rot_z = final_transform['rot z']
-                        #         rot_w = final_transform['rot w']
-                        # case "marker":
-                        #         final_transform = get_marker_world_transform(device_name, settings[device_name + "pos marker id"])
-
-                        #         rot_x = final_transform['rot x']
-                        #         rot_y = final_transform['rot y']
-                        #         rot_z = final_transform['rot z']
-                        #         rot_w = final_transform['rot w']
-                        # case "marker+gyro":
-                        #         final_transform = get_marker_gyro_transform(device_name, settings[device_name + "pos marker id"], 1)
-
-                        #         rot_x = final_transform['rot x']
-                        #         rot_y = final_transform['rot y']
-                        #         rot_z = final_transform['rot z']
-                        #         rot_w = final_transform['rot w']
                         case "gyro":
-                            if settings[f'{device_name} gyro index'] == 0:
-                                transform = get_new_transform(device_name,pos_x,pos_y,pos_z,
-                                                            controller_1_dict['gyro_quat']['x'],
-                                                            controller_1_dict['gyro_quat']['y'],
-                                                            controller_1_dict['gyro_quat']['z'],
-                                                            controller_1_dict['gyro_quat']['w'])
-                                rot_x = transform['rot x']
-                                rot_y = transform['rot y']
-                                rot_z = transform['rot z']
-                                rot_w = transform['rot w']
+                            quat = get_gyro(settings[f'{device_name} gyro id'])
 
-                                #print(controller_1_dict["gyro_quat"])
-                                #print(transform)
-                            else:
-                                transform = get_new_transform(device_name,pos_x,pos_y,pos_z,
-                                                            controller_2_dict['gyro_quat']['x'],
-                                                            controller_2_dict['gyro_quat']['y'],
-                                                            controller_2_dict['gyro_quat']['z'],
-                                                            controller_2_dict['gyro_quat']['w'])
-                                rot_x = transform['rot x']
-                                rot_y = transform['rot y']
-                                rot_z = transform['rot z']
-                                rot_w = transform['rot w']
+                            rot_x = quat["x"]
+                            rot_y = quat["y"]
+                            rot_z = quat["z"]
+                            rot_w = quat["w"]
+
                         case _:
                             final_transform = get_final_transform(device_name)
 
@@ -1292,48 +1525,98 @@ def send_controller_data(is_right):
                             rot_w = final_transform['rot w']
                 except:
                     pass
-
-                trigger = get_mapped_action(f'{side} trigger')
-                a = get_mapped_action(f'{side} a')
-                b = get_mapped_action(f'{side} b')
-                grip = get_mapped_action(f'{side} grip')
-                menu = get_mapped_action(f'{side} menu')
-                joy_btn = get_mapped_action(f'{side} joy button')
-                touch_btn = get_mapped_action(f'{side} touch button')
                 
-                if check_hardware_key_exists(f'{side} touch modifier') and get_mapped_action(f'{side} touch modifier'):
-                    joy_x, joy_y = 0.0, 0.0
-                    touch_x = get_mapped_action(f'{side} joy x')
-                    touch_y = -get_mapped_action(f'{side} joy y')
-                    touch_btn = get_mapped_action(f'{side} joy button')
+                prefix = "cl" if side == "left" else "cr"
+                settings = settings_core.get_settings()
+
+                trigger = eval_binding(settings.get(f"{prefix}_trigger", ""))
+                a       = eval_binding(settings.get(f"{prefix}_a", "")) > 0.5
+                b       = eval_binding(settings.get(f"{prefix}_b", "")) > 0.5
+                grip    = eval_binding(settings.get(f"{prefix}_grip", "")) > 0.5
+                menu    = eval_binding(settings.get(f"{prefix}_menu", "")) > 0.5
+
+                touch_mod = eval_binding(settings.get(f"{prefix}_touch mod", "")) > 0.5
+
+                joy_x = eval_binding(settings.get(f"{prefix}_joy right", "")) - eval_binding(settings.get(f"{prefix}_joy left", ""))
+                joy_y = eval_binding(settings.get(f"{prefix}_joy up", "")) - eval_binding(settings.get(f"{prefix}_joy down", ""))
+                joy_btn   = eval_binding(settings.get(f"{prefix}_joy click", "")) > 0.5
+
+                touch_x = eval_binding(settings.get(f"{prefix}_touch right", "")) - eval_binding(settings.get(f"{prefix}_touch left", ""))
+                touch_y = eval_binding(settings.get(f"{prefix}_touch up", "")) - eval_binding(settings.get(f"{prefix}_touch down", ""))
+                touch_btn = eval_binding(settings.get(f"{prefix}_touch click", "")) > 0.5
+
+                #touch: if no dedicated input for touch pad is mapped, you can hold the touch mode key and joy input will became touch input(index controller)
+                if touch_mod:
+                    touch_x = joy_x
+                    touch_y = joy_y
+                    touch_btn = joy_btn
+
+                    joy_x = 0.0
+                    joy_y = 0.0
+
+                #skeletal input
+                fingers = ["thumb", "index", "middle", "ring", "pinky"]
+
+                if settings.get("curl",True):
+                    flexion  = list(hand_data["l flexion"] if prefix == "cl" else hand_data["r flexion"])
+
+                    for i, finger in enumerate(fingers):
+                        val = eval_binding(settings.get(f"{prefix}_{finger}", ""))
+                        if val > 0.01:
+                            flexion[i * 4] = val
+
+                    if settings.get("index=trigger", False):
+                        if trigger < flexion[4]:
+                            trigger = -1 + (flexion[4] * 3)
+
+                    if settings.get("other=grip", False):
+                        highest = max(flexion[8], flexion[12], flexion[16])
+                        if grip < highest - 0.7:
+                            grip = highest - 0.7
+
                 else:
-                    joy_x = get_mapped_action(f'{side} joy x')
-                    joy_y = -get_mapped_action(f'{side} joy y')
-                    touch_x = get_mapped_action(f'{side} touch x')
-                    touch_y = -get_mapped_action(f'{side} touch y')
+                    flexion = [0.0] * 20
+
+                    for i, finger in enumerate(fingers):
+                        val = eval_binding(settings.get(f"{prefix}_{finger}", ""))
+                        if val > 0.01:
+                            flexion[i * 4] = val
+
+                if settings.get("splay",True):
+                    splays_5 = list(hand_data["l splay"]   if prefix == "cl" else hand_data["r splay"])
+
+                    if prefix == "cl":
+                        splays_5 = hand_data["l splay"]
+                    else:
+                        splays_5 = hand_data["r splay"]
+
+                # flexion[0] = 1.0 #thumb
+                # flexion[4] = 1.0 #index
+                # flexion[8] = 1.0 #middle
+                # flexion[12] = 1.0 #ring
+                # flexion[16] = 1.0 #pinky
 
                 buffer = CONTROLLER_PACKER.pack(
-                    float(pos_x), float(pos_y), float(pos_z),      # 3
-                    float(rot_w), float(rot_x), float(rot_y), float(rot_z), # 4
-                    float(joy_x), float(joy_y),                    # 2
-                    float(touch_x), float(touch_y),                # 2
-                    float(trigger),                                # 1 (Total 12)
-                    bool(a), bool(b), bool(menu), 
-                    bool(joy_btn), bool(touch_btn), bool(grip)     # 6 bools
+                    float(pos_x), float(pos_y), float(pos_z),
+                    float(rot_w), float(rot_x), float(rot_y), float(rot_z),
+                    float(joy_x), float(joy_y),
+                    float(touch_x), float(touch_y),
+                    float(trigger),
+                    *[float(f) for f in flexion],
+                    *[float(s) for s in splays_5],
+                    bool(a), bool(b), bool(menu),
+                    bool(joy_btn), bool(touch_btn), bool(grip)
                 )
-                
+
                 try:
                     win32file.WriteFile(handle, buffer)
                 except pywintypes.error as e:
                     if e.winerror in [109, 232]:
-                        #print(e)
                         break
                     raise
-                
                 time.sleep(0.001)
                 
         except Exception as e:
-            #print(e)
             pass
         finally:
             if handle:
@@ -1401,29 +1684,13 @@ def send_tracker_data(tracker_id):
                             rot_w = quat["w"]
 
                         case "gyro":
-                            if settings.get(f'{tracker_id}tracker gyro index',0) == 0:
-                                transform = get_new_transform(f'{tracker_id}tracker',pos_x,pos_y,pos_z,
-                                                            controller_1_dict['gyro_quat']['x'],
-                                                            controller_1_dict['gyro_quat']['y'],
-                                                            controller_1_dict['gyro_quat']['z'],
-                                                            controller_1_dict['gyro_quat']['w'])
-                                rot_x = transform['rot x']
-                                rot_y = transform['rot y']
-                                rot_z = transform['rot z']
-                                rot_w = transform['rot w']
-                            else:
-                                transform = get_new_transform(f'{tracker_id}tracker',pos_x,pos_y,pos_z,
-                                                            controller_2_dict['gyro_quat']['x'],
-                                                            controller_2_dict['gyro_quat']['y'],
-                                                            controller_2_dict['gyro_quat']['z'],
-                                                            controller_2_dict['gyro_quat']['w'])
-                        case _:
-                            final_transform = get_final_transform(f'{tracker_id}tracker')
+                            quat = get_gyro(settings.get(f'{tracker_id}tracker gyro id',""))
 
-                            rot_x = final_transform['rot x']
-                            rot_y = final_transform['rot y']
-                            rot_z = final_transform['rot z']
-                            rot_w = final_transform['rot w']
+                            rot_x = quat["x"]
+                            rot_y = quat["y"]
+                            rot_z = quat["z"]
+                            rot_w = quat["w"]
+
                 except:
                     pass
                 buffer = TRACKER_PACKER.pack(
@@ -1435,14 +1702,12 @@ def send_tracker_data(tracker_id):
                     win32file.WriteFile(handle, buffer)
                 except pywintypes.error as e:
                     if e.winerror in [109, 232]:
-                        #print(e)
                         break
                     raise
                 
                 time.sleep(0.001)
                 
         except Exception as e:
-            #print(e)
             pass
         finally:
             if handle:
@@ -1481,15 +1746,13 @@ def start_send_data():
 def update_vrlabel():
     can_enter = True
     while True:
-        #first_label.findChild(QLabel).setText(str(is_prosses_running("vrserver.exe")))
-
         if can_enter and is_prosses_running("vrserver.exe"):
             can_enter = False
 
             first_label.findChild(QLabel).setText("steamvr is running!")
 
             start_vr_utility()
-            #print("steamvr opened")
+            #steamvr opened
 
         if not can_enter and not is_prosses_running("vrserver.exe"):
             can_enter = True
@@ -1497,7 +1760,7 @@ def update_vrlabel():
             first_label.findChild(QLabel).setText("steamvr is not running :(")
 
             end_vr_utility()
-            #print("steamvr closed")
+            #steamvr closed
 
         time.sleep(1)
 
@@ -1603,12 +1866,10 @@ def start_vr_utility():
                 time.sleep(0.001)
 
             except Exception as e:
-                #print(e)
                 time.sleep(0.001)
                 continue
 
     except Exception as e:
-        #print(e)
         time.sleep(1)
         start_vr_utility()
 
@@ -1646,1017 +1907,325 @@ def update_found_label():
         if label:
             label.setText(display_text)
     except Exception as e:
-        #print(e)
         pass
 
-
-
-
-#controller handler/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER)
-SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_COMBINE_JOY_CONS, b"0")
-
-SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_PS4", b"1")
-SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_PS5", b"1")
-
-SDL_SetHint(b"SDL_JOYSTICK_HIDAPI_PS4_RUMBLE", b"1")
-
-controller_arr = []
-DEADZONE = 0.1
-
-def get_default_state():
-    return {
-        "a": False, "b": False, "x": False, "y": False,
-        "back": False, "guide": False, "start": False, "misc1": False,
-        "leftshoulder": False, "rightshoulder": False,
-        "leftstick": False, "rightstick": False,
-        "dpup": False, "dpdown": False, "dpleft": False, "dpright": False,
-        "paddle1": False, "paddle2": False, "paddle3": False, "paddle4": False,
-        "touchpad": False,
-        
-        "leftx": 0.0, "lefty": 0.0, "rightx": 0.0, "righty": 0.0,
-        "lefttrigger": 0.0, "righttrigger": 0.0,
-
-        "gyro_quat": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
-        "last_good_quat": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
-        "last_ts": 0,
-        
-        "gyro_bias": {
-            "wx": 0.0, "wy": 0.0, "wz": 0.0,
-            "ax": 0.0, "ay": 0.0, "az": 0.0,
-            "tx": 0.02, "ty": 0.02, "tz": 0.02,
-            "samples": 0
-        }
-    }
-
-controller_1_dict = get_default_state()
-controller_2_dict = get_default_state()
-
-def get_mapped_action(action_name="none", target="any"):
-    settings = settings_core.get_settings()
-    is_analog_req = any(word in action_name.lower() for word in ['trigger', 'joy x', 'joy y'])
-    
-    vals = []
-    
-    for map_key, mapped_action in settings.items():
-        if mapped_action != action_name:
-            continue
-
-        if len(map_key) < 2: continue
-
-        prefix = map_key[0]
-        
-        if not prefix.isdigit():
-            continue
-            
-        p_num = int(prefix) + 1  
-        raw_btn = map_key[1:]
-
-        val = None
-        target_dict = None
-        
-        if prefix == "0" and (target == "1" or target == "any"):
-            target_dict = controller_1_dict
-        elif prefix == "1" and (target == "2" or target == "any"):
-            target_dict = controller_2_dict
-
-        if target_dict and raw_btn in target_dict:
-            val = target_dict[raw_btn]
-
-            if "leftx" in raw_btn or "rightx" in raw_btn:
-                if settings.get(f"joy{p_num} invert x", False):
-                    val = -val
-            elif "lefty" in raw_btn or "righty" in raw_btn:
-                if settings.get(f"joy{p_num} invert y", False):
-                    val = -val
-
-        if val is not None:
-            vals.append(val)
-
-    if not vals:
-        return 0.0 if is_analog_req else False
-
-    if is_analog_req:
-        float_vals = [float(v) for v in vals]
-        return max(float_vals, key=abs)
-    else:
-        return any(bool(v) for v in vals)
-
-controller_arr = []
-controller_1_dict = {}
-controller_2_dict = {}
-
-CALIBRATION_SAMPLES = 200
-DEFAULT_THRESHOLD = 0.02
-DEADZONE = 0.1
-ALPHA = 0.98
-
-def normalize_quat(q):
-    mag = math.sqrt(q["x"]**2 + q["y"]**2 + q["z"]**2 + q["w"]**2)
-    if mag == 0: return {"x": 0, "y": 0, "z": 0, "w": 1}
-    return {"x": q["x"]/mag, "y": q["y"]/mag, "z": q["z"]/mag, "w": q["w"]/mag}
-
-def normalize_vec3(v):
-    """Normalize a 3D vector"""
-    mag = math.sqrt(v["x"]**2 + v["y"]**2 + v["z"]**2)
-    if mag == 0: return {"x": 0, "y": 0, "z": 1}
-    return {"x": v["x"]/mag, "y": v["y"]/mag, "z": v["z"]/mag}
-
-def quat_from_two_vectors(v1, v2):
-    v1 = normalize_vec3(v1)
-    v2 = normalize_vec3(v2)
-    
-    cross = {
-        "x": v1["y"]*v2["z"] - v1["z"]*v2["y"],
-        "y": v1["z"]*v2["x"] - v1["x"]*v2["z"],
-        "z": v1["x"]*v2["y"] - v1["y"]*v2["x"]
-    }
-    
-    dot = v1["x"]*v2["x"] + v1["y"]*v2["y"] + v1["z"]*v2["z"]
-    
-    if dot < -0.999999:
-        if abs(v1["x"]) < 0.6:
-            axis = normalize_vec3({"x": 1, "y": 0, "z": 0})
-        else:
-            axis = normalize_vec3({"x": 0, "y": 1, "z": 0})
-        axis = {
-            "x": v1["y"]*axis["z"] - v1["z"]*axis["y"],
-            "y": v1["z"]*axis["x"] - v1["x"]*axis["z"],
-            "z": v1["x"]*axis["y"] - v1["y"]*axis["x"]
-        }
-        axis = normalize_vec3(axis)
-        return {"w": 0, "x": axis["x"], "y": axis["y"], "z": axis["z"]}
-    
-    q = {
-        "w": 1.0 + dot,
-        "x": cross["x"],
-        "y": cross["y"],
-        "z": cross["z"]
-    }
-    return normalize_quat(q)
-
-def quat_multiply(q1, q2):
-    return {
-        "w": q1["w"]*q2["w"] - q1["x"]*q2["x"] - q1["y"]*q2["y"] - q1["z"]*q2["z"],
-        "x": q1["w"]*q2["x"] + q1["x"]*q2["w"] + q1["y"]*q2["z"] - q1["z"]*q2["y"],
-        "y": q1["w"]*q2["y"] - q1["x"]*q2["z"] + q1["y"]*q2["w"] + q1["z"]*q2["x"],
-        "z": q1["w"]*q2["z"] + q1["x"]*q2["y"] - q1["y"]*q2["x"] + q1["z"]*q2["w"]
-    }
-
-def quat_slerp(q1, q2, t):
-    dot = q1["w"]*q2["w"] + q1["x"]*q2["x"] + q1["y"]*q2["y"] + q1["z"]*q2["z"]
-    
-    if dot > 0.9995:
-        result = {
-            "w": q1["w"] + t * (q2["w"] - q1["w"]),
-            "x": q1["x"] + t * (q2["x"] - q1["x"]),
-            "y": q1["y"] + t * (q2["y"] - q1["y"]),
-            "z": q1["z"] + t * (q2["z"] - q1["z"])
-        }
-        return normalize_quat(result)
-    
-    if dot < 0:
-        q2 = {"w": -q2["w"], "x": -q2["x"], "y": -q2["y"], "z": -q2["z"]}
-        dot = -dot
-    
-    dot = max(-1.0, min(1.0, dot))
-    
-    theta_0 = math.acos(dot)
-    theta = theta_0 * t
-    
-    sin_theta = math.sin(theta)
-    sin_theta_0 = math.sin(theta_0)
-    
-    s1 = math.cos(theta) - dot * sin_theta / sin_theta_0
-    s2 = sin_theta / sin_theta_0
-    
-    return {
-        "w": s1 * q1["w"] + s2 * q2["w"],
-        "x": s1 * q1["x"] + s2 * q2["x"],
-        "y": s1 * q1["y"] + s2 * q2["y"],
-        "z": s1 * q1["z"] + s2 * q2["z"]
-    }
-#reset gyro////////////////////////////////////////////////////////////////////
-def reset_rotation(controller_num=None):
-    global controller_1_dict, controller_2_dict
-    
-    rot = R.from_matrix(trackers_arr[0]['rotation matrix'])
-    q = rot.as_quat() 
-    hmd_quat_dict = {"x": q[0], "y": q[1], "z": q[2], "w": q[3]}
-    
-    if controller_num == 1:
-        if "gyro_quat" in controller_1_dict:
-            controller_1_dict["gyro_quat"] = hmd_quat_dict.copy()
-            controller_1_dict["last_good_quat"] = hmd_quat_dict.copy()
-    elif controller_num == 2:
-        if "gyro_quat" in controller_2_dict:
-            controller_2_dict["gyro_quat"] = hmd_quat_dict.copy()
-            controller_2_dict["last_good_quat"] = hmd_quat_dict.copy()
-    else:
-        if "gyro_quat" in controller_1_dict:
-            controller_1_dict["gyro_quat"] = hmd_quat_dict.copy()
-            controller_1_dict["last_good_quat"] = hmd_quat_dict.copy()
-        if "gyro_quat" in controller_2_dict:
-            controller_2_dict["gyro_quat"] = hmd_quat_dict.copy()
-            controller_2_dict["last_good_quat"] = hmd_quat_dict.copy()
-
-# def reset_controller_to_marker(controller_num, marker_id, device):
-#     global controller_1_dict, controller_2_dict
-
-#     optical = get_marker_world_transform(device, marker_id)
-#     optical_rot = R.from_quat([optical["rot x"], optical["rot y"], optical["rot z"], optical["rot w"]])
-#     q = optical_rot.as_quat()
-#     marker_quat_dict = {"x": q[0], "y": q[1], "z": q[2], "w": q[3]}
-
-#     c_dict = controller_1_dict if controller_num == 1 else controller_2_dict
-#     if "gyro_quat" in c_dict:
-#         c_dict["gyro_quat"] = marker_quat_dict.copy()
-#         c_dict["last_good_quat"] = marker_quat_dict.copy()
-#reset gyro////////////////////////////////////////////////////////////////////
-
-def start_calibration(controller_num=None):
-    global controller_1_dict, controller_2_dict
-    if controller_num == 1:
-        if "gyro_bias" in controller_1_dict:
-            has_accel = controller_1_dict["gyro_bias"].get("has_accel", False)
-            controller_1_dict["gyro_bias"] = {
-                "wx": 0.0, "wy": 0.0, "wz": 0.0,
-                "ax": 0.0, "ay": 0.0, "az": 0.0,
-                "tx": 0.0, "ty": 0.0, "tz": 0.0,
-                "samples": 0,
-                "has_accel": has_accel
-            }
-            p_controller_group.findChildren(QPushButton)[0].setText("calibrating...")
-            settings_core.update_setting("gyro_calibration_1", None)
-    elif controller_num == 2:
-        if "gyro_bias" in controller_2_dict:
-            has_accel = controller_2_dict["gyro_bias"].get("has_accel", False)
-            controller_2_dict["gyro_bias"] = {
-                "wx": 0.0, "wy": 0.0, "wz": 0.0,
-                "ax": 0.0, "ay": 0.0, "az": 0.0,
-                "tx": 0.0, "ty": 0.0, "tz": 0.0,
-                "samples": 0,
-                "has_accel": has_accel
-            }
-            p_controller_group.findChildren(QPushButton)[0].setText("calibrating...")
-            settings_core.update_setting("gyro_calibration_2", None)  # Clear saved calibration
-    else:
-        # Calibrate both
-        if "gyro_bias" in controller_1_dict:
-            has_accel = controller_1_dict["gyro_bias"].get("has_accel", False)
-            controller_1_dict["gyro_bias"] = {
-                "wx": 0.0, "wy": 0.0, "wz": 0.0,
-                "ax": 0.0, "ay": 0.0, "az": 0.0,
-                "tx": 0.0, "ty": 0.0, "tz": 0.0,
-                "samples": 0,
-                "has_accel": has_accel
-            }
-            settings_core.update_setting("gyro_calibration_1", None)
-        if "gyro_bias" in controller_2_dict:
-            has_accel = controller_2_dict["gyro_bias"].get("has_accel", False)
-            controller_2_dict["gyro_bias"] = {
-                "wx": 0.0, "wy": 0.0, "wz": 0.0,
-                "ax": 0.0, "ay": 0.0, "az": 0.0,
-                "tx": 0.0, "ty": 0.0, "tz": 0.0,
-                "samples": 0,
-                "has_accel": has_accel
-            }
-            settings_core.update_setting("gyro_calibration_2", None)
-
-running = True
-
-def run_sdl_event_loop():
-    global controller_1_dict, controller_2_dict, controller_arr, gyro_mod
-    
-    id_map = {} 
-
-    def refresh_id_map():
-        id_map.clear()
-        for i, c in enumerate(controller_arr):
-            iid = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(c))
-            id_map[iid] = i
-           # print("f{iid} = {i}")
-
-    while running:
-        try:
-            SDL_GameControllerUpdate()
-            settings = settings_core.get_settings()
-            
-            p1_idx = settings.get("controller index 1", 0)
-            p2_idx = settings.get("controller index 2", 1)
-            
-
-            event = SDL_Event()
-            while SDL_PollEvent(event):
-                if event.type == SDL_CONTROLLERDEVICEADDED:
-                    new_c = SDL_GameControllerOpen(event.cdevice.which)
-                    if new_c:
-                        name = SDL_GameControllerName(new_c)
-                        #print(name)
-
-                        if SDL_GameControllerHasSensor(new_c, SDL_SENSOR_GYRO):
-                            result = SDL_GameControllerSetSensorEnabled(new_c, SDL_SENSOR_GYRO, SDL_TRUE)
-                        
-                        if SDL_GameControllerHasSensor(new_c, SDL_SENSOR_ACCEL):
-                            SDL_GameControllerSetSensorEnabled(new_c, SDL_SENSOR_ACCEL, SDL_TRUE)
-
-                        controller_arr.append(new_c)
-                        refresh_id_map()
-
-                elif event.type == SDL_CONTROLLERDEVICEREMOVED:
-                    instance_id = event.cdevice.which
-                    to_remove = None
-                    for i, c in enumerate(controller_arr):
-                        if SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(c)) == instance_id:
-                            to_remove = i
-                            SDL_GameControllerClose(c)
-                            break
-                    if to_remove is not None:
-                        controller_arr.pop(to_remove)
-                        refresh_id_map()
-
-                elif event.type == SDL_CONTROLLERSENSORUPDATE:
-                    sender_id = event.csensor.which
-                    if sender_id not in id_map: continue
-                    
-                    real_index = id_map[sender_id]
-                    
-                    target_dict = None
-                    player_num = 0
-                    
-                    if real_index == p1_idx:
-                        target_dict = controller_1_dict
-                        player_num = 1
-                    elif real_index == p2_idx:
-                        target_dict = controller_2_dict
-                        player_num = 2
-                    
-                    if target_dict is None: continue
-
-                    if "gyro_quat" not in target_dict:
-                        target_dict["gyro_quat"] = {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}
-                        target_dict["last_ts"] = event.csensor.timestamp
-                        target_dict["last_good_quat"] = {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}
-                        
-                        cal_key = f"gyro_calibration_{player_num}" 
-                        saved_cal = settings.get(cal_key, {})
-                        
-                        if saved_cal is None:
-                            saved_cal = {}
-                        
-                        target_dict["gyro_bias"] = {
-                            "wx": saved_cal.get("wx", 0.0), "wy": saved_cal.get("wy", 0.0), "wz": saved_cal.get("wz", 0.0),
-                            "ax": saved_cal.get("ax", 0.0), "ay": saved_cal.get("ay", 0.0), "az": saved_cal.get("az", 0.0),
-                            "tx": saved_cal.get("tx", 0.02), "ty": saved_cal.get("ty", 0.02), "tz": saved_cal.get("tz", 0.02),
-                            "samples": CALIBRATION_SAMPLES if saved_cal else 0
-                        }
-
-                    bias = target_dict["gyro_bias"]
-
-                    if event.csensor.sensor == SDL_SENSOR_GYRO:
-                        curr_ts = event.csensor.timestamp
-                        dt = (curr_ts - target_dict["last_ts"]) / 1000000.0
-                        target_dict["last_ts"] = curr_ts
-
-                        pfx = f"gyro{player_num}"
-                        raw_data = event.csensor.data
-                        sens = settings.get(f"{pfx} sensitivity", 1.0)
-
-                        ix = settings.get(f"{pfx} index x", 0)
-                        iy = settings.get(f"{pfx} index y", 1)
-                        iz = settings.get(f"{pfx} index z", 2)
-                        
-                        rwx = raw_data[ix] * (-1 if settings.get(f"{pfx} invert x", False) else 1)
-                        rwy = raw_data[iy] * (-1 if settings.get(f"{pfx} invert y", False) else 1)
-                        rwz = raw_data[iz] * (-1 if settings.get(f"{pfx} invert z", False) else 1)
-
-                        if bias["samples"] < CALIBRATION_SAMPLES:
-                            bias["wx"] += rwx; bias["wy"] += rwy; bias["wz"] += rwz
-                            bias["samples"] += 1
-                            if bias["samples"] == CALIBRATION_SAMPLES:
-                                bias["wx"] /= CALIBRATION_SAMPLES
-                                bias["wy"] /= CALIBRATION_SAMPLES
-                                bias["wz"] /= CALIBRATION_SAMPLES
-                                
-                                save_data = {k: v for k, v in bias.items() if k != "samples"}
-                                settings_core.update_setting(f"gyro_calibration_{player_num}", save_data)
-
-                                p_controller_group.findChildren(QPushButton)[0].setText("calibration")
-                            continue
-
-                        wx = (rwx - bias["wx"]) * sens
-                        wy = (rwy - bias["wy"]) * sens
-                        wz = (rwz - bias["wz"]) * sens
-                        
-                        if math.sqrt(wx**2 + wy**2 + wz**2) < bias["tx"]: 
-                            wx = wy = wz = 0
-
-                        mag = math.sqrt(wx**2 + wy**2 + wz**2)
-                        if mag > 0:
-                            half_angle = (mag * dt) / 2.0
-                            s = math.sin(half_angle) / mag
-                            dq = {"w": math.cos(half_angle), "x": wx * s, "y": wy * s, "z": wz * s}
-                            new_quat = normalize_quat(quat_multiply(target_dict["gyro_quat"], dq))
-                            
-                            if settings.get("bluetooth skip correction", True):
-                                dot = abs(new_quat["w"] * target_dict["last_good_quat"]["w"] + 
-                                         new_quat["x"] * target_dict["last_good_quat"]["x"] + 
-                                         new_quat["y"] * target_dict["last_good_quat"]["y"] + 
-                                         new_quat["z"] * target_dict["last_good_quat"]["z"])
-                                
-                                if dot > 0.95:
-                                    target_dict["gyro_quat"] = new_quat
-                                    target_dict["last_good_quat"] = new_quat
-                                else:
-                                    target_dict["gyro_quat"] = target_dict["last_good_quat"]
-                            else:
-                                target_dict["gyro_quat"] = new_quat
-                                target_dict["last_good_quat"] = new_quat
-
-                    elif event.csensor.sensor == SDL_SENSOR_ACCEL:
-                        pfx = f"gyro{player_num}"
-                        raw_accel = event.csensor.data
-
-                        ix = settings.get(f"{pfx} index x", 0)
-                        iy = settings.get(f"{pfx} index y", 1)
-                        iz = settings.get(f"{pfx} index z", 2)
-
-                        rax = raw_accel[ix] * (-1 if settings.get(f"{pfx} invert x", False) else 1)
-                        ray = raw_accel[iy] * (-1 if settings.get(f"{pfx} invert y", False) else 1)
-                        raz = raw_accel[iz] * (-1 if settings.get(f"{pfx} invert z", False) else 1)
-
-                        if bias["samples"] < CALIBRATION_SAMPLES:
-                            bias["ax"] += rax; bias["ay"] += ray; bias["az"] += raz
-                        else:
-                            ax = rax - bias.get("ax", 0.0)
-                            ay = ray - bias.get("ay", 0.0)
-                            az = raz - bias.get("az", 0.0)
-                            
-                            accel_mag = math.sqrt(ax**2 + ay**2 + az**2)
-                            
-                            if 0.9 < accel_mag < 1.1:
-                                correction = quat_from_two_vectors(
-                                    {"x": ax/accel_mag, "y": ay/accel_mag, "z": az/accel_mag}, 
-                                    {"x": 0, "y": 0, "z": -1}
-                                )
-                                target_dict["gyro_quat"] = normalize_quat(quat_slerp(target_dict["gyro_quat"], correction, ALPHA))
-
-            time.sleep(0.001)
-
-        except Exception as e:
-            #print(e)
-            time.sleep(0.001)
-
-def run_controller_worker(player_num):
-    global controller_1_dict, controller_2_dict, controller_arr
-    
-    target_dict = controller_1_dict if player_num == 1 else controller_2_dict
-    
-    while running:
-        try:
-            settings = settings_core.get_settings()
-            hw_index = settings.get(f"controller index {player_num}", player_num - 1)
-            
-            if 0 <= hw_index < len(controller_arr):
-                controller_handle = controller_arr[hw_index]
-                
-                new_data = poll_hardware(controller_handle)
-                
-                detect_input_change(player_num, new_data, target_dict)
-                
-                target_dict.update(new_data)
-                
-                if get_mapped_action("reset gyro", str(player_num)):
-                    reset_rotation(player_num)
-                if get_mapped_action("calibrate gyro", str(player_num)):
-                    start_calibration(player_num)
-                    
-            else:
-                pass
-
-            time.sleep(0.001)
-            
-        except Exception as e:
-            #print(e)
-            time.sleep(0.001)
-
-def start_controller_mapping():
-    global running
-    running = True
-
-    t_events = threading.Thread(target=run_sdl_event_loop, daemon=True, name="SDL_Event_Manager")
-    t_events.start()
-    
-    t_p1 = threading.Thread(target=run_controller_worker, args=(1,), daemon=True, name="P1_Worker")
-    t_p1.start()
-
-    t_p2 = threading.Thread(target=run_controller_worker, args=(2,), daemon=True, name="P2_Worker")
-    t_p2.start()
-
-    return [t_events, t_p1, t_p2]
-
-
-def poll_hardware(c):
-    def a(axis):
-        v = SDL_GameControllerGetAxis(c, axis) / 32767.0
-        if abs(v) < DEADZONE: return 0.0
-        return (v - (DEADZONE if v > 0 else -DEADZONE)) / (1.0 - DEADZONE)
-
-    return {
-        "a": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_A)),
-        "b": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_B)),
-        "x": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_X)),
-        "y": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_Y)),
-        "back": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_BACK)),
-        "start": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_START)),
-        
-        "leftstick": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_LEFTSTICK)),
-        "rightstick": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_RIGHTSTICK)),
-        "guide": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_GUIDE)),
-        "misc1": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_MISC1)),
-        
-        "leftshoulder": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)),
-        "rightshoulder": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)),
-        "dpup": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_UP)),
-        "dpdown": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_DOWN)),
-        "dpleft": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_LEFT)),
-        "dpright": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)),
-        
-        "leftx": a(SDL_CONTROLLER_AXIS_LEFTX),
-        "lefty": a(SDL_CONTROLLER_AXIS_LEFTY),
-        "rightx": a(SDL_CONTROLLER_AXIS_RIGHTX),
-        "righty": a(SDL_CONTROLLER_AXIS_RIGHTY),
-        "lefttrigger": a(SDL_CONTROLLER_AXIS_TRIGGERLEFT),
-        "righttrigger": a(SDL_CONTROLLER_AXIS_TRIGGERRIGHT),
-        
-        "paddle1": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_PADDLE1)),
-        "paddle2": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_PADDLE2)),
-        "paddle3": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_PADDLE3)),
-        "paddle4": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_PADDLE4)),
-        "touchpad": bool(SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_TOUCHPAD)),
-    }
-
-def detect_input_change(c_idx, new_state, old_state):
-    for key, val in new_state.items():
-        old_val = old_state.get(key)
-        
-        if isinstance(val, bool):
-            if val and not old_val:
-                msg = f"{c_idx} {key}"
-                mapping_label.findChild(QLabel).setText(msg)
-                
-        elif isinstance(val, float):
-            if abs(val) > 0.1 and abs(val - old_val) > 0.05:
-                msg = f"{c_idx} {key} {val:.2f}"
-                mapping_label.findChild(QLabel).setText(msg)
-
-#controller handler/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#camera//////////////////////////////////////////////////////////////////////////////////////////////////
-SHOW_FEED = True
-RESOLUTION_X = 640
-RESOLUTION_Y = 480
-MAX_HANDS_PER_CAMERA = 2
-SWAP_HANDS_MODE = False
-SMOOTHING_FACTOR = 0.8
-Splay_mod = 2.0
-MIN_CHANGE_THRESHOLD = 0.04
-MAX_CHANGE_THRESHOLD = 0.4
-
-REFERENCE_DEPTH_CM = 50.0
-ref_3d_mag_right = 0.08
-ref_3d_mag_left = 0.08
-smoothed_z_right = REFERENCE_DEPTH_CM
-smoothed_z_left = REFERENCE_DEPTH_CM
-DEPTH_SMOOTHING = 0.2
-
-caps = {}
-caps_lock = threading.Lock()
-camera_running = False
-camera_ready = threading.Event()
-camera_thread = None
-hands = None
-
-HAND_R, HAND_L = "right", "left"
-VERSION = "v2"
-PIPE_NAME_R = fr'\\.\pipe\vrapplication\input\glove\{VERSION}\{HAND_R}'
-PIPE_NAME_L = fr'\\.\pipe\vrapplication\input\glove\{VERSION}\{HAND_L}'
-PACK_FORMAT2 = '<20f5f2f8?f'
-SEND_INTERVAL = 0.0001
+#camera (hand tracking)//////////////////////////////////////////////////////////////////////////////////////////////////
+SHOW_FEED           = True
+RESOLUTION_X        = 640
+RESOLUTION_Y        = 480
+SWAP_HANDS_MODE     = False
+
+REFERENCE_DEPTH_CM  = 0.5
+REFERENCE_BBOX = 200.0
+
+ref_3d_mag_right    = 0.08
+ref_3d_mag_left     = 0.08
 
 hand_data = {
+    "l flexion": [0.0] * 20,
+    "l splay":   [0.0] * 5,
     "l pos x": 0.0, "l pos y": 0.0, "l pos z": 0.0,
     "l rot x": 0.0, "l rot y": 0.0, "l rot z": 0.0, "l rot w": 1.0,
-    "l flexion": [0.0] * 20,
-    "l splay": [0.0] * 5,
-    "l joy_x": 0.0, "l joy_y": 0.0,
-    "l joy_button": False, "l trigger_button": False,
-    "l a_button": False, "l b_button": False,
-    "l grab": False, "l pinch": False,
-    "l menu": False, "l calibrate": False,
-    "l trigger_value": 0.0,
-    
+
+    "r flexion": [0.0] * 20,
+    "r splay":   [0.0] * 5,
     "r pos x": 0.0, "r pos y": 0.0, "r pos z": 0.0,
     "r rot x": 0.0, "r rot y": 0.0, "r rot z": 0.0, "r rot w": 1.0,
-    "r flexion": [0.0] * 20,
-    "r splay": [0.0] * 5,
-    "r joy_x": 0.0, "r joy_y": 0.0,
-    "r joy_button": False, "r trigger_button": False,
-    "r a_button": False, "r b_button": False,
-    "r grab": False, "r pinch": False,
-    "r menu": False, "r calibrate": False,
-    "r trigger_value": 0.0,
 }
 
-right_hand_smoothed_flexion = [0.0] * 20
-left_hand_smoothed_flexion = [0.0] * 20
-right_hand_smoothed_splay = [0.0] * 5
-left_hand_smoothed_splay = [0.0] * 5
+camera_running = False
+camera_thread  = None
+camera_ready   = threading.Event()
 
-MP_LANDMARK_IDS = [
-    (1, 2, 3, 4),      #thumb
-    (5, 6, 7, 8),      #index
-    (9, 10, 11, 12),   #middle
-    (13, 14, 15, 16),  #ring
-    (17, 18, 19, 20)   #pinky
-]
+def _vec(l1, l2):
+    return np.array([l2[0]-l1[0], l2[1]-l1[1], l2[2]-l1[2]], dtype=float)
 
-FINGER_JOINTS_FOR_SPLAY = [(5, 6), (9, 10), (13, 14), (17, 18)]
-THUMB_SPLAY_ID = 2
+def _angle(v1, v2):
+    n = np.linalg.norm(v1) * np.linalg.norm(v2)
+    return np.arccos(np.clip(np.dot(v1, v2) / n, -1.0, 1.0)) if n > 1e-9 else 0.0
 
-FLEXION_MIN_ANGLE, FLEXION_MAX_ANGLE = 2.5, 3.1
-SPLAY_THUMB_MIN_ANGLE, SPLAY_THUMB_MAX_ANGLE = 0.5, 1.5
-SPLAY_FINGER_MIN_ANGLE, SPLAY_FINGER_MAX_ANGLE = 0.1, 0.7
+def _norm01(v, lo, hi):
+    return float(np.clip((v - lo) / (hi - lo), 0.0, 1.0)) if hi != lo else 0.0
 
-
-def get_vector(l1, l2):
-    return np.array([l2['x'] - l1['x'], l2['y'] - l1['y'], l2['z'] - l1['z']])
-
-def get_angle(v1, v2):
-    dot = np.dot(v1, v2)
-    norm = np.linalg.norm(v1) * np.linalg.norm(v2)
-    return np.arccos(np.clip(dot / norm, -1.0, 1.0)) if norm != 0 else 0.0
-
-def normalize_value(value, min_val, max_val):
-    return np.clip((value - min_val) / (max_val - min_val), 0.0, 1.0) if max_val != min_val else 0.0
-
-def matrix_to_quaternion(m):
+def _mat_to_quat(m):
     tr = m[0,0] + m[1,1] + m[2,2]
     if tr > 0:
         s = np.sqrt(tr + 1.0) * 2
-        return (m[2,1] - m[1,2])/s, (m[0,2] - m[2,0])/s, (m[1,0] - m[0,1])/s, 0.25*s
+        return (m[2,1]-m[1,2])/s, (m[0,2]-m[2,0])/s, (m[1,0]-m[0,1])/s, 0.25*s
     elif (m[0,0] > m[1,1]) and (m[0,0] > m[2,2]):
         s = np.sqrt(1.0 + m[0,0] - m[1,1] - m[2,2]) * 2
-        return 0.25*s, (m[0,1] + m[1,0])/s, (m[0,2] + m[2,0])/s, (m[2,1] - m[1,2])/s
+        return 0.25*s, (m[0,1]+m[1,0])/s, (m[0,2]+m[2,0])/s, (m[2,1]-m[1,2])/s
     elif m[1,1] > m[2,2]:
         s = np.sqrt(1.0 + m[1,1] - m[0,0] - m[2,2]) * 2
-        return (m[0,1] + m[1,0])/s, 0.25*s, (m[1,2] + m[2,1])/s, (m[0,2] - m[2,0])/s
+        return (m[0,1]+m[1,0])/s, 0.25*s, (m[1,2]+m[2,1])/s, (m[0,2]-m[2,0])/s
     else:
         s = np.sqrt(1.0 + m[2,2] - m[0,0] - m[1,1]) * 2
-        return (m[0,2] + m[2,0])/s, (m[1,2] + m[2,1])/s, 0.25*s, (m[1,0] - m[0,1])/s
+        return (m[0,2]+m[2,0])/s, (m[1,2]+m[2,1])/s, 0.25*s, (m[1,0]-m[0,1])/s
 
-def map_to_glove(hand_label, hand_landmarks, hand_prefix):
-    global right_hand_smoothed_flexion, left_hand_smoothed_flexion
-    global right_hand_smoothed_splay, left_hand_smoothed_splay
-    
-    is_right = (hand_label.lower() == "right")
-    flex_buf = right_hand_smoothed_flexion if is_right else left_hand_smoothed_flexion
-    splay_buf = right_hand_smoothed_splay if is_right else left_hand_smoothed_splay
-    
-    L = {lm['id']: lm for lm in hand_landmarks}
-    
-    # Flexion
-    for finger_i, mp_ids in enumerate(MP_LANDMARK_IDS):
-        for joint_i in range(3):
-            p1_id = mp_ids[joint_i-1] if joint_i > 0 else (0 if finger_i == 0 else mp_ids[0]-1)
-            p2_id, p3_id = mp_ids[joint_i], mp_ids[joint_i+1]
-            angle = get_angle(get_vector(L[p2_id], L[p1_id]), get_vector(L[p2_id], L[p3_id]))
-            val = 1.0 - normalize_value(angle, FLEXION_MIN_ANGLE, FLEXION_MAX_ANGLE)
-            idx = finger_i * 4 + joint_i
-            flex_buf[idx] = (SMOOTHING_FACTOR * val) + ((1 - SMOOTHING_FACTOR) * flex_buf[idx])
-        flex_buf[finger_i * 4 + 3] = flex_buf[finger_i * 4 + 2]
-    
-    # Splay
-    splay_buf[0] = normalize_value(
-        get_angle(get_vector(L[0], L[9]), get_vector(L[0], L[THUMB_SPLAY_ID])),
-        SPLAY_THUMB_MIN_ANGLE, SPLAY_THUMB_MAX_ANGLE
-    )
-    for i in range(len(FINGER_JOINTS_FOR_SPLAY)-1):
-        v1 = get_vector(L[FINGER_JOINTS_FOR_SPLAY[i][0]], L[FINGER_JOINTS_FOR_SPLAY[i][1]])
-        v2 = get_vector(L[FINGER_JOINTS_FOR_SPLAY[i+1][0]], L[FINGER_JOINTS_FOR_SPLAY[i+1][1]])
-        splay_buf[i+1] = normalize_value(
-            get_angle(v1, v2) * Splay_mod,
-            SPLAY_FINGER_MIN_ANGLE, SPLAY_FINGER_MAX_ANGLE
-        )
-    
-    px, py, pz, rx, ry, rz, rw = calculate_hand_position_rotation(L, is_right)
-    
-    hand_data.update({
-        f"{hand_prefix} pos x": px,
-        f"{hand_prefix} pos y": py,
-        f"{hand_prefix} pos z": pz,
-        f"{hand_prefix} rot x": rx,
-        f"{hand_prefix} rot y": ry,
-        f"{hand_prefix} rot z": rz,
-        f"{hand_prefix} rot w": rw,
-        f"{hand_prefix} flexion": flex_buf.copy(),
-        f"{hand_prefix} splay": splay_buf.copy(),
-        f"{hand_prefix} pinch": np.linalg.norm(get_vector(L[8], L[4])) < 0.05
-    })
 
-def update_actions():
-    #try:
-    for prefix, full_name in [("r", "right"), ("l", "left")]:
-        hand_data[f"{prefix} a_button"] = get_mapped_action(f'{full_name} a')
-        hand_data[f"{prefix} b_button"] = get_mapped_action(f'{full_name} b')
-        hand_data[f"{prefix} grab"] = get_mapped_action(f'{full_name} grip')
-        hand_data[f"{prefix} menu"] = get_mapped_action(f'{full_name} menu')
-        hand_data[f"{prefix} calibrate"] = get_mapped_action(f'{full_name} touch modifier')
-        
-        t_val = int(get_mapped_action(f'{full_name} trigger'))
-        hand_data[f"{prefix} trigger_value"] = t_val
-        hand_data[f"{prefix} trigger_button"] = (t_val == 1.0)
-        
-        hand_data[f"{prefix} joy_x"] = get_mapped_action(f'{full_name} joy x')
-        hand_data[f"{prefix} joy_y"] = get_mapped_action(f'{full_name} joy y')
-        hand_data[f"{prefix} joy_button"] = get_mapped_action(f'{full_name} joy button')
-    # except:
-    #     pass
+FINGER_BASES  = [1, 5, 9, 13, 17]
+FINGER_TIPS   = [4, 8, 12, 16, 20]
+FINGER_MIDS   = [3, 7, 11, 15, 19]
 
-#//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-def calculate_hand_position_rotation(L, is_right):
-    global smoothed_z_right, smoothed_z_left
-    
-    wrist, mid, idx, pky = L[0], L[9], L[5], L[17]
-    dx, dy, dz = mid['x']-wrist['x'], mid['y']-wrist['y'], (mid['z']-wrist['z'])*2.2
-    mag = np.sqrt(dx**2 + dy**2 + dz**2)
-    ref = ref_3d_mag_right if is_right else ref_3d_mag_left
-    raw_z = (ref / mag * REFERENCE_DEPTH_CM) if mag > 1e-6 else REFERENCE_DEPTH_CM
-    
+FLEXION_MIN, FLEXION_MAX     = 0.0, 20.5
+SPLAY_THUMB_MIN,  SPLAY_THUMB_MAX  = 0.0, 20.0
+SPLAY_FINGER_MIN, SPLAY_FINGER_MAX = 0.0, 20.35
+
+def _process_hand(lm_list, is_right, img_w, img_h):
+    prefix = "r" if is_right else "l"
+
+    P = [(r[0], r[1]) for r in lm_list]
+
+    P3 = [(r[0]/img_w, 1.0-(r[1]/img_h), -r[2]) for r in lm_list]
+
+    #pos////////////////////////////////////////////////////////////////////////////////////////////
+    wx, wy = P[0]
+    hand_data[f"{prefix} pos x"] = wx / img_w
+    hand_data[f"{prefix} pos y"] = 1.0 - (wy / img_h)
+
+    xs = [p[0] for p in P]
+    ys = [p[1] for p in P]
+    bbox_size = max(max(xs) - min(xs), max(ys) - min(ys))
+    raw_z = -(REFERENCE_DEPTH_CM * REFERENCE_BBOX / bbox_size) if bbox_size > 1 else -REFERENCE_DEPTH_CM
+    hand_data[f"{prefix} pos z"] = raw_z
+
+    #rot////////////////////////////////////////////////////////////////////////////////////////////
+    p_wrist  = np.array(P3[0],  dtype=float)
+    p_index  = np.array(P3[5],  dtype=float)
+    p_middle = np.array(P3[9],  dtype=float)
+    p_pinky  = np.array(P3[17], dtype=float)
+
+    v_fwd_raw = p_middle - p_wrist
+    v_fwd_raw /= np.linalg.norm(v_fwd_raw) + 1e-6
+    v_z = -v_fwd_raw
+
     if is_right:
-        smoothed_z_right = (smoothed_z_right * (1 - DEPTH_SMOOTHING)) + (raw_z * DEPTH_SMOOTHING)
-        pos_z = -smoothed_z_right
+        v_right_raw = p_pinky - p_index
     else:
-        smoothed_z_left = (smoothed_z_left * (1 - DEPTH_SMOOTHING)) + (raw_z * DEPTH_SMOOTHING)
-        pos_z = -smoothed_z_left
+        v_right_raw = p_index - p_pinky
+    v_right_raw /= np.linalg.norm(v_right_raw) + 1e-6
+
+    v_y = np.cross(v_z, v_right_raw)
+    v_y /= np.linalg.norm(v_y) + 1e-6
+
+    v_x = np.cross(v_y, v_z)
+    v_x /= np.linalg.norm(v_x) + 1e-6
+
+    mat = np.stack([v_x, v_y, v_z], axis=1)
+    qx, qy, qz, qw = _mat_to_quat(mat)
+
+    if v_x[2] > 0:
+        qx, qy, qz, qw = -qx, -qy, -qz, -qw
+
+    hand_data[f"{prefix} rot x"] = qx
+    hand_data[f"{prefix} rot y"] = qy
+    hand_data[f"{prefix} rot z"] = qz
+    hand_data[f"{prefix} rot w"] = qw
     
-    v_fwd = np.array([mid['x'] - wrist['x'], -(mid['y'] - wrist['y']), -(mid['z'] - wrist['z'])])
-    v_side_t = np.array([idx['x'] - pky['x'], -(idx['y'] - pky['y']), -(idx['z'] - pky['z'])])
-    v_fwd /= (np.linalg.norm(v_fwd) + 1e-6)
-    v_side_t /= (np.linalg.norm(v_side_t) + 1e-6)
-    v_up = np.cross(v_fwd, v_side_t) if is_right else np.cross(v_side_t, v_fwd)
-    v_up /= (np.linalg.norm(v_up) + 1e-6)
-    v_side = np.cross(v_up, v_fwd)
+    #curl////////////////////////////////////////////////////
+    finger_lms = [
+        (1,  2,  3,  4),
+        (5,  6,  7,  8),
+        (9,  10, 11, 12),
+        (13, 14, 15, 16),
+        (17, 18, 19, 20),
+    ]
+    flexion = [0.0] * 20
+    curl_values = []
+
+    for fi, (base, k1, k2, tip) in enumerate(finger_lms):
+        pb   = np.array(P[base], dtype=float)
+        pk1  = np.array(P[k1],   dtype=float)
+        ptip = np.array(P[tip],  dtype=float)
+
+        if fi == 0:
+            p1, p2, p3, p4 = [np.array(P[i], dtype=float) for i in range(1, 5)]
+            total_angle = _angle(p1-p2, p3-p2) + _angle(p2-p3, p4-p3)
+            curl = _norm01(total_angle, 6.0, 4.5)
+            flexion[fi * 4] = curl
+            curl_values.append(curl)
+        else:
+            seg_len  = np.linalg.norm(pk1 - pb)
+            extended = seg_len * 3.0
+            actual   = np.linalg.norm(ptip - pb)
+            curl     = 1.0 - np.clip(actual / (extended + 1e-6), 0.0, 1.0)
+            flexion[fi * 4] = curl
+            curl_values.append(curl)
+
+    hand_data[f"{prefix} flexion"] = flexion
+
+    #curl also affect pos, that a bug, this should fix that///////////////////////////////////////////////////////////////////
+    wx, wy = P[0]
+    hand_data[f"{prefix} pos x"] = wx / img_w
+    hand_data[f"{prefix} pos y"] = 1.0 - (wy / img_h)
+
+    xs = [p[0] for p in P]
+    ys = [p[1] for p in P]
+    bbox_size = max(max(xs) - min(xs), max(ys) - min(ys))
+    raw_z = -(REFERENCE_DEPTH_CM * REFERENCE_BBOX / bbox_size) if bbox_size > 1 else -REFERENCE_DEPTH_CM
     
-    qx, qy, qz, qw = matrix_to_quaternion(np.stack([v_side, v_up, v_fwd], axis=1))
-    return wrist['x'], 1.0 - wrist['y'], pos_z, qx, qy, qz, qw
+    global_min_curl = min(curl_values) 
+    
+    z_offset = global_min_curl * 0.28 
+    final_z = raw_z + z_offset
+
+    hand_data[f"{prefix} pos z"] = final_z
+    
+    #splay/////////////////////////////////////////////////////////////////////////////////
+    splay_range = 0.1
+    splay = [0.0] * 5
+
+    p_w = np.array(P3[0],  dtype=float) 
+    tips = [
+        np.array(P3[4],  dtype=float),#thumb
+        np.array(P3[8],  dtype=float),#index
+        np.array(P3[12], dtype=float),#mid
+        np.array(P3[16], dtype=float),#ring
+        np.array(P3[20], dtype=float)#pinky
+    ]
+
+    def get_angle(t1, t2, wrist):
+        v1, v2 = t1 - wrist, t2 - wrist
+        u1 = v1 / (np.linalg.norm(v1) + 1e-6)
+        u2 = v2 / (np.linalg.norm(v2) + 1e-6)
+        return np.arccos(np.clip(np.dot(u1, u2), -1.0, 1.0))
+
+    def map_splay_dynamic(angle, min_a, max_a, r_scale):
+        n = (angle - min_a) / (max_a - min_a + 1e-6)
+        n = np.clip(n, 0.0, 1.0)
+        
+        return ((n ** 0.3) * 2.0 - 1.0) * r_scale
+
+    splay[0] = map_splay_dynamic(get_angle(tips[0], tips[1], p_w), 0.10, 0.40, splay_range)
+    splay[1] = map_splay_dynamic(get_angle(tips[1], tips[2], p_w), 0.05, 0.20, splay_range)*5
+    splay[2] = map_splay_dynamic(get_angle(tips[2], tips[3], p_w), 0.05, 0.18, splay_range)*5
+    splay[3] = map_splay_dynamic(get_angle(tips[3], tips[4], p_w), 0.05, 0.20, splay_range)*5
+    splay[4] = map_splay_dynamic(get_angle(tips[3], tips[4], p_w), 0.05, 0.22, splay_range)*5
+
+    hand_data[f"{prefix} splay"] = splay
+
+hand_side_buffer = [0, 0] 
+side_threshold = 1
+last_known_x = {"l": 0.1, "r": 0.9}
 
 def camera_loop():
-    global camera_running, caps, hands
-    
+    global camera_running, last_known_x
+
     try:
-        mp_hands = mp.solutions.hands
-        mp_drawing = mp.solutions.drawing_utils
-        mp_drawing_styles = mp.solutions.drawing_styles
-        
-        hands = mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=MAX_HANDS_PER_CAMERA,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        
-        p_time = 0
-        camera_running = True
-        
-        timeout = 0
-        while camera_running and timeout < 50:
-            with caps_lock:
-                if caps:
-                    break
-            time.sleep(0.0001)
-            timeout += 1
-        
-        if not caps:
+        idx = settings_core.get_settings().get("camera index", 0)
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+        if not cap.isOpened():
             camera_running = False
             return
-        
+
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  RESOLUTION_X)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, RESOLUTION_Y)
+
+        detector = HandDetector(maxHands=2, detectionCon=0.5, minTrackCon=0.5)
         camera_ready.set()
-        
+
         while camera_running:
-            update_actions()
-            
-            with caps_lock:
-                cam_items = list(caps.items())
-            
-            for cam_id, cap in cam_items:
-                success, image = cap.read()
-                if not success:
-                    continue
-                
-                image = cv2.flip(image, 1)
-                
-                rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                res = hands.process(rgb_image)
-                
-                if res.multi_hand_landmarks:
-                    for i, hand_lms in enumerate(res.multi_hand_landmarks):
-                        # Get Hand Label (Left/Right)
-                        label = res.multi_handedness[i].classification[0].label
-                        
-                        # Draw Landmarks
-                        mp_drawing.draw_landmarks(
-                            image,
-                            hand_lms,
-                            mp_hands.HAND_CONNECTIONS,
-                            mp_drawing_styles.get_default_hand_landmarks_style(),
-                            mp_drawing_styles.get_default_hand_connections_style()
-                        )
-                        
-                        # Process data for Gloves
-                        l_list = [{'id': id, 'x': lm.x, 'y': lm.y, 'z': lm.z} 
-                                 for id, lm in enumerate(hand_lms.landmark)]
-                        prefix = ("l" if label == "Right" else "r") if SWAP_HANDS_MODE else \
-                                ("r" if label == "Right" else "l")
-                        map_to_glove(label, l_list, prefix)
-                        
-                        # Add Label Text to Preview
-                        h, w, _ = image.shape
-                        cx, cy = int(hand_lms.landmark[0].x * w), int(hand_lms.landmark[0].y * h)
-                        cv2.putText(image, f"{label} Hand", (cx, cy - 20),
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                
-                # FPS Calculation
-                c_time = time.time()
-                fps = 1 / (c_time - p_time) if (c_time - p_time) > 0 else 0
-                p_time = c_time
-                cv2.putText(image, f"FPS: {int(fps)}", (10, 30),
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                
-                if SHOW_FEED:
-                    cv2.imshow(f'Hand Tracking {cam_id}', image)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        camera_running = False
-            
+            success, image = cap.read()
+            if not success:
+                time.sleep(0.001)
+                continue
+
+            try:
+                hands_found, image = detector.findHands(image, draw=True)
+            except Exception as e:
+                continue
+
+            if hands_found:
+                h, w = image.shape[:2]
+                num_hands = len(hands_found)
+
+                current_hands = []
+                for i in range(num_hands):
+                    raw_lms = detector.results.multi_hand_landmarks[i].landmark
+                    current_hands.append({
+                        "x": raw_lms[0].x, 
+                        "raw_lms": raw_lms
+                    })
+
+                assignments = []
+                if num_hands == 2:
+                    sorted_hands = sorted(current_hands, key=lambda x: x["x"])
+                    assignments = [("l", sorted_hands[0]), ("r", sorted_hands[1])]
+                else:
+                    hand = current_hands[0]
+                    dist_l = abs(hand["x"] - last_known_x["l"])
+                    dist_r = abs(hand["x"] - last_known_x["r"])
+                    side = "l" if dist_l < dist_r else "r"
+                    assignments = [(side, hand)]
+
+                for side, hand_info in assignments:
+                    prefix = side
+                    is_right = (side == "r")
+                    label = "Right" if is_right else "Left"
+                    
+                    last_known_x[side] = hand_info["x"]
+
+                    lm = [[int(l.x * w), int(l.y * h), l.z] for l in hand_info["raw_lms"]]
+                    _process_hand(lm, is_right, w, h)
+
+                    try:
+                        px, py, pz = hand_data[f"{prefix} pos x"], hand_data[f"{prefix} pos y"], hand_data[f"{prefix} pos z"]
+                        rx, ry, rz, rw = hand_data[f"{prefix} rot x"], hand_data[f"{prefix} rot y"], hand_data[f"{prefix} rot z"], hand_data[f"{prefix} rot w"]
+                        fl = hand_data[f"{prefix} flexion"]
+                        sp = hand_data[f"{prefix} splay"]
+
+                        cx, cy = lm[0][0], lm[0][1]
+                        lines = [
+                            f"{label} pos x:{px:.2f} y:{py:.2f} z:{pz:.3f}",
+                            f"rot x:{rx:.2f} y:{ry:.2f} z:{rz:.2f} w:{rw:.2f}",
+                            f"flex T:{fl[0]:.2f} I:{fl[4]:.2f} M:{fl[8]:.2f} R:{fl[12]:.2f} P:{fl[16]:.2f}",
+                            f"splay T:{sp[0]:.2f} I:{sp[1]:.2f} M:{sp[2]:.2f} R:{sp[3]:.2f} P:{sp[4]:.2f}",
+                        ]
+                        for j, line in enumerate(lines):
+                            cv2.putText(image, line, (cx, cy - 20 - j*18),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0,255,0), 1)
+                    except KeyError:
+                        continue
+
+            if SHOW_FEED:
+                cv2.imshow("Hand Tracking", image)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    camera_running = False
+
             time.sleep(0.0001)
-    
+
     except Exception as e:
-        #print(e)
+        import traceback
         camera_running = False
-    
     finally:
-        with caps_lock:
-            for cap in caps.values():
-                cap.release()
-            caps.clear()
+        cap.release()
         cv2.destroyAllWindows()
-        if hands:
-            hands.close()
-#//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-def opengloves_sender(pipe_name, hand_prefix):
-    while camera_running:
-        handle = None
-        try:
-            payload = (hand_data[f"{hand_prefix} flexion"] +
-                      hand_data[f"{hand_prefix} splay"] +
-                      [hand_data[f"{hand_prefix} joy_x"],
-                       hand_data[f"{hand_prefix} joy_y"],
-                       hand_data[f"{hand_prefix} joy_button"],
-                       hand_data[f"{hand_prefix} trigger_button"],
-                       hand_data[f"{hand_prefix} a_button"],
-                       hand_data[f"{hand_prefix} b_button"],
-                       hand_data[f"{hand_prefix} grab"],
-                       hand_data[f"{hand_prefix} pinch"],
-                       hand_data[f"{hand_prefix} menu"],
-                       hand_data[f"{hand_prefix} calibrate"],
-                       hand_data[f"{hand_prefix} trigger_value"]])
-            
-            handle = win32file.CreateFile(
-                pipe_name,
-                win32file.GENERIC_WRITE,
-                0,
-                None,
-                win32file.OPEN_EXISTING,
-                0,
-                None
-            )
-            win32file.WriteFile(handle, struct.pack(PACK_FORMAT2, *payload))
-        except:
-            pass
-        finally:
-            if handle:
-                win32file.CloseHandle(handle)
-        time.sleep(SEND_INTERVAL)
 
-def create_cameras():
-    global caps
-    
-    with caps_lock:
-        for cap in caps.values():
-            cap.release()
-        caps.clear()
-        
-        try:
-            idx = settings_core.get_settings().get('camera index', 0)
-            cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-            
-            if not cap.isOpened():
-                #print(e)
-                return False
-            
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, RESOLUTION_X)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, RESOLUTION_Y)
-            caps[idx] = cap
-            return True
-        
-        except Exception as e:
-            #print(e)
-            return False
-
-def start_opengloves():
+def start_camera():
     global camera_running, camera_thread
-    
+
     if camera_running:
         camera_running = False
         if camera_thread:
             camera_thread.join(timeout=2.0)
         time.sleep(0.2)
-    
+
     camera_ready.clear()
-    
-    if settings_core.get_settings().get('opengloves'):
-        if create_cameras():
-            camera_running = True
-            camera_thread = threading.Thread(target=camera_loop, daemon=True)
-            camera_thread.start()
-            
-            if camera_ready.wait(timeout=3.0):
-                threading.Thread(target=opengloves_sender, 
-                               args=(PIPE_NAME_R, "r"), daemon=True).start()
-                threading.Thread(target=opengloves_sender, 
-                               args=(PIPE_NAME_L, "l"), daemon=True).start()
-            else:
-                camera_running = False
-        else:
-            #no camera on startup
-            pass
+
+    if settings_core.get_settings().get("hand tracking"):
+        camera_running = True
+        camera_thread  = threading.Thread(target=camera_loop, daemon=True)
+        camera_thread.start()
+
+        if not camera_ready.wait(timeout=3.0):
+            camera_running = False
 #camera//////////////////////////////////////////////////////////////////////////////////////////////////
 
 first_label = create_label({
     "text" : "steamvr is not running :(", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-
-# def change_FOV_on_check(group):
-#     settings = settings_core.get_settings()
-    
-#     if group != None:
-#         check = group.findChild(QCheckBox)
-        
-#         settings_core.update_setting("stereoscopic", check.isChecked())
-
-#         settings['stereoscopic'] = check.isChecked()
-
-    # spinboxes = fov_group.findChildren(QDoubleSpinBox)
-
-    # if settings['stereoscopic']:
-    #     fov_label.findChild(QLabel).setText("---------FOV(using Stereo)---------")
-        
-    #     spinboxes[0].setValue(settings['outer stereo'])
-    #     spinboxes[1].setValue(settings['inner stereo'])
-    #     spinboxes[2].setValue(settings['top stereo'])
-    #     spinboxes[3].setValue(settings['bottom stereo'])
-
-    # else:
-    #     fov_label.findChild(QLabel).setText("---------FOV(using Mono)---------")
-
-    #     spinboxes[0].setValue(settings['outer mono'])
-    #     spinboxes[1].setValue(settings['inner mono'])
-    #     spinboxes[2].setValue(settings['top mono'])
-    #     spinboxes[3].setValue(settings['bottom mono'])
-
-
-# def update_FOV():
-#     settings = settings_core.get_settings()
-    
-    # spinboxes = fov_group.findChildren(QDoubleSpinBox)
-
-    # if settings['stereoscopic']:
-    #     fov_label.findChild(QLabel).setText("---------FOV(using Stereo)---------")
-        
-        # settings_core.update_setting('outer stereo', spinboxes[0].value())
-        # settings_core.update_setting('inner stereo', spinboxes[1].value())
-        # settings_core.update_setting('top stereo', spinboxes[2].value())
-        # settings_core.update_setting('bottom stereo', spinboxes[3].value())
-
-    # else:
-    #     fov_label.findChild(QLabel).setText("---------FOV(using Mono)---------")
-
-        # settings_core.update_setting('outer mono', spinboxes[0].value())
-        # settings_core.update_setting('inner mono', spinboxes[1].value())
-        # settings_core.update_setting('top mono', spinboxes[2].value())
-        # settings_core.update_setting('bottom mono', spinboxes[3].value())
 
 layout_main.addWidget(create_label({
     "text" : "---------Resolution---------", 
@@ -2732,45 +2301,6 @@ misc = create_group_doublespinbox([
 ])
 layout_main.addWidget(misc)
 
-# fov_label = create_label({
-#     "text" : "---------3D and FOV---------", 
-#     "alignment" : Qt.AlignmentFlag.AlignCenter
-# })
-# layout_main.addWidget(fov_label)
-
-#/////////////////////////////////////////////////////
-# def set_fov(type, botton):
-#     settings = settings_core.get_settings()
-#     if settings['stereoscopic']:
-#         settings_core.update_setting(f"{type} stereo", float(botton.text().removeprefix(type)))
-#     else:
-#         settings_core.update_setting(f"{type} mono", float(botton.text().removeprefix(type)))
-
-    # change_FOV_on_check(misc_group1)
-
-# def calculate_vr_fov():
-#     settings = settings_core.get_settings()
-#     diagonal_fov_deg = recommended_label.findChild(QDoubleSpinBox).value()
-#     settings_core.update_setting("fov",diagonal_fov_deg)
-#     width = settings['resolution x']
-#     height = settings['resolution y']
-
-#     diag_rad = math.radians(diagonal_fov_deg)
-
-#     aspect = width / height
-    
-#     tan_half_diag = math.tan(diag_rad / 2)
-#     tan_half_v = tan_half_diag / math.sqrt(aspect**2 + 1)
-#     tan_half_h = aspect * tan_half_v
-    
-#     h_fov_deg = math.degrees(math.atan(tan_half_h) * 2)/2
-#     v_fov_deg = math.degrees(math.atan(tan_half_v) * 2)/2
-
-#     recommended_label.findChildren(QPushButton)[0].setText(f"outer {h_fov_deg:.2f}")
-#     recommended_label.findChildren(QPushButton)[1].setText(f"inner {h_fov_deg:.2f}")
-#     recommended_label.findChildren(QPushButton)[2].setText(f"top {v_fov_deg:.2f}")
-#     recommended_label.findChildren(QPushButton)[3].setText(f"bottom {v_fov_deg:.2f}")
-
 def calculate_vr_fov():
     settings_core.update_setting("convergence", recommended_label.findChildren(QDoubleSpinBox)[0].value())
     settings_core.update_setting("fov", recommended_label.findChildren(QDoubleSpinBox)[1].value())
@@ -2811,53 +2341,6 @@ def calculate_vr_fov():
     settings_core.update_setting("top mono", top_fov_deg)
     settings_core.update_setting("bottom mono", bottom_fov_deg)
 
-    # buttons = recommended_label.findChildren(QPushButton)
-    # if len(buttons) >= 4:
-    #     buttons[0].setText(f"outer {outer_fov_deg:.2f}")
-    #     buttons[1].setText(f"inner {inner_fov_deg:.2f}")
-    #     buttons[2].setText(f"top {top_fov_deg:.2f}")
-    #     buttons[3].setText(f"bottom {bottom_fov_deg:.2f}")
-
-# recommended_label = create_group_horizontal([{
-#         "type" : "label",
-#         "text" : "Recommended(click to set):", 
-#         "alignment" : Qt.AlignmentFlag.AlignCenter
-#     },
-#     {
-#         "type" : "button", 
-#         "text" : "outer", 
-#         "enabled" : True,
-#         "func"  : lambda: set_fov("outer",recommended_label.findChildren(QPushButton)[0])
-#     },
-#     {
-#         "type" : "button", 
-#         "text" : "inner", 
-#         "enabled" : True,
-#         "func"  : lambda: set_fov("inner",recommended_label.findChildren(QPushButton)[1])
-#     },    {
-#         "type" : "button", 
-#         "text" : "top", 
-#         "enabled" : True,
-#         "func"  : lambda: set_fov("top",recommended_label.findChildren(QPushButton)[2])
-#     },
-#     {
-#         "type" : "button", 
-#         "text" : "bottom", 
-#         "enabled" : True,
-#         "func"  : lambda: set_fov("bottom",recommended_label.findChildren(QPushButton)[3])
-#     },
-#     {
-#         "type" : "doublespinbox",
-#         "text" : "for FOV =",
-#         "min":-999999999,
-#         "max":999999999,
-#         "default": settings_core.get_settings()['fov'],
-#         "steps" : 0.01,
-#         "func"  : lambda: calculate_vr_fov()
-#     }])
-
-# layout_main.addWidget(recommended_label)
-
 recommended_label = create_group_horizontal([
     {
         "type" : "doublespinbox",
@@ -2878,55 +2361,6 @@ recommended_label = create_group_horizontal([
     }])
 
 layout_main.addWidget(recommended_label)
-
-# calculate_vr_fov()
-#/////////////////////////////////////////////////////
-
-# fov_group = create_group_doublespinbox([
-#     {
-#         "text" : "Outer", 
-#         "min":-999999999, 
-#         "max":999999999, 
-#         "default": settings_core.get_settings()['outer stereo'] \
-#            if settings_core.get_settings()["stereoscopic"] \
-#            else settings_core.get_settings()['outer mono'],
-#         "steps" : 0.01,
-#         "func"  : lambda: update_FOV()
-#     },
-#     {
-#         "text" : "Inner", 
-#         "min":-999999999, 
-#         "max":999999999, 
-#         "default": settings_core.get_settings()['inner stereo'] \
-#            if settings_core.get_settings()["stereoscopic"] \
-#            else settings_core.get_settings()['inner mono'],
-#         "steps" : 0.01,
-#         "func"  : lambda: update_FOV()
-#     },
-#     {
-#         "text" : "Top", 
-#         "min":-999999999, 
-#         "max":999999999, 
-#         "default": settings_core.get_settings()['top stereo'] \
-#            if settings_core.get_settings()["stereoscopic"] \
-#            else settings_core.get_settings()['top mono'],
-#         "steps" : 0.01,
-#         "func"  : lambda: update_FOV()
-#     },
-#     {
-#         "text" : "Bottom", 
-#         "min":-999999999, 
-#         "max":999999999, 
-#         "default": settings_core.get_settings()['bottom stereo'] \
-#            if settings_core.get_settings()["stereoscopic"] \
-#            else settings_core.get_settings()['bottom mono'],
-#         "steps" : 0.01,
-#         "func"  : lambda: update_FOV()
-#     }
-# ])
-# layout_main.addWidget(fov_group)
-
-# change_FOV_on_check(misc_group1)
 
 layout_main.addWidget(create_label({
     "text" : "---------Offsets---------", 
@@ -3117,7 +2551,6 @@ def install_driver():
         script_dir = os.path.dirname(os.path.abspath(__file__))
 
     source_folder = os.path.join(script_dir, "assets", "driver to copy")
-    
 
     destination_folder = settings_core.get_settings()['drivers path']
     
@@ -3129,7 +2562,6 @@ def install_driver():
         shutil.copytree(source_folder, destination_folder, dirs_exist_ok=True)
         update_install_and_config_label(False)
     except Exception as e:
-        #print(e)
         update_install_and_config_label(True)
 
 def remove_driver():
@@ -3141,9 +2573,6 @@ def remove_driver():
     try:
         shutil.rmtree(folder_path)
         update_install_and_config_label(False)
-        # install_buttons.findChildren(QPushButton)[1].setText("uninstalled successfully")
-        # time.sleep(3)
-        # install_buttons.findChildren(QPushButton)[1].setText("uninstall")
 
     except:
         update_install_and_config_label(True)
@@ -3281,8 +2710,8 @@ def list_mac_addresses():
     for interface_name, snics in interfaces.items():
         for snic in snics:
             if snic.family in (psutil.AF_LINK, -1):
-                # print(f"Interface: {interface_name}")
-                # print(f"  MAC Address: {snic.address}")
+                #p(f"Interface: {interface_name}")
+                #p(f"  MAC Address: {snic.address}")
                 #get first mac address
                 return snic.address
 
@@ -3414,7 +2843,7 @@ def click():
             dialog += 1
             ctypes.windll.user32.MessageBoxW(0, "the next dialog is the last, check the source code if you don't believe me", ":)", 0)
         case _:
-            ctypes.windll.user32.MessageBoxW(0, "gg", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, ";P", ";P", 0)
 
 tab_credits = QWidget()
 layout_credits = QVBoxLayout(tab_credits)
@@ -3424,20 +2853,16 @@ def create_credits():
     create_group = QWidget()
     layout_credits1 = QVBoxLayout(create_group)
 
-    label = QLabel("Made by: DaniXmir")
+    label = QLabel("Made by: DaniXmir")# ;P
     label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
     layout_credits1.addWidget(label)
 
-
-    # script_dir = os.path.dirname(os.path.abspath(__file__))
-    # image_path = os.path.join(script_dir, "assets", "fix.png")
     if getattr(sys, 'frozen', False):
         script_dir = os.path.dirname(sys.executable)
     else:
         script_dir = os.path.dirname(os.path.abspath(__file__))
 
     image_path = os.path.join(script_dir, "assets", "fix")
-
 
     image_button = QPushButton()
     image = QPixmap(image_path)
@@ -3455,6 +2880,7 @@ def create_credits():
     group_links = QWidget()
     layout_link = QHBoxLayout(group_links)
     
+    #todo: add icons!
     link = '<a href="https://github.com/DaniXmir/GlassVr" style="color: #4da6ff;">github!</a>'
     label1 = QLabel("open the project on " + link)
     label1.setTextFormat(Qt.TextFormat.RichText)
@@ -3473,69 +2899,18 @@ def create_credits():
 
     return create_group
 layout_credits.addWidget(create_credits())
-
-def create_credits_section(title, software_list, max_cols=3):
-    container = QWidget()
-    layout = QGridLayout(container)
-
-    title_label = create_label({
-        "text" : title,
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    })
-    layout.addWidget(title_label, 0, 0, 1, max_cols)
-
-    for index, software in enumerate(software_list):
-        row = (index // max_cols) + 1
-        col = index % max_cols
-        
-        name = software['name']
-        auth = software['auth']
-        
-        if "link" in software:
-            link_url = software["link"]
-            display_text = f'<a href="{link_url}" style="color: #4da6ff;">{name}</a><br>by {auth}'
-            
-            lbl = QLabel(display_text)
-            lbl.setTextFormat(Qt.TextFormat.RichText)
-            lbl.setOpenExternalLinks(True)
-            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        else:
-            display_text = f"{name}\nby {auth}"
-            
-            lbl = create_label({
-                "text" : display_text,
-                "alignment" : Qt.AlignmentFlag.AlignCenter
-            })
-            
-        layout.addWidget(lbl, row, col)
-        
-    return container
-
-extra_names = [
-    {"name": "openvr", "auth": "ValveSoftware", "link": "https://github.com/ValveSoftware/openvr"},
-    {"name": "pyopenvr", "auth": "cmbruns", "link": "https://github.com/cmbruns/pyopenvr"},
-    {"name": "MediaPipe", "auth": "Google Inc", "link": "https://github.com/google-ai-edge/mediapipe"},
-    {"name": "OpenCV", "auth": "OpenCV.org", "link": "https://opencv.org/"},
-    {"name": "SDL2", "auth": "libsdl.org", "link": "https://www.libsdl.org/"},
-    {"name": "viture sdk", "auth": "VITURE Inc", "link" : "https://www.viture.com/developer"},
-]
-
-software_section = create_credits_section("Software Used:", extra_names)
-layout_credits.addWidget(software_section)
-
-special_thanks_list = [
-    {"name": "OpenVR-driver-for-DIY", "auth": "r57zone", "link": "https://github.com/r57zone/OpenVR-driver-for-DIY"}
-]
-
-special_section = create_credits_section("Special Thanks:", special_thanks_list)
-layout_credits.addWidget(special_section)
-
 #credits/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #controllers/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 tab_controllers = QWidget()
 layout_controllers = QVBoxLayout(tab_controllers)
 layout_controllers.setSpacing(0)
+
+scroll_controllers = QScrollArea()
+scroll_controllers.setWidgetResizable(True)
+scroll_controllers.setWidget(tab_controllers)
+
+scroll_controllers.setMinimumWidth(1800)
 
 #/////////////
 tab_enable = QWidget()
@@ -3613,15 +2988,7 @@ def crpos_specific_widget(layout, combo):
             layout.addWidget(t)
 
         case "hand tracking":
-            t = create_group_horizontal([{
-                    "type" : "doublespinbox", 
-                    "text" :"camera depth modifier", 
-                    "min":-999999999, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings()['camera z'], 
-                    "steps" : 0.001,
-                    "func"  : lambda: settings_core.update_setting("camera z", t.findChildren(QDoubleSpinBox)[0].value())
-                }])
+            t = create_label({"text" : ""})
             
             layout.addWidget(t)
 
@@ -3722,17 +3089,16 @@ def crrot_specific_widget(layout, combo):
             layout.addWidget(t)
 
         case "gyro":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"controller index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings().get(f'cr gyro index',0), 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("cr gyro index", t.findChildren(QSpinBox)[0].value())
-                }])
-            layout.addWidget(t)
-
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "gyro id",
+                    "default": settings_core.get_settings()["cr gyro id"],
+                    "items": list(controllers_dict),
+                    "func": lambda: settings_core.update_setting("cr gyro id", combo_extra.findChildren(QComboBox)[0].currentText())
+                })
+            
+            layout.addWidget(combo_extra)
+            
         case "marker":
             t = create_group_horizontal([{
             "type" : "spinbox", 
@@ -3823,15 +3189,7 @@ def clpos_specific_widget(layout, combo):
             layout.addWidget(t)
 
         case "hand tracking":
-            t = create_group_horizontal([{
-                    "type" : "doublespinbox", 
-                    "text" :"camera depth modifier", 
-                    "min":-999999999, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings()['camera z'], 
-                    "steps" : 0.001,
-                    "func"  : lambda: settings_core.update_setting("camera z", t.findChildren(QDoubleSpinBox)[0].value())
-                }])
+            t = create_label({"text" : ""})
             
             layout.addWidget(t)
 
@@ -3943,16 +3301,15 @@ def clrot_specific_widget(layout, combo):
             layout.addWidget(t)
 
         case "gyro":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"controller index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings().get(f'cl gyro index',0), 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("cl gyro index", t.findChildren(QSpinBox)[0].value())
-                }])
-            layout.addWidget(t)
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "gyro id",
+                    "default": settings_core.get_settings()["cl gyro id"],
+                    "items": list(controllers_dict),
+                    "func": lambda: settings_core.update_setting("cl gyro id", combo_extra.findChildren(QComboBox)[0].currentText())
+                })
+            
+            layout.addWidget(combo_extra)
 
         case "offsets":
             t = create_group_horizontal([{
@@ -3988,24 +3345,26 @@ layout_controllers.addWidget(create_clrot_widget())
 
 def apply_hand_offsets(device):
     if device == "cr":
-        settings_core.update_setting(f"{device} offset world yaw", 2.910)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(2.910)
+        settings_core.update_setting(f"{device} offset world yaw", 1.660)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(1.660)
 
-        settings_core.update_setting(f"{device} offset world pitch", -0.130)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(-0.130)
+        settings_core.update_setting(f"{device} offset world pitch", -0.680)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(-0.680)
 
-        settings_core.update_setting(f"{device} offset world roll", 2.090)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(2.090)
+        settings_core.update_setting(f"{device} offset world roll", 0.670)
+        cr_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(0.670)
 
     else:
-        settings_core.update_setting(f"{device} offset world yaw", 3.860)
-        cl_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(3.860)
+        settings_core.update_setting(f"{device} offset world yaw", -1.660)
+        cl_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(-1.660)
 
-        settings_core.update_setting(f"{device} offset world pitch", 0.190)
-        cl_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(0.190)
+        settings_core.update_setting(f"{device} offset world pitch", 0.680)
+        cl_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(0.680)
 
-        settings_core.update_setting(f"{device} offset world roll", 1.990)
-        cl_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(1.990)
+        settings_core.update_setting(f"{device} offset world roll", 0.670)
+        cl_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(0.670)
+
+#mapping v2/////////////////////////////////////////////////////////////////////
 
 button_config = [    
     ("a", "a"),
@@ -4041,136 +3400,286 @@ button_config = [
     ("guide", "guide"),
 ]
 
-buttons_per_row = 9
-#combos = []
-
-combo_inputs = ["right a","right b","right grip","right menu","right trigger","right joy button","right joy x","right joy y","right touch button","right touch x","right touch y",
-                "right touch modifier",
-                "left a","left b","left grip","left menu","left trigger","left joy button","left joy x","left joy y","left touch button","left touch x","left touch y",
-                "left touch modifier", "reset gyro", "calibrate gyro", "none", 
-                ]
-
-current_mapping_slot = 0 
-
-def refresh_ui_values():
-    settings = settings_core.get_settings()
-    p_num = current_mapping_slot + 1
-    prefix = str(current_mapping_slot)
-    
-    spinboxes = p_controller_group.findChildren(QSpinBox)
-    checkboxes = p_controller_group.findChildren(QCheckBox)
-    
-    spinboxes[0].setValue(settings.get(f"controller index {p_num}", 0))
-
-    spinboxes[1].setValue(settings.get(f"gyro{p_num} index x", 0))
-    spinboxes[2].setValue(settings.get(f"gyro{p_num} index y", 1))
-    spinboxes[3].setValue(settings.get(f"gyro{p_num} index z", 2))
-
-    p_controller_group.findChildren(QDoubleSpinBox)[0].setValue(settings.get(f"gyro{p_num} sensitivity", 1))
-
-    checkboxes[0].setChecked(settings.get(f"joy{p_num} invert x", False))
-    checkboxes[1].setChecked(settings.get(f"joy{p_num} invert y", False))
-
-    checkboxes[2].setChecked(settings.get(f"gyro{p_num} invert x", False))
-    checkboxes[3].setChecked(settings.get(f"gyro{p_num} invert y", False))
-    checkboxes[4].setChecked(settings.get(f"gyro{p_num} invert z", False))
-
-
-
-    for i, (label, setting_key) in enumerate(button_config):
-        full_key = f"{prefix}{setting_key}"
-        val = settings.get(full_key, "none")
-        
-
-        if i < len(combos):
-            combo_widget = combos[i].findChild(QComboBox)
-            if combo_widget:
-                combo_widget.blockSignals(True)
-                combo_widget.setCurrentText(val)
-                combo_widget.blockSignals(False)
-
-def set_mapping_slot(new_slot):
-    global current_mapping_slot
-    current_mapping_slot = new_slot
-    refresh_ui_values()
-
-mapping_label = create_group_horizontal([{
-        "type" : "label",
-        "text" : "press something!", 
-        "alignment" : Qt.AlignmentFlag.AlignRight
-},{
-        "type" : "spinbox", 
-        "text" :"Editing Mapping For:", 
-        "min": 1, "max": 2, "default": 1, "steps" : 1,
-        "func" : lambda: set_mapping_slot(mapping_label.findChildren(QSpinBox)[0].value() - 1)
-}])
-layout_controllers.addWidget(mapping_label)
-
-p_controller_group = create_group_horizontal([
-    {
-        "type" : "spinbox", "text" :"Hardware index", "min":0, "max":999999999, "steps":1,"default":0,
-        "func" : lambda: settings_core.update_setting(f"controller index {current_mapping_slot+1}", p_controller_group.findChildren(QSpinBox)[0].value())
-    },
-    {
-        "type" : "label",
-        "text" : "joystick:", 
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {"type" : "checkbox", "text" :"invert X","default":settings_core.get_settings()[f"joy{current_mapping_slot+1} invert x"], "func" : lambda: settings_core.update_setting(f"joy{current_mapping_slot+1} invert x", p_controller_group.findChildren(QCheckBox)[0].isChecked())},
-    {"type" : "checkbox", "text" :"invert Y","default":settings_core.get_settings()[f"joy{current_mapping_slot+1} invert y"], "func" : lambda: settings_core.update_setting(f"joy{current_mapping_slot+1} invert y", p_controller_group.findChildren(QCheckBox)[1].isChecked())},
-    {
-        "type" : "label",
-        "text" : "gyro:", 
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {
-        "type" : "button", "text" :"calibrate","enabled" : True,
-        "func" : lambda: start_calibration(current_mapping_slot + 1)
-    },
-
-    {"type" : "checkbox", "text" :"invert X","default":settings_core.get_settings()[f"gyro{current_mapping_slot+1} invert x"], "func" : lambda: settings_core.update_setting(f"gyro{current_mapping_slot+1} invert x", p_controller_group.findChildren(QCheckBox)[2].isChecked())},
-    {"type" : "checkbox", "text" :"invert Y","default":settings_core.get_settings()[f"gyro{current_mapping_slot+1} invert y"], "func" : lambda: settings_core.update_setting(f"gyro{current_mapping_slot+1} invert y", p_controller_group.findChildren(QCheckBox)[3].isChecked())},
-    {"type" : "checkbox", "text" :"invert Z","default":settings_core.get_settings()[f"gyro{current_mapping_slot+1} invert z"], "func" : lambda: settings_core.update_setting(f"gyro{current_mapping_slot+1} invert z", p_controller_group.findChildren(QCheckBox)[4].isChecked())},
-
-    {"type" : "spinbox", "text" :"sensor X", "min":0, "max":2,"default":settings_core.get_settings()[f"gyro{current_mapping_slot+1} index x"], "func" : lambda: settings_core.update_setting(f"gyro{current_mapping_slot+1} index x", p_controller_group.findChildren(QSpinBox)[1].value())},
-    {"type" : "spinbox", "text" :"sensor Y", "min":0, "max":2,"default":settings_core.get_settings()[f"gyro{current_mapping_slot+1} index y"], "func" : lambda: settings_core.update_setting(f"gyro{current_mapping_slot+1} index y", p_controller_group.findChildren(QSpinBox)[2].value())},
-    {"type" : "spinbox", "text" :"sensor Z", "min":0, "max":2,"default":settings_core.get_settings()[f"gyro{current_mapping_slot+1} index z"], "func" : lambda: settings_core.update_setting(f"gyro{current_mapping_slot+1} index z", p_controller_group.findChildren(QSpinBox)[3].value())},
-    
-    {"type" : "doublespinbox", "text" :"sensitivity", "min":-999999999, "max":999999999,"default":settings_core.get_settings()[f"gyro{current_mapping_slot+1} sensitivity"], "func" : lambda: settings_core.update_setting(f"gyro{current_mapping_slot+1} sensitivity", p_controller_group.findChildren(QDoubleSpinBox)[0].value())},
-])
-layout_controllers.addWidget(p_controller_group)
-
 combos = []
-for i, (label, setting_key) in enumerate(button_config):
-    if i % buttons_per_row == 0:
-        tab_mapping = QWidget()
-        layout_mapping = QHBoxLayout(tab_mapping)
-        layout_controllers.addWidget(tab_mapping)
+
+mapping = ["a", "b", "trigger", "grip", "menu", 
+           "joy up", "joy down", "joy left", "joy right", "joy click", 
+           "touch up", "touch down", "touch left", "touch right", "touch click", 
+           "thumb", "index", "middle", "ring", "pinky", 
+           "touch mod"]
+
+current_binding_btn = None
+
+class SingleBindButton(QPushButton):
+    def __init__(self, mapping_name, current_bind, callback, parent=None):
+        super().__init__("", parent)
+        self.mapping_name = mapping_name
+        self.current_bind = current_bind
+        self.callback = callback
+        self.is_binding = False
+        
+        self.refresh_display()
+        self.clicked.connect(self.start_binding)
+
+    def refresh_display(self):
+        self.setText(f"{self.mapping_name}: {self.current_bind}")
+
+    def start_binding(self):
+        global current_binding_btn
+        if current_binding_btn and current_binding_btn != self:
+            current_binding_btn.cancel_binding()
+            
+        current_binding_btn = self
+        self.is_binding = True
+        self.setText("Press something (ESC to unbind)")
+        self.setFocus() 
+
+    def cancel_binding(self):
+        self.is_binding = False
+        self.refresh_display()
+
+    def finish_binding(self, input_name):
+        global current_binding_btn
+        self.is_binding = False
+        current_binding_btn = None
+        self.current_bind = input_name
+        self.refresh_display()
+        
+        self.callback()
+
+    def keyPressEvent(self, event):
+        if self.is_binding:
+            if event.key() == Qt.Key.Key_Escape:
+                self.finish_binding("[Unbound]")
+            else:
+                key_name = QKeySequence(event.key()).toString()
+                self.finish_binding(f"Key_{key_name}")
+        else:
+            super().keyPressEvent(event)
+
+    def mousePressEvent(self, event):
+        if self.is_binding:
+            btn_map = {
+                Qt.MouseButton.LeftButton: "Left",
+                Qt.MouseButton.RightButton: "Right",
+                Qt.MouseButton.MiddleButton: "Middle",
+                Qt.MouseButton.XButton1: "M4",
+                Qt.MouseButton.XButton2: "M5",
+                Qt.MouseButton.BackButton: "Back",
+                Qt.MouseButton.ForwardButton: "Forward",
+                Qt.MouseButton.TaskButton: "Task"
+            }
+            
+            button_id = event.button()
+            button_name = btn_map.get(button_id, f"Extra_{button_id.value}")
+            self.finish_binding(f"Mouse_{button_name}")
+        else:
+            super().mousePressEvent(event)
+
+    def wheelEvent(self, event):
+        if self.is_binding:
+            delta = event.angleDelta().y()
+            if delta > 0:
+                self.finish_binding("Mouse_WheelUp")
+            elif delta < 0:
+                self.finish_binding("Mouse_WheelDown")
+            event.accept()
+        else:
+            super().wheelEvent(event)
+
+#bindable button!
+#layout_controllers.addWidget(BindingButton("a", "b"))
+#prefix = what device
+#mapping_name = what action
+#prefix_mapping_name in settings (cr_trigger)
+class BindingGroupWidget(QWidget):
+    def __init__(self, prefix, mapping_name, parent=None):
+        super().__init__(parent)
+        self.prefix = prefix
+        self.mapping_name = mapping_name
+        self.setting_key = f"{self.prefix}_{self.mapping_name}"
+        
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.checkbox = QCheckBox("Invert")
+        self.checkbox.stateChanged.connect(self.save_settings)
+        
+        self.buttons_layout = QHBoxLayout()
+        self.main_layout.addLayout(self.buttons_layout)
+        self.main_layout.addWidget(self.checkbox)
+        self.button_widgets = []
+        
+        self.load_settings()
+
+    def load_settings(self):
+        current_settings = settings_core.get_settings()
+        bind_data = current_settings.get(self.setting_key, {})
+        
+        if not isinstance(bind_data, dict):
+            bind_data = {}
+
+        is_inverted = bind_data.get("invert", False)
+        self.checkbox.blockSignals(True)
+        self.checkbox.setChecked(is_inverted)
+        self.checkbox.blockSignals(False)
+
+        saved_buttons = bind_data.get("buttons", [])
+        
+        active_binds = [b for b in saved_buttons if b != "[Unbound]"]
+        
+        self.render_buttons(active_binds)
+
+    def render_buttons(self, binds):
+        while self.button_widgets:
+            btn = self.button_widgets.pop()
+            self.buttons_layout.removeWidget(btn)
+            btn.setParent(None)
+            btn.deleteLater()
+        
+        display_list = binds + ["[Unbound]"]
+        
+        for bind_value in display_list:
+            btn = SingleBindButton(self.mapping_name, bind_value, self.on_button_changed)
+            self.buttons_layout.addWidget(btn)
+            self.button_widgets.append(btn)
+            btn.show()
+
+    def on_button_changed(self):
+        QTimer.singleShot(10, self.save_settings)
+
+    def save_settings(self):
+        active_binds = []
+        for btn in self.button_widgets:
+            if btn.current_bind != "[Unbound]":
+                active_binds.append(btn.current_bind)
+        new_data = {
+            "buttons": active_binds,
+            "invert": self.checkbox.isChecked()
+        }
+        
+        settings_core.update_nested(self.setting_key, new_data)
+        
+        self.render_buttons(active_binds)
+
+def make_mapping_buttons(prefix):
+    group_widget = QWidget()
+    group_layout = QVBoxLayout(group_widget)
+
+    label = QLabel(f"{prefix} mapping")
+    label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    group_layout.addWidget(label)
+
+    for n in mapping:
+        group_layout.addWidget(BindingGroupWidget(prefix, n))
+
+    return group_widget
+
+def make_mapping():
+    group_widget = QWidget()
+    main_layout = QHBoxLayout(group_widget)
+
+    main_layout.addWidget(make_mapping_buttons("cl"))
     
-    combo = create_combobox({
-        "text": label,
-        "items": combo_inputs,
-        "func": lambda sk=setting_key, c_idx=i: settings_core.update_setting(
-            f"{current_mapping_slot}{sk}", 
-            combos[c_idx].findChild(QComboBox).currentText()
-        )
-    })
-    combos.append(combo)
-    layout_mapping.addWidget(combo)
+    main_layout.addWidget(create_image({"path" : "index black", "size x" : 681, "size y" : 418}))
+    
+    main_layout.addWidget(make_mapping_buttons("cr"))
 
-refresh_ui_values()
+    return group_widget
 
+layout_controllers.addWidget(make_mapping())
 
+#real controllers settings/////////////////////////////////////////////////////////////////////////////
+scroll_content_layout = None
 
+def make_controller_block(ctrl):
+    c_id   = ctrl.get("id", "unknown")
+    c_name = ctrl.get("type", "Unknown Controller")
+    
+    settings = settings_core.get_settings()
+    c_conf   = settings.get(c_id, {})
 
+    group_widget = QWidget()
+    group_layout = QVBoxLayout(group_widget)
 
+    group_layout.addWidget(create_label({"text": f"Name: {c_name}\nID: {c_id}"}))
 
+    #todo: add images later!
+    #group_layout.addWidget(create_image({"path": "fix.png", "size x": 100, "size y": 100}))
 
+    group_layout.addWidget(create_label({"text": "Gyro Settings:"}))
 
+    gyro_inverts = create_group_horizontal([
+        {"type": "label",    "text": "Invert:", "alignment": Qt.AlignmentFlag.AlignCenter},
+        {"type": "checkbox", "text": "X", "default": c_conf.get("invert_x", False),
+         "func": lambda: settings_core.update_nested(c_id, {"invert_x": gyro_inverts.findChildren(QCheckBox)[0].isChecked()})},
+        {"type": "checkbox", "text": "Y", "default": c_conf.get("invert_y", False),
+         "func": lambda: settings_core.update_nested(c_id, {"invert_y": gyro_inverts.findChildren(QCheckBox)[1].isChecked()})},
+        {"type": "checkbox", "text": "Z", "default": c_conf.get("invert_z", False),
+         "func": lambda: settings_core.update_nested(c_id, {"invert_z": gyro_inverts.findChildren(QCheckBox)[2].isChecked()})}
+    ])
+    group_layout.addWidget(gyro_inverts)
 
+    gyro_indices = create_group_horizontal([
+        {"type": "label",   "text": "Direction:", "alignment": Qt.AlignmentFlag.AlignCenter},
+        {"type": "spinbox", "text": "X", "min": 0, "max": 2, "default": c_conf.get("index_x", 0),
+         "func": lambda: settings_core.update_nested(c_id, {"index_x": gyro_indices.findChildren(QSpinBox)[0].value()})},
+        {"type": "spinbox", "text": "Y", "min": 0, "max": 2, "default": c_conf.get("index_y", 1),
+         "func": lambda: settings_core.update_nested(c_id, {"index_y": gyro_indices.findChildren(QSpinBox)[1].value()})},
+        {"type": "spinbox", "text": "Z", "min": 0, "max": 2, "default": c_conf.get("index_z", 2),
+         "func": lambda: settings_core.update_nested(c_id, {"index_z": gyro_indices.findChildren(QSpinBox)[2].value()})}
+    ])
+    group_layout.addWidget(gyro_indices)
 
+    gyro_sens = create_group_horizontal([
+        {"type": "doublespinbox", "text": "Sensitivity:", "min": -99999, "max": 99999, "steps": 0.1,
+         "default": c_conf.get("sensitivity", 1.0),
+         "func": lambda: settings_core.update_nested(c_id, {"sensitivity": gyro_sens.findChild(QDoubleSpinBox).value()})}
+    ])
+    group_layout.addWidget(gyro_sens)
 
+    group_layout.addWidget(create_button({
+        "text": "Calibrate Gyro",
+        "func": lambda: start_calibration(c_id)
+    }))
 
+    group_layout.addWidget(BindingGroupWidget(c_id, "reset_gyro"))
+    #group_layout.addWidget(BindingButton(c_id, "reset_gyro"))
+
+    return group_widget
+
+def update_controller_ui():
+    global scroll_content_layout
+    if scroll_content_layout is None:
+        return
+
+    clear_layout(scroll_content_layout)
+
+    with controllers_lock:
+        ctrls = list(controllers_dict.values())
+
+    for ctrl in ctrls:
+        block = make_controller_block(ctrl)
+        scroll_content_layout.addWidget(block)
+
+signals.controller_connected.connect(update_controller_ui)
+
+def make_base_scroll():
+    global scroll_content_layout
+
+    scroll_area = QScrollArea()
+    scroll_area.setWidgetResizable(True)
+    scroll_area.setMinimumHeight(500)
+
+    scroll_content        = QWidget()
+    scroll_content_layout = QHBoxLayout(scroll_content)
+    scroll_area.setWidget(scroll_content)
+
+    layout_controllers.addWidget(scroll_area)
+    update_controller_ui()
+
+make_base_scroll()
+#real controllers settings/////////////////////////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
 label5 = create_label({
@@ -4182,9 +3691,69 @@ layout_controllers.addWidget(label5)
 webcam = create_group_horizontal([
     {
         "type" : "checkbox", 
-        "text" : "enable hand tracking, also forward webcam data to open gloves via named pipe(finger, splay, button mapping)",
-        "default" : settings_core.get_settings()['opengloves'], 
-        "func" : lambda: start_stop_opengloves()
+        "text" : "enable hand tracking",
+        "default" : settings_core.get_settings()['hand tracking'],
+        "func" : lambda: start_hand_tracking()
+    },
+    {
+        "type" : "checkbox", 
+        "text" : "curl",
+        "default" : settings_core.get_settings().get("curl", True),
+        "func" : lambda: settings_core.update_setting("curl",webcam1.findChildren(QCheckBox)[1].isChecked())
+    },
+    {
+        "type" : "checkbox", 
+        "text" : "splay",
+        "default" : settings_core.get_settings().get("splay", True),
+        "func" : lambda: settings_core.update_setting("splay",webcam1.findChildren(QCheckBox)[2].isChecked())
+    },
+    {
+        "type" : "checkbox", 
+        "text" : "index curl effects trigger",
+        "default" : settings_core.get_settings().get("index=trigger", False),
+        "func" : lambda: settings_core.update_setting("index=trigger",webcam1.findChildren(QCheckBox)[3].isChecked())
+    },
+    {
+        "type" : "checkbox", 
+        "text" : "other curl effects grip",
+        "default" : settings_core.get_settings().get("other=grip", False),
+        "func" : lambda: settings_core.update_setting("other=grip",webcam1.findChildren(QCheckBox)[4].isChecked())
+    },
+    {#spacing label!
+        "type" : "label",
+        "text":"",
+        "alignment" : Qt.AlignmentFlag.AlignCenter
+    }
+])
+layout_controllers.addWidget(webcam)
+
+webcam1 = create_group_horizontal([
+    {
+        "type" : "doublespinbox", 
+        "text" :"physical camera offset x", 
+        "min":-999999999, 
+        "max":999999999, 
+        "default":settings_core.get_settings()['camera offset x'], 
+        "steps" : 0.01,
+        "func"  : lambda: settings_core.update_setting("camera offset x", webcam.findChildren(QDoubleSpinBox)[0].value())
+    },
+    {
+        "type" : "doublespinbox", 
+        "text" :"physical camera offset y", 
+        "min":-999999999, 
+        "max":999999999, 
+        "default":settings_core.get_settings()['camera offset y'], 
+        "steps" : 0.01,
+        "func"  : lambda: settings_core.update_setting("camera offset y", webcam.findChildren(QDoubleSpinBox)[1].value())
+    },
+    {
+        "type" : "doublespinbox", 
+        "text" :"physical camera offset z", 
+        "min":-999999999, 
+        "max":999999999, 
+        "default":settings_core.get_settings()['camera offset z'], 
+        "steps" : 0.01,
+        "func"  : lambda: settings_core.update_setting("camera offset z", webcam.findChildren(QDoubleSpinBox)[2].value())
     },
     {
         "type" : "spinbox", 
@@ -4195,15 +3764,20 @@ webcam = create_group_horizontal([
         "steps" : 1,
         "func"  : lambda: settings_core.update_setting("camera index", webcam.findChildren(QSpinBox)[0].value())
     },
+    {#spacing label!
+        "type" : "label",
+        "text":"",
+        "alignment" : Qt.AlignmentFlag.AlignCenter
+    }
 ])
-layout_controllers.addWidget(webcam)
+layout_controllers.addWidget(webcam1)
 
-def start_stop_opengloves():
+def start_hand_tracking():
     enabled = webcam.findChild(QCheckBox).isChecked()
-    settings_core.update_setting("opengloves", enabled)
+    settings_core.update_setting("hand tracking", enabled)
 
     if enabled:
-        start_opengloves()
+        start_camera()
     else:
         pass
 
@@ -4561,6 +4135,11 @@ cr_offsets_world = create_group_horizontal([
         "default":settings_core.get_settings()['cr offset world roll'], 
         "steps" : 0.01,
         "func"  : lambda: settings_core.update_setting("cr offset world roll", cr_offsets_world.findChildren(QDoubleSpinBox)[5].value())
+    },
+    {#spacing label!
+        "type" : "label",
+        "text":"",
+        "alignment" : Qt.AlignmentFlag.AlignCenter
     }
 ])
 layout_controllers.addWidget(cr_offsets_world)
@@ -4624,6 +4203,11 @@ cr_offsets_local = create_group_horizontal([
         "default":settings_core.get_settings()['cr offset local roll'], 
         "steps" : 0.01,
         "func"  : lambda: settings_core.update_setting("cr offset local roll", cr_offsets_local.findChildren(QDoubleSpinBox)[5].value())
+    },
+    {#spacing label!
+        "type" : "label",
+        "text":"",
+        "alignment" : Qt.AlignmentFlag.AlignCenter
     }
 ])
 layout_controllers.addWidget(cr_offsets_local)
@@ -4692,6 +4276,11 @@ cl_offsets_world = create_group_horizontal([
         "default":settings_core.get_settings()['cl offset world roll'], 
         "steps" : 0.01,
         "func"  : lambda: settings_core.update_setting("cl offset world roll", cl_offsets_world.findChildren(QDoubleSpinBox)[5].value())
+    },
+    {#spacing label!
+        "type" : "label",
+        "text":"",
+        "alignment" : Qt.AlignmentFlag.AlignCenter
     }
 ])
 layout_controllers.addWidget(cl_offsets_world)
@@ -4755,6 +4344,11 @@ cl_offsets_local = create_group_horizontal([
         "default":settings_core.get_settings()['cl offset local roll'], 
         "steps" : 0.01,
         "func"  : lambda: settings_core.update_setting("cl offset local roll", cl_offsets_local.findChildren(QDoubleSpinBox)[5].value())
+    },
+    {#spacing label!
+        "type" : "label",
+        "text":"",
+        "alignment" : Qt.AlignmentFlag.AlignCenter
     }
 ])
 layout_controllers.addWidget(cl_offsets_local)
@@ -4878,16 +4472,15 @@ def trackerrot_specific_widget(index, layout, combo):
             layout.addWidget(t)
 
         case "gyro":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"controller index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings.get(f'{index}tracker gyro index',0), 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting(f'{index}tracker gyro index', t.findChildren(QSpinBox)[0].value())
-                }])
-            layout.addWidget(t)
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "gyro id",
+                    "default": settings_core.get_settings().get(f'{index}tracker gyro id', ""),
+                    "items": list(controllers_dict),
+                    "func": lambda: settings_core.update_setting(f'{index}tracker gyro id', combo_extra.findChildren(QComboBox)[0].currentText())
+                })
+            
+            layout.addWidget(combo_extra)
 
         case "offsets":
             t = create_group_horizontal([{
@@ -4914,8 +4507,8 @@ def create_tracker_widget(index = 0):
             "type" : "combobox",
             "text": f'{index} position mode',
             "default": settings.get(f'{index}trackerpos mode', "redirect"),
-            "items": ["redirect", "offsets"],# "hip emulation"], add later////////////////////////////////////////////////////////////////////////////////////////
-            "func": lambda: trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))#lambda: settings_core.update_setting(f'{index}tracker mode', combo_extra.findChild(QComboBox).currentText())
+            "items": ["redirect", "offsets"],
+            "func": lambda: trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))
         })
     layout_extrapos.addWidget(combopos_extra)
     trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))
@@ -4927,8 +4520,8 @@ def create_tracker_widget(index = 0):
             "type" : "combobox",
             "text": f'{index} rotation mode',
             "default": settings.get(f'{index}trackerrot mode', "redirect"),
-            "items": ["redirect", "offsets", "gyro"],# "hip emulation"], add later////////////////////////////////////////////////////////////////////////////////////////
-            "func": lambda: trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))#lambda: settings_core.update_setting(f'{index}tracker mode', combo_extra.findChild(QComboBox).currentText())
+            "items": ["redirect", "offsets", "gyro"],
+            "func": lambda: trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))
         })
     layout_extrarot.addWidget(comborot_extra)
     trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))
@@ -5066,21 +4659,6 @@ layout_devices = QVBoxLayout(tab_devices)
 
 devices_arr = []
 
-# def create_trackers_display():
-#     settings_core.update_setting("trackers num", tracker_num.findChild(QSpinBox).value())
-#     settings = settings_core.get_settings()
-
-#     devices_arr.clear()
-#     if settings['trackers num'] == 0:
-#         clear_layout(layout_devices)
-#     else:
-#         for n in range(settings['trackers num']):
-#             devices_arr.append(create_tracker_widget(n))
-
-#         clear_layout(layout_devices)
-#         for n in devices_arr:
-#             layout_devices.addWidget(n)
-
 def create_trackers_display():
     settings_core.update_setting("trackers num", tracker_num.findChild(QSpinBox).value())
     settings = settings_core.get_settings()
@@ -5129,15 +4707,15 @@ tracker_title_label1 = create_label({
 })
 group_layout.addWidget(tracker_title_label1)
 
-# trackers_label1 = create_label({
-#     "text" : "0 found", 
-#     "alignment" : Qt.AlignmentFlag.AlignCenter
-# })
-# group_layout.addWidget(trackers_label1)
-
 #////////////////////////////////////////////////////
-scroll = QScrollArea()
-scroll.setWidgetResizable(True)
+scroll_detected = QScrollArea()
+scroll_detected.setWidgetResizable(True)
+
+scroll_detected.setMinimumHeight(720)
+# scroll_detected.setMaximumHeight(720)
+
+scroll_detected.setMinimumWidth(250)
+# scroll_detected.setMaximumWidth(250)
 
 container = QWidget()
 layout = QVBoxLayout(container)
@@ -5148,14 +4726,33 @@ trackers_label1 = create_label({
 })
 layout.addWidget(trackers_label1)
 
-scroll.setWidget(container)
+scroll_detected.setWidget(container)
 
-group_layout.addWidget(scroll)
+group_layout.addWidget(scroll_detected)
 #////////////////////////////////////////////////////
 
+def start_reset_gyro():
+    thread = threading.Thread(target=reset_gyro_on_input, daemon=True)
+    thread.start()
+
+def reset_gyro_on_input():
+    while True:
+        for n in list(controllers_dict):
+            settings = settings_core.get_settings()
+            config_key = f"{n}_reset_gyro"
+            binding = settings.get(config_key)
+
+            if binding and eval_binding(binding):
+                if settings.get("hmd gyro id", "") == n:
+                    reset_gyro(n, True)
+                else:
+                    reset_gyro(n)
+
+        time.sleep(0.001)
+
 if __name__ == '__main__':
-    if settings_core.get_settings()['opengloves']:
-        start_opengloves()
+    if settings_core.get_settings()['hand tracking']:
+        start_camera()
     # if settings_core.get_settings()['markers']:
     #     start_markers()
 
@@ -5164,8 +4761,13 @@ if __name__ == '__main__':
     start_send_data()
     start_update_vrlabel()
 
+    # start_wiimote_threads()
+
+    start_reset_gyro()
+
 tabs.addTab(tab_main, "Hmd")
-tabs.addTab(tab_controllers, "Controllers")
+tabs.addTab(scroll_controllers, "Controllers")
+
 tabs.addTab(tab_trackers, "Trackers")
 tabs.addTab(tab_driver, "Driver")
 tabs.addTab(tab_credits, "Credits")
@@ -5174,3 +4776,5 @@ window_layout.addWidget(tabs)
 window_layout.addWidget(group_widget)
 window.show()
 app.exec()
+
+#;P
