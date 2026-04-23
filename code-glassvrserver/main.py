@@ -46,7 +46,7 @@ from collections import deque
 
 from PyInstaller.utils.hooks import collect_dynamic_libs
 
-binaries = collect_dynamic_libs('sdl3dll')
+#binaries = collect_dynamic_libs('sdl3dll')
 
 app = QApplication([])#sys.argv)
 
@@ -277,15 +277,19 @@ def create_combobox(dict):
 
     combobox = QComboBox()
     
-    if 'items' in dict:
-        combobox.addItems(dict['items'])
-    
-    if 'default' in dict:\
-        combobox.setCurrentText(dict['default'])
+    combobox.addItems(dict.get('items',""))
+    combobox.setCurrentText(dict.get('default',""))
 
-    if 'func' in dict:
-        combobox.currentIndexChanged.connect(lambda: dict['func']())
+    if 'index change' in dict:
+        combobox.currentIndexChanged.connect(lambda: dict['index change']())
+
+    if 'pre show' in dict:
+        def wrapped_popup():
+            dict['pre show'](combobox)
+            QComboBox.showPopup(combobox)
         
+        combobox.showPopup = wrapped_popup
+
     group_layout.addWidget(combobox)
 
     return group_widget
@@ -420,7 +424,7 @@ def quat_slerp(q1, q2, t):
     return {k: s1*q1[k] + s2*q2[k] for k in "wxyz"}
 
 def _hmd_quat_dict():
-    q = R.from_matrix(trackers_arr[0]["rotation matrix"]).as_quat()
+    q = R.from_matrix(list(trackers_dict.values())[0]["rotation matrix"]).as_quat() #trackers_arr[0]["rotation matrix"]).as_quat()
     return {"x": q[0], "y": q[1], "z": q[2], "w": q[3]}
 
 def reset_gyro(target_id=None, to_zero=False):
@@ -759,6 +763,168 @@ def eval_binding(bind_data):
 
 #controller handler v3/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#vr utility/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+def update_vrlabel():
+    can_enter = True
+    while True:
+        if can_enter and is_prosses_running("vrserver.exe"):
+            can_enter = False
+
+            first_label.findChild(QLabel).setText("steamvr is running!")
+
+            start_vr_utility()
+            #steamvr opened
+
+        if not can_enter and not is_prosses_running("vrserver.exe"):
+            can_enter = True
+
+            first_label.findChild(QLabel).setText("steamvr is not running :(")
+
+            end_vr_utility()
+            #steamvr closed
+
+        time.sleep(1)
+
+def start_update_vrlabel():
+    t = threading.Thread(target=update_vrlabel, daemon=True)
+    t.start()
+    return t
+
+trackers_dict = {}
+trackers_arr = []
+
+def start_vr_utility():
+    global trackers_dict, trackers_arr
+
+    try:
+        vr.init(vr.VRApplication_Utility)
+        vr_system = vr.VRSystem()
+        
+        PROP_SERIAL = vr.Prop_SerialNumber_String
+        PROP_MODEL = vr.Prop_ControllerType_String
+        PROP_RENDER = vr.Prop_RenderModelName_String
+
+        while True:
+            try:
+                poses = vr_system.getDeviceToAbsoluteTrackingPose(2, 0.0, vr.k_unMaxTrackedDeviceCount)
+                
+                current_frame_dict = {}
+                current_frame_arr = []
+
+                for i in range(vr.k_unMaxTrackedDeviceCount):
+                    device_class = vr_system.getTrackedDeviceClass(i)
+                    
+                    if device_class in (vr.TrackedDeviceClass_HMD, 
+                                      vr.TrackedDeviceClass_Controller, 
+                                      vr.TrackedDeviceClass_GenericTracker, 
+                                      vr.TrackedDeviceClass_TrackingReference):
+                        
+                        serial = vr_system.getStringTrackedDeviceProperty(i, PROP_SERIAL)
+                        model = vr_system.getStringTrackedDeviceProperty(i, PROP_MODEL)
+                        render = vr_system.getStringTrackedDeviceProperty(i, PROP_RENDER)
+                        
+                        role_hint = "Unknown"
+                        if device_class in (vr.TrackedDeviceClass_Controller, vr.TrackedDeviceClass_GenericTracker):
+                            role_enum = vr_system.getControllerRoleForTrackedDeviceIndex(i)
+                            role_map = {
+                                vr.TrackedControllerRole_LeftHand: "LeftHand",
+                                vr.TrackedControllerRole_RightHand: "RightHand",
+                                vr.TrackedControllerRole_OptOut: "OptOut",
+                                vr.TrackedControllerRole_Treadmill: "Treadmill",
+                                vr.TrackedControllerRole_Stylus: "Stylus"
+                            }
+                            role_hint = role_map.get(role_enum, "Tracker/Controller")
+                        elif device_class == vr.TrackedDeviceClass_HMD:
+                            role_hint = "HMD"
+                        elif device_class == vr.TrackedDeviceClass_TrackingReference:
+                            role_hint = "BaseStation"
+
+                        pose = poses[i]
+                        is_connected = pose.bDeviceIsConnected
+                        is_valid = pose.bPoseIsValid
+
+                        device_data = {
+                            "index": i,
+                            "class": device_class,
+                            "model": model,
+                            "render": render,
+                            "role": role_hint,
+                            "connected": is_connected,
+                            "pose_valid": is_valid,
+                            "serial": serial
+                        }
+
+                        if is_connected and is_valid:
+                            m = pose.mDeviceToAbsoluteTracking
+                            
+                            pos_x, pos_y, pos_z = m[0][3], m[1][3], m[2][3]
+                            
+                            rotation_matrix = np.array([
+                                [m[0][0], m[0][1], m[0][2]],
+                                [m[1][0], m[1][1], m[1][2]],
+                                [m[2][0], m[2][1], m[2][2]]
+                            ])
+
+                            device_data.update({
+                                "pos x": pos_x,
+                                "pos y": pos_y,
+                                "pos z": pos_z,
+                                "rotation matrix": rotation_matrix
+                            })
+
+                            current_frame_arr.append(device_data)
+
+                        current_frame_dict[serial] = device_data
+
+                trackers_dict = current_frame_dict
+                trackers_arr = current_frame_arr
+
+                if 'update_found_label' in globals():
+                    update_found_label()
+                
+                time.sleep(0.001)
+
+            except Exception as e:
+                print(f"Error in VR Loop: {e}")
+                time.sleep(0.01)
+                continue
+
+    except Exception as e:
+        print(f"VR System Error: {e}. Retrying in 1s...")
+        time.sleep(1)
+        start_vr_utility()
+
+def end_vr_utility():
+    vr.shutdown()
+
+def update_found_label():
+    global trackers_dict
+    display_text = ""
+    
+    for count, (serial, data) in enumerate(trackers_dict.items()):
+        display_text += f"[{count}] ROLE: {data['role']} | {data['model']}\n"
+        display_text += f"Serial: {serial}\n"
+        
+        conn = "CONNECTED" if data.get('connected') else "DISCONNECTED"
+        valid = "TRACKING" if data.get('pose_valid') else "SEARCHING..."
+        display_text += f"Status: {conn} | {valid}\n"
+
+        if "pos x" in data:
+            px, py, pz = data['pos x'], data['pos y'], data['pos z']
+            display_text += f"Pos: X:{px:+.3f} Y:{py:+.3f} Z:{pz:+.3f}\n"
+            
+            if "rotation matrix" in data:
+                m = data['rotation matrix']
+                display_text += f"Rot: [{m[0][0]:+.2f}, {m[0][1]:+.2f}, {m[0][2]:+.2f}]...\n"
+        
+        display_text += "-----------------------------------\n"
+
+    label = trackers_label1.findChild(QLabel)
+    if label:
+        label.setText(display_text)
+
+#vr utility/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #main/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 tab_main = QWidget()
 layout_main = QVBoxLayout(tab_main)
@@ -787,18 +953,24 @@ def hmdpos_specific_widget(layout, combo):
     settings = settings_core.get_settings()
 
     match mode:
-        case "redirect":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"Redirect Index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings['hmdpos index'], 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("hmdpos index", t.findChildren(QSpinBox)[0].value())
-                }])
-            
-            layout.addWidget(t)
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get("hmdpos copy serial",""),
+                    "items": list(set([settings.get("hmdpos copy serial", "")] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting("hmdpos copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get("hmdpos copy serial", ""),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
+            layout.addWidget(combo_extra)
+
         # case "keyboard":
         #     t = create_group_horizontal([{
         #             "type" : "spinbox", 
@@ -837,9 +1009,9 @@ def create_hmdpos_widget():
     combo_extra = create_combobox({
             "type" : "combobox",
             "text": "hmd position mode",
-            "default": settings.get(f'hmdpos mode', "redirect"),
-            "items": ["redirect", "offsets"],# "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "func": lambda: hmdpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+            "default": settings.get(f'hmdpos mode', "copy"),
+            "items": ["copy", "offsets"],# "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: hmdpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
     layout_extra.addWidget(combo_extra)
@@ -863,17 +1035,23 @@ def hmdrot_specific_widget(layout, combo):
     settings = settings_core.get_settings()
 
     match mode:
-        case "redirect":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"Redirect Index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings['hmdrot index'], 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("hmdrot index", t.findChildren(QSpinBox)[0].value())
-                }])
-            layout.addWidget(t)
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get("hmdrot copy serial",""),
+                    "items": list(set([settings.get("hmdrot copy serial", "")] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting("hmdrot copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get("hmdrot copy serial", ""),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
+            layout.addWidget(combo_extra)
 
         case "mouse":
             t = create_group_horizontal([{
@@ -894,16 +1072,41 @@ def hmdrot_specific_widget(layout, combo):
                     "func"  : lambda: settings_core.update_setting("hmdrot index", t.findChildren(QSpinBox)[0].value())
                 }])
             layout.addWidget(t)
-            
+
         case "gyro":
             combo_extra = create_combobox({
                     "type" : "combobox",
                     "text": "gyro id",
-                    "default": settings["hmd gyro id"],
-                    "items": list(controllers_dict),
-                    "func": lambda: settings_core.update_setting("hmd gyro id", combo_extra.findChildren(QComboBox)[0].currentText())
+                    "default": settings.get("hmd gyro id", ""),
+                    "items": list({str(settings.get("hmd gyro id", "")), *controllers_dict}) if settings.get("hmd gyro id") else list(controllers_dict),
+                    "index change": lambda: settings_core.update_setting("hmd gyro id", combo_extra.findChild(QComboBox).currentText()),
+                    "pre show": lambda cb: (
+                        saved := str(settings.get("hmd gyro id", "")),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *controllers_dict}) if saved else list(controllers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
                 })
-            
+            layout.addWidget(combo_extra)
+
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get("hmdrot copy serial",""),
+                    "items": list(set([settings.get("hmdrot copy serial", "")] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting("hmdrot copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get("hmdrot copy serial", ""),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
             layout.addWidget(combo_extra)
 
         case "xr glasses":
@@ -936,9 +1139,9 @@ def create_hmdrot_widget():
     combo_extra = create_combobox({
             "type" : "combobox",
             "text": "hmd rotation mode",
-            "default": settings.get(f'hmdrot mode', "redirect"),
-            "items": ["redirect", "offsets", "gyro", "xr glasses"],# "mouse"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "func": lambda: hmdrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+            "default": settings.get(f'hmdrot mode', "copy"),
+            "items": ["copy", "offsets", "gyro", "xr glasses"],# "mouse"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: hmdrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
     layout_extra.addWidget(combo_extra)
@@ -949,15 +1152,6 @@ def create_hmdrot_widget():
 layout_main.addWidget(create_hmdrot_widget())
 #rot//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #hmd modes/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-trackers_arr = [] #[{"pos x" : m[0][3],
-                    #"pos y" : m[1][3],
-                    #"pos z" : m[2][3], 
-                    #"rotation matrix" :[
-                    #[m[0][0], m[0][1], m[0][2]],
-                    #[m[1][0], m[1][1], m[1][2]],
-                    # [m[2][0], m[2][1], m[2][2]]
-                    # ]}]
 
 def is_prosses_running(PROCESS_NAME):
     for proc in psutil.process_iter(['name']):
@@ -971,103 +1165,27 @@ def check_hardware_key_exists(hardware_name):
     
     return hardware_name in settings.values()
 
-#deprecated dont use! should delete later!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-def get_final_transform(device = "hmd", override = None):
-    settings = settings_core.get_settings()
-
-    try:
-        tracker_pos_idx = settings.get(f'{device}pos index', 0)
-
-        if override == None:
-            tracker_pos = trackers_arr[tracker_pos_idx]
-        else:
-            tracker_pos = override
-
-        tracker_rot_idx = settings.get(f'{device}rot index', 0)
-
-        if override == None:
-            tracker_rot = trackers_arr[tracker_rot_idx]
-        else:
-            tracker_rot = override
-
-        offset_local = np.array([
-            settings.get(f'{device} offset local x', 0.0),
-            settings.get(f'{device} offset local y', 0.0),
-            settings.get(f'{device} offset local z', 0.0)
-        ])
-        
-        offset_world = np.array([
-            settings.get(f'{device} offset world x', 0.0),
-            settings.get(f'{device} offset world y', 0.0),
-            settings.get(f'{device} offset world z', 0.0)
-        ])
-        
-        device_rotation = R.from_matrix(tracker_rot['rotation matrix'])
-        
-        rotated_local_offset = device_rotation.apply(offset_local)
-        
-        pos_x = tracker_pos['pos x'] + rotated_local_offset[0] + offset_world[0]
-        pos_y = tracker_pos['pos y'] + rotated_local_offset[1] + offset_world[1]
-        pos_z = tracker_pos['pos z'] + rotated_local_offset[2] + offset_world[2]
-        
-        offset_local_angles_rad = [
-            settings.get(f'{device} offset local roll', 0.0),
-            settings.get(f'{device} offset local yaw', 0.0),
-            settings.get(f'{device} offset local pitch', 0.0)
-        ]
-        
-        offset_world_angles_rad = [
-            settings.get(f'{device} offset world roll', 0.0),
-            settings.get(f'{device} offset world yaw', 0.0),
-            settings.get(f'{device} offset world pitch', 0.0)
-        ]
-        
-        offset_local_rotation = R.from_euler('ZYX', offset_local_angles_rad, degrees=False)
-        offset_world_rotation = R.from_euler('ZYX', offset_world_angles_rad, degrees=False)
-        
-        final_rotation = offset_world_rotation * device_rotation * offset_local_rotation
-        quat_final = final_rotation.as_quat()
-        
-        return({
-            "pos x" : pos_x, "pos y" : pos_y, "pos z" : pos_z,
-            "rot x" : quat_final[0], "rot y" : quat_final[1], "rot z" : quat_final[2], "rot w" : quat_final[3]
-        })
-    except:
-        try:
-            offset_local_angles_rad = [
-                settings.get(f'{device} offset local roll', 0.0),
-                settings.get(f'{device} offset local yaw', 0.0),
-                settings.get(f'{device} offset local pitch', 0.0)
-            ]
-            
-            offset_world_angles_rad = [
-                settings.get(f'{device} offset world roll', 0.0),
-                settings.get(f'{device} offset world yaw', 0.0),
-                settings.get(f'{device} offset world pitch', 0.0)
-            ]
-            
-            offset_local_rotation = R.from_euler('ZYX', offset_local_angles_rad, degrees=False)
-            offset_world_rotation = R.from_euler('ZYX', offset_world_angles_rad, degrees=False)
-            combined_rotation = offset_world_rotation * offset_local_rotation
-            quat = combined_rotation.as_quat()
-            
-            return({
-                "pos x" : settings.get(f'{device} offset local x', 0.0) + settings.get(f'{device} offset world x', 0.0),
-                "pos y" : settings.get(f'{device} offset local y', 0.0) + settings.get(f'{device} offset world y', 0.0),
-                "pos z" : settings.get(f'{device} offset local z', 0.0) + settings.get(f'{device} offset world z', 0.0),
-                "rot x" : quat[0], "rot y" : quat[1], "rot z" : quat[2], "rot w" : quat[3]
-            })
-        except:
-            return({
-                "pos x" : 0.0, "pos y" : 0.0, "pos z" : 0.0,
-                "rot x" : 0.0, "rot y" : 0.0, "rot z" : 0.0, "rot w" : 1.0
-            })
-
-#use this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def get_new_transform(device="hmd", px=0.0, py=0.0, pz=0.0, rx=0.0, ry=0.0, rz=0.0, rw=0.0):
     #get the final position of the emulated device with offsets applied,
     #device: from what settings to take offsets
     #other arguments: are what the current pos and rot of the emulated device, example: to copy x from tracker, pass trackers_arr[tracker_pos_idx]['pos x'] to px
+
+    #//////////////////////////////////////////////////
+    # copy = trackers_dict["hmdpos copy serial"]
+    # matrix = copy["rotation matrix"]
+    # r = R.from_matrix(matrix)
+    # quat = r.as_quat()
+    # final_transform = get_new_transform("hmd", copy['pos x'], copy['pos y'], copy['pos z'], rx=quat[0], ry=quat[1], rz=quat[2], rw=quat[3])
+
+    # pos_x = final_transform['pos x']
+    # pos_y = final_transform['pos y']
+    # pos_z = final_transform['pos z']
+    # rot_x = final_transform['rot x']
+    # rot_y = final_transform['rot y']
+    # rot_z = final_transform['rot z']
+    # rot_w = final_transform['rot w']
+    #//////////////////////////////////////////////////
+
     settings = settings_core.get_settings()
     
     try:
@@ -1174,29 +1292,27 @@ def send_hmd_data():
             while True:
                 settings = settings_core.get_settings()
 
-                final_transform = get_final_transform("hmd")
-                pos_x = final_transform['pos x']
-                pos_y = final_transform['pos y']
-                pos_z = final_transform['pos z']
-                rot_x = final_transform['rot x']
-                rot_y = final_transform['rot y']
-                rot_z = final_transform['rot z']
-                rot_w = final_transform['rot w']
+                pos_x = 0.0
+                pos_y = 0.0
+                pos_z = 0.0
+                rot_x = 0.0
+                rot_y = 0.0
+                rot_z = 0.0
+                rot_w = 0.0
+
                 try:
                     match settings['hmdpos mode']:
-                        case "redirect":
+                        case "copy":
                             pass
 
                         case "offsets":
-                            pos_x = settings["hmd offset world x"]
-                            pos_y = settings["hmd offset world y"]
-                            pos_z = settings["hmd offset world z"]
+                            pass
 
                         case "keyboard":
                             pass
 
                         case _:
-                            final_transform = get_final_transform("hmd")
+                            final_transform = get_new_transform("hmd")
 
                             pos_x = final_transform['pos x']
                             pos_y = final_transform['pos y']
@@ -1205,18 +1321,11 @@ def send_hmd_data():
                     pass
                 try:
                     match settings['hmdrot mode']:
-                        case "redirect":
+                        case "copy":
                             pass
 
                         case "offsets":
-                            quat = euler_to_quat(settings["hmd offset world yaw"],
-                                                 settings["hmd offset world pitch"],
-                                                 settings["hmd offset world roll"])
-
-                            rot_x = quat["x"]
-                            rot_y = quat["y"]
-                            rot_z = quat["z"]
-                            rot_w = quat["w"]
+                            pass
 
                         case "mouse":
                             pass
@@ -1230,7 +1339,7 @@ def send_hmd_data():
                             rot_w = quat["w"]
 
                         case _:
-                            final_transform = get_final_transform("hmd")
+                            final_transform = get_new_transform("hmd")
 
                             rot_x = final_transform['rot x']
                             rot_y = final_transform['rot y']
@@ -1284,11 +1393,14 @@ def get_hand_world_transform(device):
         fov_vertical   = top_stereo  + bottom_stereo
 
         hmd_pos = np.array([
-            trackers_arr[0]['pos x'],
-            trackers_arr[0]['pos y'],
-            trackers_arr[0]['pos z']
+            list(trackers_dict.values())[0]['pos x'],
+            list(trackers_dict.values())[0]['pos y'],
+            list(trackers_dict.values())[0]['pos z']
+            # trackers_arr[0]['pos x'],
+            # trackers_arr[0]['pos y'],
+            # trackers_arr[0]['pos z']
         ])
-        hmd_rot = R.from_matrix(trackers_arr[0]['rotation matrix'])
+        hmd_rot = R.from_matrix(list(trackers_dict.values())[0]['rotation matrix'])
 
         screen_x = hand_data[f'{hand_prefix} pos x']
         screen_y = hand_data[f'{hand_prefix} pos y']
@@ -1344,10 +1456,6 @@ def get_hand_world_transform(device):
             "rot z": 0.0,
             "rot w": 1.0
         }
-
-#best offsets/////////////////////////////////////////////////////////////////////////////////////////////////////////
-#right 2.560 -0.280 2.060
-#left 3.860 0.190 1.990
 
 def is_key_pressed_globally(vk_code):
     return (ctypes.windll.user32.GetAsyncKeyState(vk_code) & 0x8000) != 0
@@ -1443,20 +1551,21 @@ def send_controller_data(is_right):
             while True:
                 settings = settings_core.get_settings()
 
-                final_transform = get_final_transform(device_name)
-                pos_x = final_transform['pos x']
-                pos_y = final_transform['pos y']
-                pos_z = final_transform['pos z']
-                rot_x = final_transform['rot x']
-                rot_y = final_transform['rot y']
-                rot_z = final_transform['rot z']
-                rot_w = final_transform['rot w']
+                pos_x = 0.0
+                pos_y = 0.0
+                pos_z = 0.0
+                rot_x = 0.0
+                rot_y = 0.0
+                rot_z = 0.0
+                rot_w = 0.0
+
                 try:
                     match settings[f'{device_name}pos mode']:
+                        case "copy":
+                            pass
+
                         case "offsets":
-                            pos_x = float(settings.get(f"{device_name} offset world x", 0.0))
-                            pos_y = float(settings.get(f"{device_name} offset world y", 0.0))
-                            pos_z = float(settings.get(f"{device_name} offset world z", 0.0))
+                            pass
 
                         case "hand tracking":
                             if settings_core.get_settings()['hand tracking'] != False:
@@ -1466,13 +1575,13 @@ def send_controller_data(is_right):
                                 pos_y = final_transform['pos y']
                                 pos_z = final_transform['pos z']
                             else:
-                                final_transform = get_final_transform(device_name)
+                                final_transform = get_new_transform(device_name)
 
                                 pos_x = final_transform['pos x']
                                 pos_y = final_transform['pos y']
                                 pos_z = final_transform['pos z']
                         case _:
-                            final_transform = get_final_transform(device_name)
+                            final_transform = get_new_transform(device_name)
 
                             pos_x = final_transform['pos x']
                             pos_y = final_transform['pos y']
@@ -1482,15 +1591,11 @@ def send_controller_data(is_right):
                     pass
                 try:
                     match settings[f'{device_name}rot mode']:
-                        case "offsets":
-                            quat = euler_to_quat(settings[f"{device_name} offset world yaw"],
-                                                 settings[f"{device_name} offset world pitch"],
-                                                 settings[f"{device_name} offset world roll"])
+                        case "copy":
+                            pass
 
-                            rot_x = quat["x"]
-                            rot_y = quat["y"]
-                            rot_z = quat["z"]
-                            rot_w = quat["w"]
+                        case "offsets":
+                            pass
 
                         case "hand tracking":
                             if settings_core.get_settings()['hand tracking'] != False:
@@ -1501,7 +1606,7 @@ def send_controller_data(is_right):
                                 rot_z = final_transform['rot z']
                                 rot_w = final_transform['rot w']
                             else:
-                                final_transform = get_final_transform(device_name)
+                                final_transform = get_new_transform(device_name)
 
                                 rot_x = final_transform['rot x']
                                 rot_y = final_transform['rot y']
@@ -1517,7 +1622,7 @@ def send_controller_data(is_right):
                             rot_w = quat["w"]
 
                         case _:
-                            final_transform = get_final_transform(device_name)
+                            final_transform = get_new_transform(device_name)
 
                             rot_x = final_transform['rot x']
                             rot_y = final_transform['rot y']
@@ -1637,9 +1742,8 @@ def send_tracker_data(tracker_id):
             
             while True:
                 settings = settings_core.get_settings()
-                override = None
 
-                final_transform = get_final_transform(f'{tracker_id}tracker')
+                final_transform = get_new_transform(f'{tracker_id}tracker')
                 pos_x = final_transform['pos x']
                 pos_y = final_transform['pos y']
                 pos_z = final_transform['pos z']
@@ -1648,20 +1752,18 @@ def send_tracker_data(tracker_id):
                 rot_z = final_transform['rot z']
                 rot_w = final_transform['rot w']
                 try:
-                    match settings.get(f"{tracker_id}trackerpos mode", "redirect"):
-                        case "redirect":
+                    match settings.get(f"{tracker_id}trackerpos mode", "copy"):
+                        case "copy":
                             pass
 
                         case "offsets":
-                            pos_x = settings[f"{tracker_id}tracker offset world x"]
-                            pos_y = settings[f"{tracker_id}tracker offset world y"]
-                            pos_z = settings[f"{tracker_id}tracker offset world z"]
+                            pass
 
                         case "hip emulation":
                             pass
 
                         case _:
-                            final_transform = get_final_transform(f'{tracker_id}tracker')
+                            final_transform = get_new_transform(f'{tracker_id}tracker')
 
                             pos_x = final_transform['pos x']
                             pos_x = final_transform['pos y']
@@ -1669,19 +1771,12 @@ def send_tracker_data(tracker_id):
                 except:
                     pass
                 try:
-                    match settings.get(f"{tracker_id}trackerrot mode", "redirect"):
-                        case "redirect":
+                    match settings.get(f"{tracker_id}trackerrot mode", "copy"):
+                        case "copy":
                             pass
 
                         case "offsets":
-                            quat = euler_to_quat(settings[f"{tracker_id}tracker offset world yaw"],
-                                                 settings[f"{tracker_id}tracker offset world pitch"],
-                                                 settings[f"{tracker_id}tracker offset world roll"])
-
-                            rot_x = quat["x"]
-                            rot_y = quat["y"]
-                            rot_z = quat["z"]
-                            rot_w = quat["w"]
+                            pass
 
                         case "gyro":
                             quat = get_gyro(settings.get(f'{tracker_id}tracker gyro id',""))
@@ -1742,172 +1837,6 @@ def start_send_data():
     return threads
 
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-def update_vrlabel():
-    can_enter = True
-    while True:
-        if can_enter and is_prosses_running("vrserver.exe"):
-            can_enter = False
-
-            first_label.findChild(QLabel).setText("steamvr is running!")
-
-            start_vr_utility()
-            #steamvr opened
-
-        if not can_enter and not is_prosses_running("vrserver.exe"):
-            can_enter = True
-
-            first_label.findChild(QLabel).setText("steamvr is not running :(")
-
-            end_vr_utility()
-            #steamvr closed
-
-        time.sleep(1)
-
-def start_update_vrlabel():
-    t = threading.Thread(target=update_vrlabel, daemon=True)
-    t.start()
-    return t
-
-trackers_dict = {}
-
-def start_vr_utility():
-    global trackers_dict, trackers_arr
-
-    try:
-        vr.init(vr.VRApplication_Utility)
-        vr_system = vr.VRSystem()
-        
-        PROP_SERIAL = vr.Prop_SerialNumber_String
-        PROP_MODEL = vr.Prop_ControllerType_String
-        PROP_RENDER = vr.Prop_RenderModelName_String
-
-        while True:
-            try:
-                poses = vr_system.getDeviceToAbsoluteTrackingPose(2, 0.0, vr.k_unMaxTrackedDeviceCount)
-                
-                new_dict = {}
-                new_arr = []
-
-                for i in range(vr.k_unMaxTrackedDeviceCount):
-                    device_class = vr_system.getTrackedDeviceClass(i)
-                    
-                    if device_class in (vr.TrackedDeviceClass_HMD, 
-                                      vr.TrackedDeviceClass_Controller, 
-                                      vr.TrackedDeviceClass_GenericTracker, 
-                                      vr.TrackedDeviceClass_TrackingReference):
-                        
-                        serial = vr_system.getStringTrackedDeviceProperty(i, PROP_SERIAL)
-                        model = vr_system.getStringTrackedDeviceProperty(i, PROP_MODEL)
-                        render = vr_system.getStringTrackedDeviceProperty(i, PROP_RENDER)
-                        
-                        role_hint = "Unknown"
-                        if device_class in (vr.TrackedDeviceClass_Controller, vr.TrackedDeviceClass_GenericTracker):
-                            role_enum = vr_system.getControllerRoleForTrackedDeviceIndex(i)
-                            role_map = {
-                                vr.TrackedControllerRole_LeftHand: "LeftHand",
-                                vr.TrackedControllerRole_RightHand: "RightHand",
-                                vr.TrackedControllerRole_OptOut: "OptOut",
-                                vr.TrackedControllerRole_Treadmill: "Treadmill",
-                                vr.TrackedControllerRole_Stylus: "Stylus"
-                            }
-                            role_hint = role_map.get(role_enum, "Tracker/Controller")
-                        elif device_class == vr.TrackedDeviceClass_HMD:
-                            role_hint = "HMD"
-                        elif device_class == vr.TrackedDeviceClass_TrackingReference:
-                            role_hint = "BaseStation"
-
-                        pose = poses[i]
-                        is_connected = pose.bDeviceIsConnected
-                        is_valid = pose.bPoseIsValid
-
-                        device_data = {
-                            "index": i,
-                            "class": device_class,
-                            "model": model,
-                            "render": render,
-                            "role": role_hint,
-                            "connected": is_connected,
-                            "pose_valid": is_valid,
-                            "serial": serial
-                        }
-
-                        if is_connected and is_valid:
-                            m = pose.mDeviceToAbsoluteTracking
-                            
-                            pos_x, pos_y, pos_z = m[0][3], m[1][3], m[2][3]
-                            
-                            rotation_matrix = np.array([
-                                [m[0][0], m[0][1], m[0][2]],
-                                [m[1][0], m[1][1], m[1][2]],
-                                [m[2][0], m[2][1], m[2][2]]
-                            ])
-
-                            device_data.update({
-                                "pos x": pos_x,
-                                "pos y": pos_y,
-                                "pos z": pos_z,
-                                "rotation matrix": rotation_matrix
-                            })
-
-                            new_arr.append({
-                                "pos x": pos_x,
-                                "pos y": pos_y,
-                                "pos z": pos_z,
-                                "rotation matrix": rotation_matrix
-                            })
-
-                        new_dict[serial] = device_data
-
-                trackers_dict = new_dict
-                trackers_arr = new_arr
-
-                update_found_label()
-                time.sleep(0.001)
-
-            except Exception as e:
-                time.sleep(0.001)
-                continue
-
-    except Exception as e:
-        time.sleep(1)
-        start_vr_utility()
-
-def end_vr_utility():
-    vr.shutdown()
-
-def update_found_label():
-    global trackers_dict
-    display_text = ""
-    count = 0
-    for serial, data in trackers_dict.items():
-        display_text += f'[{count}] '
-        display_text += f"ROLE: {data['role']} | {data['model']}\n"
-        display_text += f"Serial: {serial}\n"
-        
-        if data.get('connected'):# and data.get('pose_valid'):
-            px, py, pz = data['pos x'], data['pos y'], data['pos z']
-            display_text += f"Pos: X:{px:+.3f} Y:{py:+.3f} Z:{pz:+.3f}\n"
-            
-            if "rotation matrix" in data:
-                m = data['rotation matrix']
-                display_text += "Rot Matrix:\n"
-                display_text += f"  [{m[0][0]:+.2f}, {m[0][1]:+.2f}, {m[0][2]:+.2f}]\n"
-                display_text += f"  [{m[1][0]:+.2f}, {m[1][1]:+.2f}, {m[1][2]:+.2f}]\n"
-                display_text += f"  [{m[2][0]:+.2f}, {m[2][1]:+.2f}, {m[2][2]:+.2f}]\n"
-        else:
-            display_text += "OFFLINE"# OR UNTRACKED\n"
-        
-        display_text += "-----------------------------------\n"
-
-        count += 1
-
-    try:
-        label = trackers_label1.findChild(QLabel)
-        if label:
-            label.setText(display_text)
-    except Exception as e:
-        pass
 
 #camera (hand tracking)//////////////////////////////////////////////////////////////////////////////////////////////////
 SHOW_FEED           = True
@@ -2655,7 +2584,7 @@ def update_install_and_config_label(failed = False):
     #//////////////////////////////////////////////////////////////////////////////////////////////
 
     if get_activateMultipleDrivers_true():
-        config_leb.setText("steamvr.vrsettings has activateMultipleDrivers : true, all good :)")
+        config_leb.setText("steamvr.vrsettings has activateMultipleDrivers : true, all good ;P")
     else:
         if folder_exist(settings_core.get_settings()['drivers path'] + "/glassvrdriver"):
             config_leb.setText("steamvr.vrsettings is missing: activateMultipleDrivers : false, set the correct path and click to reinstall to add it!")
@@ -2722,21 +2651,21 @@ def click():
     match dialog:
         case 0:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "OUCH!!!!!!!!!!!", ":)", 0)
-            ctypes.windll.user32.MessageBoxW(0, "why???????????????", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "OUCH!!!!!!!!!!!", ";P", 0)
+            ctypes.windll.user32.MessageBoxW(0, "why???????????????", ";P", 0)
         case 1:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "STOP!!!!", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "STOP!!!!", ";P", 0)
         case 2:
-            ctypes.windll.user32.MessageBoxW(0, "if i'll show you something cool, will you stop clicking?", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "if i'll show you something cool, will you stop clicking?", ";P", 0)
             dialog += 1
             webbrowser.open("https://danixmir.itch.io/hyperlost")
             ctypes.windll.user32.MessageBoxW(0, "its a game i made!", ":>", 0)
         case 3:
-            response = ctypes.windll.user32.MessageBoxW(0, "do you like it?", ":)", 4)
+            response = ctypes.windll.user32.MessageBoxW(0, "do you like it?", ";P", 4)
             if response == 6:
                 dialog += 1
-                ctypes.windll.user32.MessageBoxW(0, "thank you!!!", ":)", 0)
+                ctypes.windll.user32.MessageBoxW(0, "thank you!!!", ";P", 0)
             else:
                 system = platform.system()
                 if system == "Windows":
@@ -2745,16 +2674,16 @@ def click():
                     os.system("sudo shutdown -h now")
         case 4:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "AHH!!!!!!!!!!!!!!!!!!!!!!!!", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "AHH!!!!!!!!!!!!!!!!!!!!!!!!", ";P", 0)
         case 5:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "you promised you'll stop", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "you promised you'll stop", ";P", 0)
         case 6:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "i feel betrayed", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "i feel betrayed", ";P", 0)
         case 7:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "...", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "...", ";P", 0)
         case 8:
             dialog += 1
             ctypes.windll.user32.MessageBoxW(0, "go do something else!!!!!!!!", ":)", 0)
@@ -2763,74 +2692,74 @@ def click():
             ctypes.windll.user32.MessageBoxW(0, "can you stop??????????", ":)", 0)
         case 10:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "plz stop", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "plz stop", ";P", 0)
         case 11:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "i have nothing more to show you", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "i have nothing more to show you", ";P", 0)
         case 12:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "(ignores)", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "(ignores)", ";P", 0)
         case 13:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "i know where you live", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "i know where you live", ";P", 0)
         case 14:
             dialog += 1
             ctypes.windll.user32.MessageBoxW(0, "ip: " + get_public_ip() + "\nmac: " + list_mac_addresses(), ":)", 0)
         case 15:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "now will you stop?", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "now will you stop?", ";P", 0)
         case 16:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "i don't understand", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "i don't understand", ";P", 0)
         case 17:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "since when you were the one in control?", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "since when you were the one in control?", ";P", 0)
         case 18:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "hehe, that was a reference", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "hehe, that was a reference", ";P", 0)
         case 19:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "seriously stop", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "seriously stop", ";P", 0)
         case 20:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "you don't know what you're doing", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "you don't know what you're doing", ";P", 0)
         case 21:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "YOU WILL KILL US BOTH", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "YOU WILL KILL US BOTH", ";P", 0)
         case 22:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "or not", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "or not", ";P", 0)
         case 22:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "this is the last straw", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "this is the last straw", ";P", 0)
         case 23:
             dialog += 1
             os.startfile("C:\Windows\System32")
-            ctypes.windll.user32.MessageBoxW(0, "I'M GONNA DO IT", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "I'M GONNA DO IT", ";P", 0)
         case 24:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "wow", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "wow", ";P", 0)
         case 25:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "i give up", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "i give up", ";P", 0)
         case 26:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "...", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "...", ";P", 0)
         case 27:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "...", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "...", ";P", 0)
         case 28:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "...", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "...", ";P", 0)
         case 29:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "so.....?", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "so.....?", ";P", 0)
         case 30:
             dialog += 1
             ctypes.windll.user32.MessageBoxW(0, "error", "Alert", 0)
         case 31:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "click one more time i dare you", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "click one more time i dare you", ";P", 0)
         case 32:
             dialog += 1
             for n in range(2147483647):
@@ -2838,10 +2767,10 @@ def click():
                 webbrowser.open("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
         case 34:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "you know what, you win", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "you know what, you win", ";P", 0)
         case 35:
             dialog += 1
-            ctypes.windll.user32.MessageBoxW(0, "the next dialog is the last, check the source code if you don't believe me", ":)", 0)
+            ctypes.windll.user32.MessageBoxW(0, "the next dialog is the last, check the source code if you don't believe me", ";P", 0)
         case _:
             ctypes.windll.user32.MessageBoxW(0, ";P", ";P", 0)
 
@@ -2953,19 +2882,27 @@ def crpos_specific_widget(layout, combo):
 
     mode = combo.currentText()
 
+    settings = settings_core.get_settings()
+
     match mode:
-        case "redirect":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"Redirect Index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings()['crpos index'], 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("crpos index", t.findChildren(QSpinBox)[0].value())
-                }])
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get("crpos copy serial",""),
+                    "items": list(set([settings.get("crpos copy serial", "")] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting("crpos copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get("crpos copy serial", ""),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
+            layout.addWidget(combo_extra)
             
-            layout.addWidget(t)
         case "keyboard":
             t = create_group_horizontal([{
                     "type" : "spinbox", 
@@ -3021,9 +2958,9 @@ def create_crpos_widget():
     combo_extra = create_combobox({
             "type" : "combobox",
             "text": "right position mode",
-            "default": settings.get(f'crpos mode', "redirect"),
-            "items": ["redirect", "offsets", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "func": lambda: crpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+            "default": settings.get(f'crpos mode', "copy"),
+            "items": ["copy", "offsets", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: crpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
     layout_extra.addWidget(combo_extra)
@@ -3044,20 +2981,27 @@ def crrot_specific_widget(layout, combo):
             widget.deleteLater()
 
     mode = combo.currentText()
-    #settings = settings_core.get_settings()
+
+    settings = settings_core.get_settings()
 
     match mode:
-        case "redirect":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"Redirect Index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings()['crrot index'], 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("crrot index", t.findChildren(QSpinBox)[0].value())
-                }])
-            layout.addWidget(t)
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get("crrot copy serial",""),
+                    "items": list(set([settings.get("crrot copy serial", "")] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting("crrot copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get("crrot copy serial", ""),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
+            layout.addWidget(combo_extra)
 
         case "mouse":
             t = create_group_horizontal([{
@@ -3092,13 +3036,20 @@ def crrot_specific_widget(layout, combo):
             combo_extra = create_combobox({
                     "type" : "combobox",
                     "text": "gyro id",
-                    "default": settings_core.get_settings()["cr gyro id"],
-                    "items": list(controllers_dict),
-                    "func": lambda: settings_core.update_setting("cr gyro id", combo_extra.findChildren(QComboBox)[0].currentText())
+                    "default": settings.get("cr gyro id", ""),
+                    "items": list({str(settings.get("cr gyro id", "")), *controllers_dict}) if settings.get("hmd gyro id") else list(controllers_dict),
+                    "index change": lambda: settings_core.update_setting("cr gyro id", combo_extra.findChild(QComboBox).currentText()),
+                    "pre show": lambda cb: (
+                        saved := str(settings.get("cr gyro id", "")),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *controllers_dict}) if saved else list(controllers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
                 })
-            
             layout.addWidget(combo_extra)
-            
+
         case "marker":
             t = create_group_horizontal([{
             "type" : "spinbox", 
@@ -3128,9 +3079,9 @@ def create_crrot_widget():
     combo_extra = create_combobox({
             "type" : "combobox",
             "text": "right rotation mode",
-            "default": settings.get(f'crrot mode', "redirect"),
-            "items": ["redirect", "offsets", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro",#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "func": lambda: crrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+            "default": settings.get(f'crrot mode', "copy"),
+            "items": ["copy", "offsets", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro",#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: crrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
     layout_extra.addWidget(combo_extra)
@@ -3154,19 +3105,27 @@ def clpos_specific_widget(layout, combo):
 
     mode = combo.currentText()
 
+    settings = settings_core.get_settings()
+
     match mode:
-        case "redirect":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"Redirect Index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings()['clpos index'], 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("clpos index", t.findChildren(QSpinBox)[0].value())
-                }])
-            
-            layout.addWidget(t)
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get("clpos copy serial",""),
+                    "items": list(set([settings.get("clpos copy serial", "")] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting("clpos copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get("clpos copy serial", ""),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
+            layout.addWidget(combo_extra)
+
         case "keyboard":
             t = create_group_horizontal([{
                     "type" : "spinbox", 
@@ -3222,9 +3181,9 @@ def create_clpos_widget():
     combo_extra = create_combobox({
             "type" : "combobox",
             "text": "left position mode",
-            "default": settings.get(f'clpos mode', "redirect"),
-            "items": ["redirect", "offsets", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "func": lambda: clpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+            "default": settings.get(f'clpos mode', "copy"),
+            "items": ["copy", "offsets", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: clpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
     layout_extra.addWidget(combo_extra)
@@ -3246,18 +3205,26 @@ def clrot_specific_widget(layout, combo):
 
     mode = combo.currentText()
 
+    settings = settings_core.get_settings()
+
     match mode:
-        case "redirect":
-            t = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"Redirect Index", 
-                    "min":0, 
-                    "max":999999999, 
-                    "default": settings_core.get_settings()['clrot index'], 
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting("clrot index", t.findChildren(QSpinBox)[0].value())
-                }])
-            layout.addWidget(t)
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get("clrot copy serial",""),
+                    "items": list(set([settings.get("clrot copy serial", "")] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting("clrot copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get("clrot copy serial", ""),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
+            layout.addWidget(combo_extra)
 
         case "mouse":
             t = create_group_horizontal([{
@@ -3304,11 +3271,18 @@ def clrot_specific_widget(layout, combo):
             combo_extra = create_combobox({
                     "type" : "combobox",
                     "text": "gyro id",
-                    "default": settings_core.get_settings()["cl gyro id"],
-                    "items": list(controllers_dict),
-                    "func": lambda: settings_core.update_setting("cl gyro id", combo_extra.findChildren(QComboBox)[0].currentText())
+                    "default": settings.get("cl gyro id", ""),
+                    "items": list({str(settings.get("cl gyro id", "")), *controllers_dict}) if settings.get("hmd gyro id") else list(controllers_dict),
+                    "index change": lambda: settings_core.update_setting("cl gyro id", combo_extra.findChild(QComboBox).currentText()),
+                    "pre show": lambda cb: (
+                        saved := str(settings.get("cl gyro id", "")),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *controllers_dict}) if saved else list(controllers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
                 })
-            
             layout.addWidget(combo_extra)
 
         case "offsets":
@@ -3328,9 +3302,9 @@ def create_clrot_widget():
     combo_extra = create_combobox({
             "type" : "combobox",
             "text": "left rotation mode",
-            "default": settings.get(f'clrot mode', "redirect"),
-            "items": ["redirect", "offsets", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "func": lambda: clrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+            "default": settings.get(f'clrot mode', "copy"),
+            "items": ["copy", "offsets", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: clrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
     layout_extra.addWidget(combo_extra)
@@ -3699,25 +3673,25 @@ webcam = create_group_horizontal([
         "type" : "checkbox", 
         "text" : "curl",
         "default" : settings_core.get_settings().get("curl", True),
-        "func" : lambda: settings_core.update_setting("curl",webcam1.findChildren(QCheckBox)[1].isChecked())
+        "func" : lambda: settings_core.update_setting("curl",webcam.findChildren(QCheckBox)[1].isChecked())
     },
     {
         "type" : "checkbox", 
         "text" : "splay",
         "default" : settings_core.get_settings().get("splay", True),
-        "func" : lambda: settings_core.update_setting("splay",webcam1.findChildren(QCheckBox)[2].isChecked())
+        "func" : lambda: settings_core.update_setting("splay",webcam.findChildren(QCheckBox)[2].isChecked())
     },
     {
         "type" : "checkbox", 
         "text" : "index curl effects trigger",
         "default" : settings_core.get_settings().get("index=trigger", False),
-        "func" : lambda: settings_core.update_setting("index=trigger",webcam1.findChildren(QCheckBox)[3].isChecked())
+        "func" : lambda: settings_core.update_setting("index=trigger",webcam.findChildren(QCheckBox)[3].isChecked())
     },
     {
         "type" : "checkbox", 
         "text" : "other curl effects grip",
         "default" : settings_core.get_settings().get("other=grip", False),
-        "func" : lambda: settings_core.update_setting("other=grip",webcam1.findChildren(QCheckBox)[4].isChecked())
+        "func" : lambda: settings_core.update_setting("other=grip",webcam.findChildren(QCheckBox)[4].isChecked())
     },
     {#spacing label!
         "type" : "label",
@@ -3735,7 +3709,7 @@ webcam1 = create_group_horizontal([
         "max":999999999, 
         "default":settings_core.get_settings()['camera offset x'], 
         "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("camera offset x", webcam.findChildren(QDoubleSpinBox)[0].value())
+        "func"  : lambda: settings_core.update_setting("camera offset x", webcam1.findChildren(QDoubleSpinBox)[0].value())
     },
     {
         "type" : "doublespinbox", 
@@ -3744,7 +3718,7 @@ webcam1 = create_group_horizontal([
         "max":999999999, 
         "default":settings_core.get_settings()['camera offset y'], 
         "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("camera offset y", webcam.findChildren(QDoubleSpinBox)[1].value())
+        "func"  : lambda: settings_core.update_setting("camera offset y", webcam1.findChildren(QDoubleSpinBox)[1].value())
     },
     {
         "type" : "doublespinbox", 
@@ -3753,7 +3727,7 @@ webcam1 = create_group_horizontal([
         "max":999999999, 
         "default":settings_core.get_settings()['camera offset z'], 
         "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("camera offset z", webcam.findChildren(QDoubleSpinBox)[2].value())
+        "func"  : lambda: settings_core.update_setting("camera offset z", webcam1.findChildren(QDoubleSpinBox)[2].value())
     },
     {
         "type" : "spinbox", 
@@ -3762,7 +3736,7 @@ webcam1 = create_group_horizontal([
         "max":999999999, 
         "default":settings_core.get_settings()['camera index'], 
         "steps" : 1,
-        "func"  : lambda: settings_core.update_setting("camera index", webcam.findChildren(QSpinBox)[0].value())
+        "func"  : lambda: settings_core.update_setting("camera index", webcam1.findChildren(QSpinBox)[0].value())
     },
     {#spacing label!
         "type" : "label",
@@ -3781,7 +3755,7 @@ def start_hand_tracking():
     else:
         pass
 
-#camera markers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#camera (markers)/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # webcam2 = create_group_horizontal([
 #     {
 #         "type" : "checkbox", 
@@ -4372,18 +4346,23 @@ def trackerpos_specific_widget(index, layout, combo):
     settings = settings_core.get_settings()
 
     match mode:
-        case "redirect":
-            tracker_redirect_group = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"Redirect Index",
-                    "min":0,
-                    "max":999999999, 
-                    "default": settings.get(f'{index}trackerpos index', 0),
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting(f'{index}trackerpos index', tracker_redirect_group.findChildren(QSpinBox)[0].value())
-                }
-                ])
-            layout.addWidget(tracker_redirect_group)
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get(f'{index}trackerpos copy serial'),
+                    "items": list(set([settings.get(f'{index}trackerpos copy serial')] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting(f'{index}trackerpos copy serial', combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get(f'{index}trackerpos copy serial'),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
+            layout.addWidget(combo_extra)
 
         case "hip emulation":
 
@@ -4432,21 +4411,25 @@ def trackerrot_specific_widget(index, layout, combo):
     settings = settings_core.get_settings()
 
     match mode:
-        case "redirect":
-            tracker_redirect_group = create_group_horizontal([{
-                    "type" : "spinbox", 
-                    "text" :"Redirect Index",
-                    "min":0,
-                    "max":999999999, 
-                    "default": settings.get(f'{index}trackerrot index', 0),
-                    "steps" : 1,
-                    "func"  : lambda: settings_core.update_setting(f'{index}trackerrot index', tracker_redirect_group.findChildren(QSpinBox)[0].value())
-                }
-                ])
-            layout.addWidget(tracker_redirect_group)
+        case "copy":
+            combo_extra = create_combobox({
+                    "type" : "combobox",
+                    "text": "Copy Serial",
+                    "default": settings.get(f'{index}trackerrot copy serial'),
+                    "items": list(set([settings.get(f'{index}trackerrot copy serial')] + list(trackers_dict))),
+                    "index change": lambda: settings_core.update_setting(f'{index}trackerrot copy serial', combo_extra.findChildren(QComboBox)[0].currentText()),
+                    "pre show": lambda cb: (
+                        saved := settings.get(f'{index}trackerrot copy serial'),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)), 
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
+                })
+            layout.addWidget(combo_extra)
 
         case "hip emulation":
-
             t = create_group_spinbox([{
                 "text" : "hmd index",
                 "min": 0,
@@ -4475,11 +4458,18 @@ def trackerrot_specific_widget(index, layout, combo):
             combo_extra = create_combobox({
                     "type" : "combobox",
                     "text": "gyro id",
-                    "default": settings_core.get_settings().get(f'{index}tracker gyro id', ""),
-                    "items": list(controllers_dict),
-                    "func": lambda: settings_core.update_setting(f'{index}tracker gyro id', combo_extra.findChildren(QComboBox)[0].currentText())
+                    "default": settings.get(f'{index}tracker gyro id', ""),
+                    "items": list({str(settings.get(f'{index}tracker gyro id', "")), *controllers_dict}) if settings.get("hmd gyro id") else list(controllers_dict),
+                    "index change": lambda: settings_core.update_setting(f'{index}tracker gyro id', combo_extra.findChild(QComboBox).currentText()),
+                    "pre show": lambda cb: (
+                        saved := str(settings.get(f'{index}tracker gyro id', "")),
+                        val := cb.currentText(), 
+                        cb.clear(), 
+                        cb.addItems(list({saved, *controllers_dict}) if saved else list(controllers_dict)),
+                        cb.setCurrentText(val), 
+                        None
+                    )[-1]
                 })
-            
             layout.addWidget(combo_extra)
 
         case "offsets":
@@ -4506,9 +4496,9 @@ def create_tracker_widget(index = 0):
     combopos_extra = create_combobox({
             "type" : "combobox",
             "text": f'{index} position mode',
-            "default": settings.get(f'{index}trackerpos mode', "redirect"),
-            "items": ["redirect", "offsets"],
-            "func": lambda: trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))
+            "default": settings.get(f'{index}trackerpos mode', "copy"),
+            "items": ["copy", "offsets"],
+            "index change": lambda: trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))
         })
     layout_extrapos.addWidget(combopos_extra)
     trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))
@@ -4519,9 +4509,9 @@ def create_tracker_widget(index = 0):
     comborot_extra = create_combobox({
             "type" : "combobox",
             "text": f'{index} rotation mode',
-            "default": settings.get(f'{index}trackerrot mode', "redirect"),
-            "items": ["redirect", "offsets", "gyro"],
-            "func": lambda: trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))
+            "default": settings.get(f'{index}trackerrot mode', "copy"),
+            "items": ["copy", "offsets", "gyro"],
+            "index change": lambda: trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))
         })
     layout_extrarot.addWidget(comborot_extra)
     trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))

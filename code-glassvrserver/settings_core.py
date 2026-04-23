@@ -35,15 +35,15 @@ default_settings = {
 
     "prediction time" : 0.011,
 
-    "hmdpos index": 0,
-    "hmdrot index": 0,
+    "hmdpos copy serial": "",
+    "hmdrot copy serial": "",
 
-    "hmd redirect invert yaw" : False,
-    "hmd redirect invert pitch" : False,
-    "hmd redirect invert roll" : False,
+    # "hmd redirect invert yaw" : False,
+    # "hmd redirect invert pitch" : False,
+    # "hmd redirect invert roll" : False,
 
-    "hmdpos mode" : "redirect",
-    "hmdrot mode" : "redirect",
+    "hmdpos mode" : "copy",
+    "hmdrot mode" : "copy",
 
     "hmd offset world x": 0.0,
     "hmd offset world y": 0.0,
@@ -62,11 +62,11 @@ default_settings = {
     "ipd": 0.0,
     "head to eye dist": 0.0,
 
-    "crpos index": 0,
-    "crrot index": 0,
+    "crpos copy serial": "",
+    "crrot copy serial": "",
 
-    "crpos mode" : "redirect",
-    "crrot mode" : "redirect",
+    "crpos mode" : "copy",
+    "crrot mode" : "copy",
 
     "cr offset world x": 0.0,
     "cr offset world y": 0.0,
@@ -82,11 +82,11 @@ default_settings = {
     "cr offset local pitch": 0.0,
     "cr offset local roll": 0.0,
 
-    "clpos index": 0,
-    "clrot index": 0,
+    "clpos copy serial": "",
+    "clrot copy serial": "",
 
-    "clpos mode" : "redirect",
-    "clrot mode" : "redirect",
+    "clpos mode" : "copy",
+    "clrot mode" : "copy",
 
     "cl offset world x": 0.0,
     "cl offset world y": 0.0,
