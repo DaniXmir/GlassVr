@@ -358,6 +358,24 @@ static vr::HmdQuaternion_t EulerToQuatZYX(float roll, float yaw, float pitch) {
     return q;
 }
 
+static int GetTrackerIndexBySerial(const std::string& targetSerial) {
+    if (targetSerial.empty()) return -1;
+
+    for (uint32_t i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
+        vr::PropertyContainerHandle_t container = vr::VRProperties()->TrackedDeviceToPropertyContainer(i);
+        if (container == vr::k_ulInvalidPropertyContainer) continue;
+
+        char serialBuf[256];
+        vr::ETrackedPropertyError err;
+        vr::VRProperties()->GetStringProperty(container, vr::Prop_SerialNumber_String, serialBuf, sizeof(serialBuf), &err);
+
+        if (err == vr::TrackedProp_Success && targetSerial == serialBuf) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
 vr::DriverPose_t CSampleDeviceDriver::GetPose()
 {
     UpdateTrackers();
@@ -379,7 +397,7 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
 
     //c++ moment
     //switch (posmode) {
-    //case "redirect":
+    //case "copy":
     //    // code block
     //    break;
     //case "test":
@@ -389,7 +407,7 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
     //    // code block
     //}
     //switch (rotmode) {
-    //case "redirect":
+    //case "copy":
     //    // code block
     //    break;
     //case "test":
@@ -400,8 +418,9 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
     //}
 
     //pos here///////////////////////////////////////////////////////
-    if (posmode == "redirect") {
-        int tracker_pos_idx = GetIntFromSettingsByKey(device + "pos index");
+    if (posmode == "copy") {
+        std::string targetSerial = GetStringFromSettingsByKey(device + "pos copy serial");
+        int tracker_pos_idx = GetTrackerIndexBySerial(targetSerial);
 
         if (tracker_pos_idx >= 0 && tracker_pos_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_pos_idx].bPoseIsValid)
         {
@@ -437,6 +456,11 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
             pose.vecPosition[2] = 0.0f;
         }
     }
+    else if (posmode == "offsets") {
+        pose.vecPosition[0] = GetFloatFromSettingsByKey(device + " offset world x");
+        pose.vecPosition[1] = GetFloatFromSettingsByKey(device + " offset world y");
+        pose.vecPosition[2] = GetFloatFromSettingsByKey(device + " offset world z");
+    }
     else if (posmode == "test") {
         //
     }
@@ -447,8 +471,9 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
     }
 
     //rot here///////////////////////////////////////////////////////
-    if (rotmode == "redirect") {
-        int tracker_rot_idx = GetIntFromSettingsByKey(device + "rot index");
+    if (rotmode == "copy") {
+        std::string targetRotSerial = GetStringFromSettingsByKey(device + "rot copy serial");
+        int tracker_rot_idx = GetTrackerIndexBySerial(targetRotSerial);
 
         if (tracker_rot_idx >= 0 && tracker_rot_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_rot_idx].bPoseIsValid)
         {
@@ -480,6 +505,18 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
             pose.qRotation.y = 0.0f;
             pose.qRotation.z = 0.0f;
         }
+    }
+    else if (rotmode == "offsets") {
+        float yaw = GetFloatFromSettingsByKey(device + " offset world yaw");
+        float pitch = GetFloatFromSettingsByKey(device + " offset world pitch");
+        float roll = GetFloatFromSettingsByKey(device + " offset world roll");
+
+        vr::HmdQuaternion_t offsetQuat = EulerToQuatZYX(roll, yaw, pitch);
+
+        pose.qRotation.w = offsetQuat.w;
+        pose.qRotation.x = offsetQuat.x;
+        pose.qRotation.y = offsetQuat.y;
+        pose.qRotation.z = offsetQuat.z;
     }
     //viture-
     else if (rotmode == "xr glasses") {
@@ -580,7 +617,6 @@ void CSampleDeviceDriver::PipeThreadThreadEntry()
             continue;
         }
 
-        // 2. Read loop
         PacketHmd incomingData;
         DWORD bytesRead;
         while (m_bThreadRunning)
