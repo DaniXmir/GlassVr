@@ -140,7 +140,7 @@ void CSampleDeviceDriver::Deactivate()
         delete m_pVitureDevice;
         m_pVitureDevice = nullptr;
     }
-    m_poseInitialized = false;  // ← add this
+    m_poseInitialized = false;
     m_startupInverse = { 1, 0, 0, 0 };
     //viture-
 }
