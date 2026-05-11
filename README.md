@@ -50,7 +50,7 @@ like prototyping or a fun weekend project, or you just scared of c++ lol
 # The Boring Technical Staff...
 the driver is composed of 2 parts, the python "server"/ui side and the C++ driver side, 
 the ui side isnt just a frontend, its used in some modes like hand tracking or input emulation from SDL3, 
-its sends its data via named pipes, these pipes can also be hijacked if you want to send custom data, see the examples
+its sends its data via named pipes, these pipes can also be hijacked if you want to send custom data, see examples
 
 # Building:
 you can figure this out i believe in you ;P
