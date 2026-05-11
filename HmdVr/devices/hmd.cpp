@@ -1,7 +1,7 @@
 ﻿#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 
-#include "csampledevicedriver.h"
+#include "hmd.h"
 #include "settings.h" 
 #include "basics.h"
 
@@ -33,11 +33,6 @@ float ResolutionY = 1080.0f;
 bool FullScreen = false;
 float RefreshRate = 90.0f;
 
-void CSampleDeviceDriver::UpdateData(const PacketHmd& data)
-{
-    m_poseDataCache = data;
-}
-
 CSampleDeviceDriver::CSampleDeviceDriver()
 {
     //viture-
@@ -46,12 +41,7 @@ CSampleDeviceDriver::CSampleDeviceDriver()
     m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
     m_ulPropertyContainer = vr::k_ulInvalidPropertyContainer;
 
-    m_poseDataCache.rot_w = 1.0;
-
     m_flIPD = vr::VRSettings()->GetFloat(k_pch_SteamVR_Section, k_pch_SteamVR_IPD_Float);
-
-    m_poseDataCache.ipd = m_flIPD;
-    m_poseDataCache.head_to_eye_dist = 0.0;
 
     char buf[1024];
 
@@ -65,9 +55,6 @@ CSampleDeviceDriver::CSampleDeviceDriver()
     m_flDisplayFrequency = RefreshRate;
 }
 
-//CSampleDeviceDriver::~CSampleDeviceDriver()
-//{
-//}
 //viture-
 CSampleDeviceDriver::~CSampleDeviceDriver() {
     if (m_pVitureDevice) {
@@ -76,6 +63,7 @@ CSampleDeviceDriver::~CSampleDeviceDriver() {
     }
 }
 //viture-
+
 EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
 {
     Stereoscopic = GetBoolFromSettingsByKey("stereoscopic");
@@ -117,32 +105,32 @@ EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
     vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_IsOnDesktop_Bool, false);
     vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_DisplayDebugMode_Bool, !FullScreen);
 
-    m_bThreadRunning = true;
-    m_pPipeThread = new std::thread(&CSampleDeviceDriver::PipeThreadThreadEntry, this);
     //viture-
     m_pVitureDevice = new Viture();
     //viture-
+
+    //connections
+    m_comm.AddUDP(GetIntFromSettingsByKey("hmd port"));
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_HMD_Pos");
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_HMD_Rot");
+    //connections
+
     return VRInitError_None;
 }
 
 void CSampleDeviceDriver::Deactivate()
 {
-    m_bThreadRunning = false;
-    if (m_pPipeThread) {
-        m_pPipeThread->join();
-        delete m_pPipeThread;
-        m_pPipeThread = nullptr;
-    }
-    m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
 
     //viture-
     if (m_pVitureDevice) {
         delete m_pVitureDevice;
         m_pVitureDevice = nullptr;
     }
-    m_poseInitialized = false;  // ← add this
+    m_poseInitialized = false;
     m_startupInverse = { 1, 0, 0, 0 };
     //viture-
+
+    m_comm.StopAll();
 }
 
 void CSampleDeviceDriver::EnterStandby()
@@ -305,7 +293,7 @@ bool CSampleDeviceDriver::ComputeInverseDistortion(vr::HmdVector2_t* pA, vr::EVR
 //pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static uint32_t g_foundTrackers[vr::k_unMaxTrackedDeviceCount];
 static uint32_t g_trackerCount = 0;
-static int g_selectedIndex = 0;//GetIntFromSettingsByKey("hmd index");
+static int g_selectedIndex = 0;
 
 static void UpdateTrackers() {
     g_trackerCount = 0;
@@ -376,6 +364,28 @@ static int GetTrackerIndexBySerial(const std::string& targetSerial) {
     return -1;
 }
 
+//c++ moment
+//switch (posmode) {
+//case "copy":
+//    // code block
+//    break;
+//case "test":
+//    // code block
+//    break;
+//default:
+//    // code block
+//}
+//switch (rotmode) {
+//case "copy":
+//    // code block
+//    break;
+//case "test":
+//    // code block
+//    break;
+//default:
+//    // code block
+//}
+
 vr::DriverPose_t CSampleDeviceDriver::GetPose()
 {
     UpdateTrackers();
@@ -395,27 +405,13 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
     vr::TrackedDevicePose_t rawPoses[vr::k_unMaxTrackedDeviceCount];
     vr::VRServerDriverHost()->GetRawTrackedDevicePoses(0, rawPoses, vr::k_unMaxTrackedDeviceCount);
 
-    //c++ moment
-    //switch (posmode) {
-    //case "copy":
-    //    // code block
-    //    break;
-    //case "test":
-    //    // code block
-    //    break;
-    //default:
-    //    // code block
-    //}
-    //switch (rotmode) {
-    //case "copy":
-    //    // code block
-    //    break;
-    //case "test":
-    //    // code block
-    //    break;
-    //default:
-    //    // code block
-    //}
+    //connections
+    udp_pos = m_comm.GetUdpPos();
+    udp_rot = m_comm.GetUdpRot();
+
+    pipe_pos = m_comm.GetPipePos();
+    pipe_rot = m_comm.GetPipeRot();
+    //connections
 
     //pos here///////////////////////////////////////////////////////
     if (posmode == "copy") {
@@ -461,13 +457,20 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
         pose.vecPosition[1] = GetFloatFromSettingsByKey(device + " offset world y");
         pose.vecPosition[2] = GetFloatFromSettingsByKey(device + " offset world z");
     }
+    else if (posmode == "UDP") {
+        Transform FinalTransform = GetNewTransform(device, udp_pos.x, udp_pos.y, udp_pos.z, pose.qRotation.x, pose.qRotation.y, pose.qRotation.z, pose.qRotation.w);
+
+        pose.vecPosition[0] = FinalTransform.pos_x;
+        pose.vecPosition[1] = FinalTransform.pos_y;
+        pose.vecPosition[2] = FinalTransform.pos_z;
+    }
     else if (posmode == "test") {
         //
     }
     else {
-        pose.vecPosition[0] = m_poseDataCache.pos_x;
-        pose.vecPosition[1] = m_poseDataCache.pos_y;
-        pose.vecPosition[2] = m_poseDataCache.pos_z;
+        pose.vecPosition[0] = pipe_pos.x;
+        pose.vecPosition[1] = pipe_pos.y;
+        pose.vecPosition[2] = pipe_pos.z;
     }
 
     //rot here///////////////////////////////////////////////////////
@@ -559,15 +562,22 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
         }
     }
     //viture-
+    else if (rotmode == "UDP") {
+        Transform FinalTransform = GetNewTransform(device, pose.vecPosition[0], pose.vecPosition[1], pose.vecPosition[2], udp_rot.x, udp_rot.y, udp_rot.z, udp_rot.w);
 
+        pose.qRotation.w = FinalTransform.rot_w;
+        pose.qRotation.x = FinalTransform.rot_x;
+        pose.qRotation.y = FinalTransform.rot_y;
+        pose.qRotation.z = FinalTransform.rot_z;
+    }
     else if (rotmode == "test") {
         //get from server!
     }
     else {
-        pose.qRotation.w = m_poseDataCache.rot_w;
-        pose.qRotation.x = m_poseDataCache.rot_x;
-        pose.qRotation.y = m_poseDataCache.rot_y;
-        pose.qRotation.z = m_poseDataCache.rot_z;
+        pose.qRotation.w = pipe_rot.w;
+        pose.qRotation.x = pipe_rot.x;
+        pose.qRotation.y = pipe_rot.y;
+        pose.qRotation.z = pipe_rot.z;
     }
 
     pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");
@@ -584,59 +594,17 @@ void CSampleDeviceDriver::RunFrame()
     if (m_unObjectId != vr::k_unTrackedDeviceIndexInvalid) {
         vr::VRServerDriverHost()->TrackedDevicePoseUpdated(m_unObjectId, GetPose(), sizeof(DriverPose_t));
 
-        m_flIPD = GetFloatFromSettingsByKey("ipd");//(float)m_poseDataCache.ipd;
+        m_flIPD = GetFloatFromSettingsByKey("ipd");
         vr::VRProperties()->SetFloatProperty(
             m_ulPropertyContainer,
             vr::Prop_UserIpdMeters_Float,
             m_flIPD
         );
-        HeadToEyeDist = GetFloatFromSettingsByKey("head to eye dist");//(float)m_poseDataCache.head_to_eye_dist;
+        HeadToEyeDist = GetFloatFromSettingsByKey("head to eye dist");
         vr::VRProperties()->SetFloatProperty(
             m_ulPropertyContainer,
             vr::Prop_UserHeadToEyeDepthMeters_Float,
             HeadToEyeDist
         );
-    }
-}
-
-void CSampleDeviceDriver::PipeThreadThreadEntry()
-{
-    while (m_bThreadRunning)
-    {
-        m_hPipe = CreateFileA(
-            "\\\\.\\pipe\\GlassVR_HMD",
-            GENERIC_READ,
-            0,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
-
-        if (m_hPipe == INVALID_HANDLE_VALUE) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            continue;
-        }
-
-        PacketHmd incomingData;
-        DWORD bytesRead;
-        while (m_bThreadRunning)
-        {
-            bool bSuccess = ReadFile(
-                m_hPipe,
-                &incomingData,
-                sizeof(PacketHmd),
-                &bytesRead,
-                NULL);
-
-            if (bSuccess && bytesRead == sizeof(PacketHmd)) {
-                UpdateData(incomingData);
-            }
-            else {
-                break;
-            }
-        }
-
-        CloseHandle(m_hPipe);
-        m_hPipe = INVALID_HANDLE_VALUE;
     }
 }

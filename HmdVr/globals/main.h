@@ -2,9 +2,9 @@
 #define CSERVERDRIVER_SAMPLE_H
 
 #include <openvr_driver.h>
-#include "csampledevicedriver.h"
-#include "csamplecontrollerdriver.h"
-#include "cstracker.h"
+#include "hmd.h"
+#include "indexcontroller.h"
+#include "tracker.h"
 
 #include "settings.h"
 

@@ -3,7 +3,7 @@
 
 //#include "driverlog.h"
 
-#include "cserverdriver_sample.h"
+#include "main.h"
 #include "cwatchdogdriver_sample.h"
 
 #include <string.h>

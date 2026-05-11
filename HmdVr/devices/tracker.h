@@ -5,14 +5,14 @@
 #include <string>
 #include <thread>
 #include <mutex>
-#include <windows.h>
 
-#pragma pack(push, 1)
-struct PacketTracker {
-    double pos_x, pos_y, pos_z;
-    double rot_w, rot_x, rot_y, rot_z;
-};
-#pragma pack(pop)
+#include "packets.h"
+#include "comm.h"
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
 
 class CSampleTracker : public vr::ITrackedDeviceServerDriver
 {
@@ -33,10 +33,6 @@ public:
     void SetTrackerIndex(int32_t TrackerIndex);
     std::string GetSerialNumber() const;
 
-    void UpdateData(const PacketTracker& data);
-
-    void PipeThreadThreadEntry();
-
 private:
     vr::TrackedDeviceIndex_t m_unObjectId;
     vr::PropertyContainerHandle_t m_ulPropertyContainer;
@@ -45,13 +41,15 @@ private:
 
     vr::VRInputComponentHandle_t m_hSystemButton;
 
-    PacketTracker m_poseDataCache;
+    //connections
+    CommManager m_comm;
 
-    std::thread* m_pPipeThread = nullptr;
-    bool m_bThreadRunning = false;
-    std::mutex m_poseMutex;
-    HANDLE m_hPipe = INVALID_HANDLE_VALUE;
+    PacketPos pipe_pos;
+    PacketRot pipe_rot;
 
+    PacketPos udp_pos;
+    PacketRot udp_rot;
+    //connections
 };
 
 #endif

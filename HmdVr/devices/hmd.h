@@ -2,11 +2,16 @@
 #define CSAMPLEDEVICEDRIVER_H
 
 #include <openvr_driver.h>
-#include "settings.h"
 #include <string> 
 #include <cstdint>
 #include <thread>
 #include <atomic>
+
+#include "settings.h"
+#include "globals.h"
+
+#include "packets.h"
+#include "comm.h"
 
 //viture-
 #include "viture.h"
@@ -17,27 +22,11 @@
 #endif
 #include <windows.h>
 
-struct PacketHmd {
-    double pos_x;
-    double pos_y;
-    double pos_z;
-
-    double rot_w;
-    double rot_x;
-    double rot_y;
-    double rot_z;
-
-    double ipd;
-    double head_to_eye_dist;
-};
-
 class CSampleDeviceDriver : public vr::ITrackedDeviceServerDriver, public vr::IVRDisplayComponent
 {
 public:
     CSampleDeviceDriver();
     virtual ~CSampleDeviceDriver();
-
-    void UpdateData(const PacketHmd& data);
 
     virtual vr::EVRInitError Activate(vr::TrackedDeviceIndex_t unObjectId) override;
     virtual void Deactivate() override;
@@ -55,7 +44,6 @@ public:
     virtual void GetProjectionRaw(vr::EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom) override;
 
     virtual vr::HmdMatrix34_t GetEyeToHeadTransform(vr::EVREye eEye);
-    //virtual vr::DriverPose_t GetHeadFromEyePose(vr::EVREye eEye);
 
     virtual vr::DistortionCoordinates_t ComputeDistortion(vr::EVREye eEye, float fU, float fV) override;
 
@@ -64,24 +52,27 @@ public:
     void RunFrame();
     std::string GetSerialNumber() const { return m_sSerialNumber; }
 
-    //viture-
+//viture-
 private:
     Viture* m_pVitureDevice = nullptr;
-    //viture-
+//viture-
 
 private:
-    void PipeThreadThreadEntry();
-    std::thread* m_pPipeThread;
-    std::atomic<bool> m_bThreadRunning;
-    HANDLE m_hPipe;
-
     vr::TrackedDeviceIndex_t m_unObjectId;
     vr::PropertyContainerHandle_t m_ulPropertyContainer;
 
     std::string m_sSerialNumber;
     std::string m_sModelNumber;
 
-    PacketHmd m_poseDataCache;
+    //connections
+    CommManager m_comm;
+
+    PacketPos pipe_pos;
+    PacketRot pipe_rot;
+
+    PacketPos udp_pos;
+    PacketRot udp_rot;
+    //connections
 
     int32_t m_nWindowX;
     int32_t m_nWindowY;

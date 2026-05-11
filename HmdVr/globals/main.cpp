@@ -1,7 +1,7 @@
 ////thanks https://github.com/r57zone/OpenVR-driver-for-DIY
 //m to open legacy hmd monitor
 
-#include "cserverdriver_sample.h"
+#include "main.h"
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>

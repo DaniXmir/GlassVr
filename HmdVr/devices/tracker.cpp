@@ -1,6 +1,7 @@
-#include "cstracker.h"
+#include "tracker.h"
 #include "settings.h" 
 #include "basics.h"
+#include "globals.h"
 #include <math.h>
 
 using namespace vr;
@@ -43,24 +44,19 @@ vr::EVRInitError CSampleTracker::Activate(vr::TrackedDeviceIndex_t unObjectId)
 
     vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/system/click", &m_hSystemButton);
 
-    m_bThreadRunning = true;
-    m_pPipeThread = new std::thread(&CSampleTracker::PipeThreadThreadEntry, this);
+    //connections
+    m_comm.AddUDP(GetIntFromSettingsByKey(std::to_string(m_nTrackerIndex) + "tracker port"));
+
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_TRACKER_" + std::to_string(m_nTrackerIndex) + "_Pos");
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_TRACKER_" + std::to_string(m_nTrackerIndex) + "_Rot");
+    //connections
 
     return VRInitError_None;
 }
 
 void CSampleTracker::Deactivate()
 {
-    m_bThreadRunning = false;
-    if (m_hPipe != INVALID_HANDLE_VALUE) {
-        CancelIoEx(m_hPipe, NULL);
-    }
-    if (m_pPipeThread) {
-        if (m_pPipeThread->joinable()) m_pPipeThread->join();
-        delete m_pPipeThread;
-        m_pPipeThread = nullptr;
-    }
-    m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
+    m_comm.StopAll();
 }
 
 void CSampleTracker::EnterStandby() {}
@@ -159,9 +155,10 @@ vr::DriverPose_t CSampleTracker::GetPose()
     std::string device = std::to_string(m_nTrackerIndex) + "tracker";
 
     vr::DriverPose_t pose = { 0 };
+
     pose.poseIsValid = true;
     pose.result = vr::TrackingResult_Running_OK;
-    pose.deviceIsConnected = true;
+    //pose.deviceIsConnected = true;
     pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
     pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
 
@@ -170,6 +167,27 @@ vr::DriverPose_t CSampleTracker::GetPose()
 
     vr::TrackedDevicePose_t rawPoses[vr::k_unMaxTrackedDeviceCount];
     vr::VRServerDriverHost()->GetRawTrackedDevicePoses(0, rawPoses, vr::k_unMaxTrackedDeviceCount);
+
+    //connections
+    udp_pos = m_comm.GetUdpPos();
+    udp_rot = m_comm.GetUdpRot();
+
+    pipe_pos = m_comm.GetPipePos();
+    pipe_rot = m_comm.GetPipeRot();
+    //connections
+
+    //bad apple///////////////////////////////////////////////////////
+    if (rotmode == "bad apple") {
+        if (pipe_rot.x == 0.0)
+            pose.deviceIsConnected = false;
+        else {
+            pose.deviceIsConnected = true;
+        }
+    }
+    else {
+        pose.deviceIsConnected = true;
+    }
+    //bad apple///////////////////////////////////////////////////////
 
     //pos here///////////////////////////////////////////////////////
     if (posmode == "copy") {
@@ -218,10 +236,17 @@ vr::DriverPose_t CSampleTracker::GetPose()
     else if (posmode == "test") {
         //
     }
+    else if (posmode == "UDP") {
+        Transform FinalTransform = GetNewTransform(device, udp_pos.x, udp_pos.y, udp_pos.z, pose.qRotation.x, pose.qRotation.y, pose.qRotation.z, pose.qRotation.w);
+
+        pose.vecPosition[0] = FinalTransform.pos_x;
+        pose.vecPosition[1] = FinalTransform.pos_y;
+        pose.vecPosition[2] = FinalTransform.pos_z;
+    }
     else {
-        pose.vecPosition[0] = m_poseDataCache.pos_x;
-        pose.vecPosition[1] = m_poseDataCache.pos_y;
-        pose.vecPosition[2] = m_poseDataCache.pos_z;
+        pose.vecPosition[0] = pipe_pos.x;
+        pose.vecPosition[1] = pipe_pos.y;
+        pose.vecPosition[2] = pipe_pos.z;
     }
 
     //rot here///////////////////////////////////////////////////////
@@ -275,16 +300,23 @@ vr::DriverPose_t CSampleTracker::GetPose()
     else if (rotmode == "test") {
         //
     }
+    else if (rotmode == "UDP") {
+        Transform FinalTransform = GetNewTransform(device, pose.vecPosition[0], pose.vecPosition[1], pose.vecPosition[2], udp_rot.x, udp_rot.y, udp_rot.z, udp_rot.w);
+
+        pose.qRotation.w = FinalTransform.rot_w;
+        pose.qRotation.x = FinalTransform.rot_x;
+        pose.qRotation.y = FinalTransform.rot_y;
+        pose.qRotation.z = FinalTransform.rot_z;
+    }
     else {
-        pose.qRotation.w = m_poseDataCache.rot_w;
-        pose.qRotation.x = m_poseDataCache.rot_x;
-        pose.qRotation.y = m_poseDataCache.rot_y;
-        pose.qRotation.z = m_poseDataCache.rot_z;
+        pose.qRotation.w = pipe_rot.w;
+        pose.qRotation.x = pipe_rot.x;
+        pose.qRotation.y = pipe_rot.y;
+        pose.qRotation.z = pipe_rot.z;
     }
 
     pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");
 
-    std::lock_guard<std::mutex> lock(m_poseMutex);
     return pose;
 }
 //pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,47 +332,10 @@ void CSampleTracker::RunFrame()
 
 void CSampleTracker::ProcessEvent(const vr::VREvent_t& vrEvent)
 {
-
+    
 }
 
 std::string CSampleTracker::GetSerialNumber() const
 {
     return "TRK" + std::to_string(m_nTrackerIndex) + "Serial";
-}
-
-void CSampleTracker::UpdateData(const PacketTracker& data)
-{
-    m_poseDataCache = data;
-}
-
-void CSampleTracker::PipeThreadThreadEntry()
-{
-    std::string pipeName = "\\\\.\\pipe\\GlassVR_Tracker_" + std::to_string(m_nTrackerIndex);
-
-    while (m_bThreadRunning)
-    {
-        m_hPipe = CreateFileA(pipeName.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
-
-        if (m_hPipe == INVALID_HANDLE_VALUE) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            continue;
-        }
-
-        PacketTracker incomingData;
-        DWORD bytesRead;
-        while (m_bThreadRunning)
-        {
-            bool bSuccess = ReadFile(m_hPipe, &incomingData, sizeof(PacketTracker), &bytesRead, NULL);
-
-            if (bSuccess && bytesRead == sizeof(PacketTracker)) {
-                std::lock_guard<std::mutex> lock(m_poseMutex);
-                m_poseDataCache = incomingData;
-            }
-            else {
-                break;
-            }
-        }
-        CloseHandle(m_hPipe);
-        m_hPipe = INVALID_HANDLE_VALUE;
-    }
 }

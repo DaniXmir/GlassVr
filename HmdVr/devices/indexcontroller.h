@@ -7,29 +7,16 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
-#include <windows.h>
 
 #include "hand_simulation.h"
 
-#pragma pack(push, 1)
-struct PacketController {
-    double pos_x, pos_y, pos_z;
-    double rot_w, rot_x, rot_y, rot_z;
-    double joy_x, joy_y;
-    double touch_x, touch_y;
-    double trigger;
+#include "packets.h"
+#include "comm.h"
 
-    double flexions[20];
-    double splays[5];
-
-    bool a;
-    bool b;
-    bool menu;
-    bool joy_btn;
-    bool touch_btn;
-    bool grip;
-};
-#pragma pack(pop)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
 
 class CSampleControllerDriver : public vr::ITrackedDeviceServerDriver
 {
@@ -50,29 +37,37 @@ public:
     void SetControllerIndex(int32_t CtrlIndex);
     void PowerOff();
 
-    void UpdateData(const PacketController& data);
-
 private:
-    void PipeThreadThreadEntry();
-    std::thread* m_pPipeThread = nullptr;
-    std::atomic<bool> m_bThreadRunning{ false };
-    HANDLE m_hPipe = INVALID_HANDLE_VALUE;
-    std::mutex m_poseMutex;
-
-    void UpdateSkeletalInput(PacketController& packet);
+    void UpdateSkeletalInput(PacketSkeletal& packet);
 
     vr::TrackedDeviceIndex_t m_unObjectId;
     vr::PropertyContainerHandle_t m_ulPropertyContainer;
 
     vr::VRInputComponentHandle_t m_HButtons[13];
-    vr::VRInputComponentHandle_t m_HAnalog[10];
+    vr::VRInputComponentHandle_t m_HAnalog[12];
     vr::VRInputComponentHandle_t m_HSkeletal;
 
     vr::VRInputComponentHandle_t m_compHaptic;
 
     int32_t right;
 
-    PacketController m_poseDataCache;
+    //connections
+    CommManager m_comm;
+
+    PacketPos pipe_pos;
+    PacketRot pipe_rot;
+
+    PacketPos udp_pos;
+    PacketRot udp_rot;
+    //connections
+
+    //input
+    PacketInputIndex pipe_input;
+    PacketInputIndex udp_input;
+
+    PacketSkeletal pipe_skeletal;
+    PacketSkeletal udp_skeletal;
+    //input
 
     MyHandSimulation m_handSimulation;
 };

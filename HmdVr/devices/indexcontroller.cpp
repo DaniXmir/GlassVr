@@ -1,5 +1,6 @@
-#include "csamplecontrollerdriver.h"
-#include "settings.h" 
+#include "indexcontroller.h"
+#include "settings.h"
+#include "globals.h"
 #include <math.h>
 #include <string>
 
@@ -27,11 +28,10 @@ CSampleControllerDriver::CSampleControllerDriver()
     for (int i = 0; i < 13; i++) {
         m_HButtons[i] = vr::k_ulInvalidInputComponentHandle;
     }
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 12; i++) {
         m_HAnalog[i] = vr::k_ulInvalidInputComponentHandle;
     }
 
-    m_poseDataCache = { 0 };
     right = 0;
 }
 
@@ -64,32 +64,35 @@ vr::EVRInitError CSampleControllerDriver::Activate(vr::TrackedDeviceIndex_t unOb
 
     vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_InputProfilePath_String, "{indexcontroller}/input/index_controller_profile.json");
 
+    //buttons etc
     vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/a/click", &m_HButtons[0]);
     vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/b/click", &m_HButtons[1]);
     vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/system/click", &m_HButtons[2]);
-    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/system/touch", &m_HButtons[3]);
-    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/trigger/click", &m_HButtons[4]);
-    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/trackpad/touch", &m_HButtons[5]);
-    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/grip/click", &m_HButtons[6]);
-    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/grip/touch", &m_HButtons[6]);
     vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/thumbstick/click", &m_HButtons[7]);
-    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/thumbstick/touch", &m_HButtons[8]);
+    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/trigger/click", &m_HButtons[4]);
+
     vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/a/touch", &m_HButtons[9]);
-    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/trackpad/click", &m_HButtons[11]);
+    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/b/touch", &m_HButtons[10]);
+    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/system/touch", &m_HButtons[3]);
+    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/thumbstick/touch", &m_HButtons[8]);
+    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/trigger/touch", &m_HButtons[12]);
+    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/trackpad/touch", &m_HButtons[5]);
+    vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/grip/touch", &m_HButtons[6]);
 
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/thumbstick/x", &m_HAnalog[0], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedTwoSided);
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/thumbstick/y", &m_HAnalog[1], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedTwoSided);
-    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/trigger/value", &m_HAnalog[2], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/trackpad/x", &m_HAnalog[3], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedTwoSided);
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/trackpad/y", &m_HAnalog[4], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedTwoSided);
+    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/trigger/value", &m_HAnalog[2], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/trackpad/force", &m_HAnalog[5], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
-    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/grip/force", &m_HAnalog[6], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/grip/value", &m_HAnalog[7], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
+    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/grip/force", &m_HAnalog[6], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
 
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/index", &m_HAnalog[8], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
     vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/middle", &m_HAnalog[9], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
-    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/ring", &m_HAnalog[8], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
-    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/pinky", &m_HAnalog[8], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
+    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/ring", &m_HAnalog[10], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
+    vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/finger/pinky", &m_HAnalog[11], vr::VRScalarType_Absolute, vr::VRScalarUnits_NormalizedOneSided);
+    //buttons etc
 
     vr::VRProperties()->SetInt32Property(m_ulPropertyContainer, vr::Prop_Axis0Type_Int32, vr::k_eControllerAxis_Joystick);
 
@@ -120,26 +123,27 @@ vr::EVRInitError CSampleControllerDriver::Activate(vr::TrackedDeviceIndex_t unOb
 
     vr::VRDriverInput()->CreateHapticComponent(m_ulPropertyContainer, "/output/haptic", &m_compHaptic);
 
-    m_bThreadRunning = true;
-    m_pPipeThread = new std::thread(&CSampleControllerDriver::PipeThreadThreadEntry, this);
+    //connections
+    if (right) {
+        m_comm.AddUDP(GetIntFromSettingsByKey("cr port"));
+    }
+    else {
+        m_comm.AddUDP(GetIntFromSettingsByKey("cl port"));
+    }
+
+    std::string side = right ? "RIGHT" : "LEFT";
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_CONTROLLER_" + side + "_Pos");
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_CONTROLLER_" + side + "_Rot");
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_CONTROLLER_" + side + "_Input");
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_CONTROLLER_" + side + "_Skeletal");
+    //connections
 
     return VRInitError_None;
 }
 
 void CSampleControllerDriver::Deactivate()
 {
-    m_bThreadRunning = false;
-
-    if (m_hPipe != INVALID_HANDLE_VALUE) {
-        CancelIoEx(m_hPipe, NULL);
-    }
-
-    if (m_pPipeThread) {
-        if (m_pPipeThread->joinable()) m_pPipeThread->join();
-        delete m_pPipeThread;
-        m_pPipeThread = nullptr;
-    }
-
+    m_comm.StopAll();
     m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
 }
 
@@ -255,6 +259,14 @@ vr::DriverPose_t CSampleControllerDriver::GetPose()
     vr::TrackedDevicePose_t rawPoses[vr::k_unMaxTrackedDeviceCount];
     vr::VRServerDriverHost()->GetRawTrackedDevicePoses(0, rawPoses, vr::k_unMaxTrackedDeviceCount);
 
+    //connections
+    udp_pos = m_comm.GetUdpPos();
+    udp_rot = m_comm.GetUdpRot();
+
+    pipe_pos = m_comm.GetPipePos();
+    pipe_rot = m_comm.GetPipeRot();
+    //connections
+    
     //pos here///////////////////////////////////////////////////////
     if (posmode == "copy") {
         std::string targetSerial = GetStringFromSettingsByKey(device + "pos copy serial");
@@ -302,10 +314,17 @@ vr::DriverPose_t CSampleControllerDriver::GetPose()
     else if (posmode == "test") {
         //
     }
+    else if (posmode == "UDP") {
+        Transform FinalTransform = GetNewTransform(device, udp_pos.x, udp_pos.y, udp_pos.z, pose.qRotation.x, pose.qRotation.y, pose.qRotation.z, pose.qRotation.w);
+
+        pose.vecPosition[0] = FinalTransform.pos_x;
+        pose.vecPosition[1] = FinalTransform.pos_y;
+        pose.vecPosition[2] = FinalTransform.pos_z;
+    }
     else {
-        pose.vecPosition[0] = m_poseDataCache.pos_x;
-        pose.vecPosition[1] = m_poseDataCache.pos_y;
-        pose.vecPosition[2] = m_poseDataCache.pos_z;
+        pose.vecPosition[0] = pipe_pos.x;
+        pose.vecPosition[1] = pipe_pos.y;
+        pose.vecPosition[2] = pipe_pos.z;
     }
 
     //rot here///////////////////////////////////////////////////////
@@ -359,21 +378,28 @@ vr::DriverPose_t CSampleControllerDriver::GetPose()
     else if (rotmode == "test") {
         //
     }
+    else if (rotmode == "UDP") {
+        Transform FinalTransform = GetNewTransform(device, pose.vecPosition[0], pose.vecPosition[1], pose.vecPosition[2], udp_rot.x, udp_rot.y, udp_rot.z, udp_rot.w);
+
+        pose.qRotation.w = FinalTransform.rot_w;
+        pose.qRotation.x = FinalTransform.rot_x;
+        pose.qRotation.y = FinalTransform.rot_y;
+        pose.qRotation.z = FinalTransform.rot_z;
+    }
     else {
-        pose.qRotation.w = m_poseDataCache.rot_w;
-        pose.qRotation.x = m_poseDataCache.rot_x;
-        pose.qRotation.y = m_poseDataCache.rot_y;
-        pose.qRotation.z = m_poseDataCache.rot_z;
+        pose.qRotation.w = pipe_rot.w;
+        pose.qRotation.x = pipe_rot.x;
+        pose.qRotation.y = pipe_rot.y;
+        pose.qRotation.z = pipe_rot.z;
     }
 
     pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");
 
-    std::lock_guard<std::mutex> lock(m_poseMutex);
     return pose;
 }
 //pos here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void CSampleControllerDriver::UpdateSkeletalInput(PacketController& packet)
+void CSampleControllerDriver::UpdateSkeletalInput(PacketSkeletal& packet)
 {
     vr::VRBoneTransform_t boneTransforms[31];
 
@@ -407,53 +433,60 @@ void CSampleControllerDriver::UpdateSkeletalInput(PacketController& packet)
 
 void CSampleControllerDriver::RunFrame()
 {
-    const float TRIGGER_CLICK_THRESHOLD = 0.9f;
+    std::string device = right ? "cr" : "cl";
+    std::string InputMode = GetStringFromSettingsByKey(device + "input mode");
+    std::string SkeletalMode = GetStringFromSettingsByKey(device + "skeletal mode");
 
-    float thumbX = m_poseDataCache.joy_x;
-    float thumbY = m_poseDataCache.joy_y;
-    float trackpadX = m_poseDataCache.touch_x;
-    float trackpadY = m_poseDataCache.touch_y;
-    float triggerValue = m_poseDataCache.trigger;
-    bool isGripPressed = m_poseDataCache.grip;
-    bool isTrackpadClicked = m_poseDataCache.touch_btn;
+    PacketInputIndex input = {};
+    PacketSkeletal skeletal = {};
 
-    bool isTriggerPressed = (triggerValue > TRIGGER_CLICK_THRESHOLD);
-    bool isThumbTouched = m_poseDataCache.joy_btn || (fabs(thumbX) > 0.01f) || (fabs(thumbY) > 0.01f);
-    bool isTrackpadTouched = isTrackpadClicked || (fabs(trackpadX) > 0.01f) || (fabs(trackpadY) > 0.01f);
-    float gripValue = isGripPressed ? 1.0f : 0.0f;
+    if (InputMode == "app (named pipe)") {
+        input = m_comm.GetPipeInput();
+    }
+    else if (InputMode == "UDP") {
+        input = m_comm.GetUdpInput();
+    }
 
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[0], m_poseDataCache.a, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[1], m_poseDataCache.b, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[2], m_poseDataCache.menu, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[4], isTriggerPressed, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[6], m_poseDataCache.grip, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[7], m_poseDataCache.joy_btn, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[11], m_poseDataCache.touch_btn, 0);
+    if (SkeletalMode == "app (named pipe)") {
+        skeletal = m_comm.GetPipeSkeletal();
+    }
+    else if (SkeletalMode == "UDP") {
+        skeletal = m_comm.GetUdpSkeletal();
+    }
 
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[9], m_poseDataCache.a, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[10], m_poseDataCache.b, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[3], m_poseDataCache.menu, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[8], isThumbTouched, 0);
-    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[5], isTrackpadTouched, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[0], input.a, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[1], input.b, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[2], input.system, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[7], input.joy_btn, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[4], input.trigger_btn, 0);
 
-    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[0], thumbX, 0);
-    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[1], thumbY, 0);
-    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[2], triggerValue, 0);
-    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[3], trackpadX, 0);
-    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[4], trackpadY, 0);
-    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[5], isTrackpadClicked ? 1.0f : 0.0f, 0);
-    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[6], gripValue, 0);
-    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[7], gripValue, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[9], input.a_cap, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[10], input.b_cap, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[3], input.system_cap, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[8], input.joy_cap, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[12], input.trigger_cap, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[5], input.touch_cap, 0);
+    vr::VRDriverInput()->UpdateBooleanComponent(m_HButtons[6], input.grip_cap, 0);
 
-    UpdateSkeletalInput(m_poseDataCache);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[0], input.joy_x, 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[1], input.joy_y, 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[3], input.touch_x, 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[4], input.touch_y, 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[2], input.trigger, 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[5], input.touch_force, 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[7], input.grip_pull, 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[6], input.grip_force, 0);
+
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[8], (float)skeletal.flexions[4], 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[9], (float)skeletal.flexions[8], 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[10], (float)skeletal.flexions[12], 0);
+    vr::VRDriverInput()->UpdateScalarComponent(m_HAnalog[11], (float)skeletal.flexions[16], 0);
+
+    UpdateSkeletalInput(skeletal);
 
     if (m_unObjectId != vr::k_unTrackedDeviceIndexInvalid) {
-        if (right) {
-            g_selectedIndex = GetIntFromSettingsByKey("cr index");
-        }
-        else {
-            g_selectedIndex = GetIntFromSettingsByKey("cl index");
-        }
+        if (right) g_selectedIndex = GetIntFromSettingsByKey("cr index");
+        else       g_selectedIndex = GetIntFromSettingsByKey("cl index");
         vr::VRServerDriverHost()->TrackedDevicePoseUpdated(m_unObjectId, GetPose(), sizeof(DriverPose_t));
     }
 }
@@ -477,55 +510,5 @@ std::string CSampleControllerDriver::GetSerialNumber() const
         return "CTRL2Serial";
     default:
         return "CTRLSerial";
-    }
-}
-
-void CSampleControllerDriver::UpdateData(const PacketController& data)
-{
-    m_poseDataCache = data;
-}
-
-void CSampleControllerDriver::PipeThreadThreadEntry()
-{
-    std::string pipeName = right ? "\\\\.\\pipe\\GlassVR_Right" : "\\\\.\\pipe\\GlassVR_Left";
-
-    while (m_bThreadRunning)
-    {
-        m_hPipe = CreateFileA(
-            pipeName.c_str(),
-            GENERIC_READ,
-            0,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
-
-        if (m_hPipe == INVALID_HANDLE_VALUE) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            continue;
-        }
-
-        PacketController incomingData;
-        DWORD bytesRead;
-        while (m_bThreadRunning)
-        {
-            bool bSuccess = ReadFile(
-                m_hPipe,
-                &incomingData,
-                sizeof(PacketController),
-                &bytesRead,
-                NULL);
-
-            if (bSuccess && bytesRead == sizeof(PacketController)) {
-                std::lock_guard<std::mutex> lock(m_poseMutex);
-                m_poseDataCache = incomingData;
-            }
-            else {
-                break;
-            }
-        }
-
-        CloseHandle(m_hPipe);
-        m_hPipe = INVALID_HANDLE_VALUE;
     }
 }

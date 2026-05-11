@@ -1,4 +1,4 @@
-#ifndef VITURE_H
+﻿#ifndef VITURE_H
 #define VITURE_H
 
 #include <atomic>
@@ -44,7 +44,7 @@ private:
     static Viture* s_instance;
     static void static_imu_pose_callback(float* data, uint64_t ts);
     static void static_imu_raw_callback(float* data, uint64_t ts, uint64_t vsync);
-
+    
     alignas(16) float m_euler_atomic[3];
 
     std::atomic<bool> m_first_sample{ true };

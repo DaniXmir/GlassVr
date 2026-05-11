@@ -121,78 +121,74 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_WINDOWS;HTTP_CLIENT_EXPORTS;CURL_STATICLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)headers;$(ProjectDir)headers\curl-8.17.0\include;$(ProjectDir)headers\curl-8.17.0\include\curl;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)headers;$(ProjectDir)headers\viture headers;$(ProjectDir)headers\openvr;$(ProjectDir)headers\hidapi;$(ProjectDir)globals;$(ProjectDir)misc;$(ProjectDir)viture;$(ProjectDir)devices;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="headers\openvr.h" />
-    <ClInclude Include="headers\openvr_capi.h" />
-    <ClInclude Include="headers\openvr_driver.h" />
-    <ClInclude Include="samples\driver_sample\basics.h" />
-    <ClInclude Include="samples\driver_sample\csamplecontrollerdriver.h" />
-    <ClInclude Include="samples\driver_sample\csampledevicedriver.h" />
-    <ClInclude Include="samples\driver_sample\cserverdriver_sample.h" />
-    <ClInclude Include="samples\driver_sample\cstracker.h" />
-    <ClInclude Include="samples\driver_sample\cwatchdogdriver_sample.h" />
-    <ClInclude Include="samples\driver_sample\driverlog.h" />
-    <ClInclude Include="samples\driver_sample\hand_simulation.h" />
-    <ClInclude Include="samples\driver_sample\settings.h" />
-    <ClInclude Include="samples\driver_sample\viture.h" />
+    <ClInclude Include="headers\openvr\openvr.h" />
+    <ClInclude Include="headers\openvr\openvr_capi.h" />
+    <ClInclude Include="headers\openvr\openvr_driver.h" />
+    <ClInclude Include="headers\hidapi\hidapi.h" />
+    <ClInclude Include="headers\hidapi\hidapi_winapi.h" />
+    <ClInclude Include="headers\viture headers\viture_device.h" />
+    <ClInclude Include="headers\viture headers\viture_device_carina.h" />
+    <ClInclude Include="headers\viture headers\viture_glasses_provider.h" />
+    <ClInclude Include="headers\viture headers\viture_macros_public.h" />
+    <ClInclude Include="headers\viture headers\viture_protocol_public.h" />
+    <ClInclude Include="headers\viture headers\viture_version.h" />
+    <ClInclude Include="globals\comm.h" />
+    <ClInclude Include="misc\basics.h" />
+    <ClInclude Include="devices\hmd.h" />
+    <ClInclude Include="globals\main.h" />
+    <ClInclude Include="devices\tracker.h" />
+    <ClInclude Include="misc\cwatchdogdriver_sample.h" />
+    <ClInclude Include="misc\driverlog.h" />
+    <ClInclude Include="devices\indexcontroller.h" />
+    <ClInclude Include="globals\globals.h" />
+    <ClInclude Include="devices\hand_simulation.h" />
+    <ClInclude Include="globals\packets.h" />
+    <ClInclude Include="globals\settings.h" />
+    <ClInclude Include="viture\viture.h" />
+    <ClInclude Include="misc\vrmath.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="headers\openvr_api.cs" />
-    <None Include="headers\openvr_api.json" />
-    <None Include="samples\driver_sample\default.vrsettings" />
-    <None Include="x64\Release\driver_fakehmd.dll.recipe" />
-    <None Include="x64\Release\driver_fakehmd.iobj" />
-    <None Include="x64\Release\driver_fakehmd.ipdb" />
-    <None Include="x64\Release\HmdVr.dll.recipe" />
-    <None Include="x64\Release\HmdVr.iobj" />
-    <None Include="x64\Release\HmdVr.ipdb" />
-    <None Include="x64\Release\HmdVr.tlog\CL.command.1.tlog" />
-    <None Include="x64\Release\HmdVr.tlog\Cl.items.tlog" />
-    <None Include="x64\Release\HmdVr.tlog\CL.read.1.tlog" />
-    <None Include="x64\Release\HmdVr.tlog\CL.write.1.tlog" />
-    <None Include="x64\Release\HmdVr.tlog\HmdVr.lastbuildstate" />
-    <None Include="x64\Release\HmdVr.tlog\link.command.1.tlog" />
-    <None Include="x64\Release\HmdVr.tlog\link.read.1.tlog" />
-    <None Include="x64\Release\HmdVr.tlog\link.secondary.1.tlog" />
-    <None Include="x64\Release\HmdVr.tlog\link.write.1.tlog" />
-    <None Include="x64\Release\HmdVr.tlog\unsuccessfulbuild" />
-    <None Include="x64\Release\vc143.pdb" />
+    <None Include="headers\openvr\openvr_api.cs" />
+    <None Include="headers\openvr\openvr_api.json" />
+    <None Include="misc\default.vrsettings" />
+    <None Include="x64\viture x64\carina_vio.dll" />
+    <None Include="x64\viture x64\glasses.dll" />
+    <None Include="x64\viture x64\glew32.dll" />
+    <None Include="x64\viture x64\hidapi.dll" />
+    <None Include="x64\viture x64\hidapi.pdb" />
+    <None Include="x64\viture x64\libusb-1.0.dll" />
+    <None Include="x64\viture x64\opencv_world4100.dll" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="samples\driver_sample\basics.cpp" />
-    <ClCompile Include="samples\driver_sample\csamplecontrollerdriver.cpp" />
-    <ClCompile Include="samples\driver_sample\csampledevicedriver.cpp" />
-    <ClCompile Include="samples\driver_sample\cserverdriver_sample.cpp" />
-    <ClCompile Include="samples\driver_sample\cstracker.cpp" />
-    <ClCompile Include="samples\driver_sample\cwatchdogdriver_sample.cpp" />
-    <ClCompile Include="samples\driver_sample\driverlog.cpp" />
-    <ClCompile Include="samples\driver_sample\driver_sample.cpp" />
-    <ClCompile Include="samples\driver_sample\hand_simulation.cpp" />
-    <ClCompile Include="samples\driver_sample\settings.cpp" />
-    <ClCompile Include="samples\driver_sample\viture.cpp" />
+    <ClCompile Include="misc\basics.cpp" />
+    <ClCompile Include="globals\comm.cpp" />
+    <ClCompile Include="devices\indexcontroller.cpp" />
+    <ClCompile Include="devices\hmd.cpp" />
+    <ClCompile Include="globals\main.cpp" />
+    <ClCompile Include="devices\tracker.cpp" />
+    <ClCompile Include="misc\cwatchdogdriver_sample.cpp" />
+    <ClCompile Include="misc\driverlog.cpp" />
+    <ClCompile Include="misc\driver_sample.cpp" />
+    <ClCompile Include="globals\globals.cpp" />
+    <ClCompile Include="devices\hand_simulation.cpp" />
+    <ClCompile Include="globals\settings.cpp" />
+    <ClCompile Include="viture\viture.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="samples\driver_sample\CMakeLists.txt" />
-    <Text Include="x64\Release\HmdVr.log" />
-  </ItemGroup>
-  <ItemGroup>
-    <Object Include="x64\Release\basics.obj" />
-    <Object Include="x64\Release\csamplecontrollerdriver.obj" />
-    <Object Include="x64\Release\csampledevicedriver.obj" />
-    <Object Include="x64\Release\cserverdriver_sample.obj" />
-    <Object Include="x64\Release\cwatchdogdriver_sample.obj" />
-    <Object Include="x64\Release\driverlog.obj" />
-    <Object Include="x64\Release\driver_sample.obj" />
+    <Library Include="x64\viture x64\glasses.lib" />
+    <Library Include="x64\viture x64\hidapi.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets" />
 </Project>
