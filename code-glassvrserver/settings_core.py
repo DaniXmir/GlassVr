@@ -28,11 +28,6 @@ default_settings = {
     "top stereo" : 26.120,
     "bottom stereo" : 26.120,
 
-    # "ip sending": "127.0.0.1",
-    # "port sending": 9999,
-    # "ip receiving": "127.0.0.1",
-    # "port receiving": 9999,
-
     "prediction time" : 0.011,
 
     "hmdpos copy serial": "",
@@ -168,9 +163,22 @@ default_settings = {
     # "clrot marker id" : 40,
 
     "trackers num": 0,
+
+    "bad apple speed" : 10.0,
+    "bad apple ui" : True,
+
+    "crinput mode" : "app (named pipe)",
+    "crskeletal mode" : "app (named pipe)",
+
+    "clinput mode" : "app (named pipe)",
+    "clskeletal mode" : "app (named pipe)",
+
+    "hmd port" : 9000,
+    "cr port" : 9001,
+    "cl port" : 9002,
+    #"0tracker port" : 9003
 }
 
-##################################################################################################
 def get_path():
     appdata_path = os.getenv('APPDATA')
     folder_name = 'glassvr'
@@ -185,8 +193,6 @@ def get_path():
     return file_path
 
 file_path = get_path()
-#file_path = 'settings.json'
-##################################################################################################
 
 def reset_settings():
     with open(file_path, 'w') as f:
