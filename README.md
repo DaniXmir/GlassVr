@@ -42,7 +42,8 @@ with more communication protocols coming soon like bluetooth and serial
 a common use case for this would be to build a custom controller with an arduino or esp32, lets say you only want to wire flex sensors and a gyro, you can use only the position part of the hand tracking or use a base station tracker and a joycon for the other inputs, or you wired everything and run out gpio ports? you could use 2 or more boards! like one for input and the other for skeletal, 
 index controller capacitive buttons are also supported so for full emulation youll need at least 9 digital and 9 analog ports, add 5 more analog for splay
 
-python examples for UDP and nammed pipes are available with arduino coming later
+python examples for UDP and nammed pipes are available: https://github.com/DaniXmir/GlassVr/tree/master/examples/python
+with arduino coming later
 
 ideally you would want to build your own driver but i can see some use cases that it would be kinda overkill, 
 like prototyping or a fun weekend project, or you just scared of c++ lol
