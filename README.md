@@ -1,5 +1,5 @@
 # I THINK YOU'R LOST, THIS ISN'T THE MAIN BRANCH...
-this branch uses windows shared memory(SHM) to communicate with the server, the main branch switch to UDP communication,
+this branch uses windows shared memory(SHM) to communicate with the server,
 please go to the main branch if you got here accidentally because this one will not be updated
 
 # GlassVr
