@@ -28,12 +28,11 @@ lots of people suggested using 2 computer mice for each hand.
   <img src="https://img.youtube.com/vi/mYdC2gVEi6Y/maxresdefault.jpg" width="600" alt="Watch the video">
 </a>
 
-using old controllers as trackers by copying their position and rotation! this method does not require reprogramming the controller, useful if your old controller have a dead usb port like my index one
-
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/tracker%20emulation.png width="600">
-
 custom controllers! full index controller emulation is supported including capacitive buttons!
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/vr%20spinner.gif width="600">
+
+using old controllers as trackers by copying their position and rotation! this method does not require reprogramming the controller, useful if your old controller have a dead usb port like my index one
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/tracker%20emulation.png width="600">
 
 and many more!
 also position and rotation can be emulated independently for each device allowing for lots of combinations!
