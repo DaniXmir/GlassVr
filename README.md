@@ -47,8 +47,8 @@ index controller capacitive buttons are also supported so for full emulation you
 python examples for UDP and nammed pipes are available: https://github.com/DaniXmir/GlassVr/tree/master/examples/python
 with arduino coming later
 
-ideally you would want to build your own driver but i can see some use cases that it would be kinda overkill, 
-like prototyping or a fun weekend project, or you just scared of c++ lol
+ideally you would want to build your own driver but i can see some use cases where that would be kinda overkill, 
+like for prototyping or a fun weekend project, or you just scared of c++ lol
 
 # The Boring Technical Staff...
 the driver is composed of 2 parts, the python "server"/ui side and the C++ driver side, 
