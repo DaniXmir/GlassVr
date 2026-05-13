@@ -15,7 +15,7 @@ to uninstall, simply click on "uninstall" in the Driver tab
 youll also need to do lots of configuring because of the modular approach of the project
 
 # Some Features:
-emulating an headset with xr glasses imu(only viture glasses are supported for now) or a controller gyro like strapping a joycon to a hat for 3dof with static offsets for position
+headset emulation with xr glasses imu(only viture glasses are supported for now) or a controller gyro like strapping a joycon to a hat for 3dof with static offsets for position
 		
 <a href="https://www.youtube.com/watch?v=K8fJ-rsfZ1U">
   <img src="https://img.youtube.com/vi/K8fJ-rsfZ1U/maxresdefault.jpg" width="600" alt="Watch the video">
