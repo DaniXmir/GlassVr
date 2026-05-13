@@ -32,6 +32,9 @@ using old controllers as trackers by copying their position and rotation! this m
 
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/tracker%20emulation.png width="600">
 
+custom controllers! full index controller emulation is supported including capacitive buttons!
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/vr%20spinner.gif width="600">
+
 and many more!
 also position and rotation can be emulated independently for each device allowing for lots of combinations!
 
