@@ -81,3 +81,7 @@ and add "activateMultipleDrivers" : true
 1. linux?
 
 	in the future... maybe.. (properly)
+
+2. installed steam or steamvr on disk d?
+
+	dont, you gonna have a bad time!
