@@ -85,3 +85,4 @@ and add "activateMultipleDrivers" : true
 2. installed steam or steamvr on disk d?
 
 	dont, you gonna have a bad time!
+	while you could get it working, steam and steamvr REALLY want to be on disk c, you can install the games on disk d no problem but i recommend keeping steam on c
