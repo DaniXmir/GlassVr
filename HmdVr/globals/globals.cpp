@@ -41,10 +41,28 @@ static void EulerToQuat(float rollZ, float yawY, float pitchX, float q[4]) {
     q[2] = cx * cy * sz - sx * sy * cz;//z
     q[3] = cx * cy * cz + sx * sy * sz;//w
 }
-
+////////////////////////////////////////////////////////////////////////////////////////
 Transform GetNewTransform(const std::string& device, float px, float py, float pz, float rx, float ry, float rz, float rw) {
     try {
         float device_quat[4] = { rx, ry, rz, rw };
+        float q_local_off[4], q_world_off[4], q_playspace[4];
+
+        float ps_yaw = GetFloatFromSettingsByKey(device + " playspace yaw");
+        EulerToQuat(0, ps_yaw, 0, q_playspace);
+
+        EulerToQuat(
+            GetFloatFromSettingsByKey(device + " offset local roll"),
+            GetFloatFromSettingsByKey(device + " offset local yaw"),
+            GetFloatFromSettingsByKey(device + " offset local pitch"),
+            q_local_off
+        );
+
+        EulerToQuat(
+            GetFloatFromSettingsByKey(device + " offset world roll"),
+            GetFloatFromSettingsByKey(device + " offset world yaw"),
+            GetFloatFromSettingsByKey(device + " offset world pitch"),
+            q_world_off
+        );
 
         float offset_local[3] = {
             GetFloatFromSettingsByKey(device + " offset local x"),
@@ -61,29 +79,24 @@ Transform GetNewTransform(const std::string& device, float px, float py, float p
         float rotated_local[3];
         RotateVector(device_quat, offset_local, rotated_local);
 
-        float final_px = px + rotated_local[0] + offset_world[0];
-        float final_py = py + rotated_local[1] + offset_world[1];
-        float final_pz = pz + rotated_local[2] + offset_world[2];
+        float mid_px = px + rotated_local[0] + offset_world[0];
+        float mid_py = py + rotated_local[1] + offset_world[1];
+        float mid_pz = pz + rotated_local[2] + offset_world[2];
 
-        float q_local_off[4], q_world_off[4];
+        float final_pos[3] = { mid_px, mid_py, mid_pz };
+        float final_px, final_py, final_pz;
 
-        EulerToQuat(
-            GetFloatFromSettingsByKey(device + " offset local roll"),
-            GetFloatFromSettingsByKey(device + " offset local yaw"),
-            GetFloatFromSettingsByKey(device + " offset local pitch"),
-            q_local_off
-        );
+        float rotated_pos[3];
+        RotateVector(q_playspace, final_pos, rotated_pos);
+        final_px = rotated_pos[0];
+        final_py = rotated_pos[1];
+        final_pz = rotated_pos[2];
 
-        EulerToQuat(
-            GetFloatFromSettingsByKey(device + " offset world roll"),
-            GetFloatFromSettingsByKey(device + " offset world yaw"),
-            GetFloatFromSettingsByKey(device + " offset world pitch"),
-            q_world_off
-        );
+        float temp_q[4], mid_q[4], final_q[4];
 
-        float temp_q[4], final_q[4];
         MultiplyQuat(q_world_off, device_quat, temp_q);
-        MultiplyQuat(temp_q, q_local_off, final_q);
+        MultiplyQuat(temp_q, q_local_off, mid_q);
+        MultiplyQuat(q_playspace, mid_q, final_q);
 
         return {
             final_px, final_py, final_pz,
@@ -94,3 +107,4 @@ Transform GetNewTransform(const std::string& device, float px, float py, float p
         return { px, py, pz, rx, ry, rz, rw };
     }
 }
+////////////////////////////////////////////////////////////////////////////////////////

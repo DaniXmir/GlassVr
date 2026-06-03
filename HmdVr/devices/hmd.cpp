@@ -17,6 +17,8 @@
 #include <cstdio>
 #include <sstream>
 
+#include <sddl.h>
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -364,28 +366,6 @@ static int GetTrackerIndexBySerial(const std::string& targetSerial) {
     return -1;
 }
 
-//c++ moment
-//switch (posmode) {
-//case "copy":
-//    // code block
-//    break;
-//case "test":
-//    // code block
-//    break;
-//default:
-//    // code block
-//}
-//switch (rotmode) {
-//case "copy":
-//    // code block
-//    break;
-//case "test":
-//    // code block
-//    break;
-//default:
-//    // code block
-//}
-
 vr::DriverPose_t CSampleDeviceDriver::GetPose()
 {
     UpdateTrackers();
@@ -525,9 +505,9 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
     else if (rotmode == "xr glasses") {
         if (m_pVitureDevice && m_pVitureDevice->is_connected()) {
 
-            if (GetAsyncKeyState('0') & 0x8000) {
-                m_pVitureDevice->recenter();
-            }
+            //if (GetAsyncKeyState('0') & 0x8000) {
+            //    m_pVitureDevice->recenter();
+            //}
 
             float euler[3], quat[4], gyro[3];
             m_pVitureDevice->get_imu_data(euler, quat, gyro);

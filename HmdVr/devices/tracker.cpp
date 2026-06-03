@@ -332,10 +332,10 @@ void CSampleTracker::RunFrame()
 
 void CSampleTracker::ProcessEvent(const vr::VREvent_t& vrEvent)
 {
-    
+
 }
 
 std::string CSampleTracker::GetSerialNumber() const
 {
-    return "TRK" + std::to_string(m_nTrackerIndex) + "Serial";
+    return "Trk" + std::to_string(m_nTrackerIndex) + "Serial";
 }

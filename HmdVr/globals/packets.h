@@ -59,6 +59,10 @@ struct PacketSkeletal {
     double splays[5];
 };
 
+struct PacketExtra {
+    bool reset;
+};
+
 #pragma pack(pop)
 
 #endif

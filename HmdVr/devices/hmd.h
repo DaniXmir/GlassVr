@@ -52,10 +52,10 @@ public:
     void RunFrame();
     std::string GetSerialNumber() const { return m_sSerialNumber; }
 
-//viture-
+    //viture-
 private:
     Viture* m_pVitureDevice = nullptr;
-//viture-
+    //viture-
 
 private:
     vr::TrackedDeviceIndex_t m_unObjectId;

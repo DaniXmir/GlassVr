@@ -9,6 +9,7 @@
 #include <vector>
 #include <string>
 #include <windows.h>
+#include <map>
 
 class CommManager {
 public:
@@ -37,6 +38,8 @@ private:
     void UdpThreadLoop(SOCKET sock);
     void PipeThreadLoop(std::string pipeName);
 
+    std::map<SOCKET, HANDLE> m_pipeHandles;
+
     std::mutex m_mutex;
     std::atomic<bool> m_bIsRunning;
 
@@ -54,6 +57,9 @@ private:
 
     PacketSkeletal m_udpSkeletal = { 0 };
     PacketSkeletal m_pipeSkeletal = { 0 };
+
+    PacketExtra m_udpExtra = { 0 };
+    PacketExtra m_pipeExtra = { 0 };
 };
 
 #endif
