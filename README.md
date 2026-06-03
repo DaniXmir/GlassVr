@@ -1,110 +1,72 @@
-# GlassVr
-glassvr is an openvr driver that let you use XR/AR glasses with 6dof and even stereoscopic 3D in steamvr,
-while steamvr isn't really designed for a "headset" like this, they work surprisingly well in it,
-i originally made this driver to create a super light headset using my XR glasses with a base station tracker for SteamVR but since i added a lot more features
+# GlassVr(name work in progress)
+is a super modular openvr driver that let you emulate vr devices like a headset, controllers and trackers with hardware that you already own! 
+i originally made this driver to create a super light headset using my XR glasses and a base station tracker but since i added a lot more features!
 
 showcase on youtube: https://www.youtube.com/watch?v=LaRQ5dUw4bU
 
 also join the discord! https://discord.gg/jyvWdKBpPj
 
-these include:
- - headset emulation
- - index controller emulation
- - tracker emulation
- - hand tracking with a usb webcan(experimental)
- - hmd rotation with 3dof from xr glasses imu(viture glasses only for now)
- - rotation emulation for all devices with gyro from x/d input controllers
- - split position and rotation emulation for all emulated devices allowing you to take position from one device and rotation from another
- - copying device position and rotation and applying it to another with offsets
- - static offsets for all emulated devices, usefull for 3dof only setups
- - and more!
-
 # Installing
 1. download the .rar in the Releases tab and extract it
 2. run main.exe
 3. in the Driver tab click "install"
-now when you launch steamvr you should see a window called "Headset Window" and it should be copying one of you'r trackers position and rotation
 
 to uninstall, simply click on "uninstall" in the Driver tab
+youll also need to do lots of configuring because of the modular approach of the project
 
-note:
- - 3dof from imu only works on viture glasses for now
- - not every glasses out there support stereoscopic 3D(SBS), here is how to enable it on the viture pro xr
-hold the button closest to the screen until the resolution change to 3840x1080@60, the problem is that its @60, 60hz in vr is not good so i dont recommend using it if you'r glasses cant at least do 90hz in that mode
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_090401.jpg width="512">
+# Some Features:
+headset emulation with xr glasses imu(only viture glasses are supported for now) or a controller gyro like strapping a joycon to a hat for 3dof with static offsets for position
+		
+<a href="https://www.youtube.com/watch?v=K8fJ-rsfZ1U">
+  <img src="https://img.youtube.com/vi/K8fJ-rsfZ1U/maxresdefault.jpg" width="600" alt="Watch the video">
+</a>
 
-there is a way to overclock the glasses to 3840x1080@90 but...
-WARNING: this method will make you'r gpu driver unable to use 2D mode so do it at you'r own risk,
-fix(if needed): uninstall you'r gpu driver in device manager
-1) download cru https://customresolutionutility.net/ nvidia's or amd's custom resolution won't work here
-2) switch to 3D mode add 3840x1080@90
-3) click restart.exe
-
-also try downgrading you'r firmware if you can, i found that older firmwares can be more stable
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/hz2.png width="512">
-
-# Requirements
-- xr glasses or a monitor, for you'r eyes ofcourse
-- vr controller or vr tracker, to track you'r head(only for 6dof)
-
-base stations aren't required, if you have any other vr tracker like vive ultimate, ps move etc.. they will also work
-
-# Optinal Hardware
-- 2 additional controllers, one for each hand
-- a way to attach you'r controller/tracker to you head, alignment isn't critical since you can adjust position and rotation offsets later
-- steamvr watchman dongles(for vive, index etc controllres only), while not required, are needed if you want to use your controllers wirelessly, one dongle per device
-
-here is a cool video that explains what are dongles: https://www.youtube.com/watch?v=gmzmNvJFkSc
-
-the full setup should look something like this (glasses, 2 base stations, 3 controllers or 2 controllers and a tracker, 2 dongles, tracker mount)
-
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_085109.jpg width="512">
-
-# Mounting the controller/tracker
-mount it as close to the center of you'r head as you can,
-now as to how to mount it, that up to you, the most basic setup i could find is a hat and a shoe laces,
-if you end up 3D printing something, please share it online so other could use it
-
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20251130_081836.jpg width="512">
-
-here's my design: https://www.thingiverse.com/thing:7293001
-
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/20260211_174231.jpg width="512">
-
-# Other features
-tldr i was bored and added some cool features
-
- - controller emulation:
-
-	emulate index controller with a tracker and a physical controller, supports xbox, joycons, ps4/5 etc
+pcvr hand tracking with just a normal camera! you can also emulate input with keyboard and mouse or physical controllers that compatible with SDL3(basically everything)
+lots of people suggested using 2 computer mice for each hand.
 	
-	demonstration: darth maul dual saber using only one controller:
-	
-	<a href="https://www.youtube.com/watch?v=AHyDTgIQ-1U">
-	  <img src="https://img.youtube.com/vi/AHyDTgIQ-1U/maxresdefault.jpg" width="600" alt="Watch the video">
-	</a>
+<a href="https://www.youtube.com/watch?v=mYdC2gVEi6Y">
+  <img src="https://img.youtube.com/vi/mYdC2gVEi6Y/maxresdefault.jpg" width="600" alt="Watch the video">
+</a>
 
- - hand tracking using a webcam(curl and splay only):
+custom controllers! full index controller emulation is supported including capacitive buttons!
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/vr%20spinner.gif width="600">
 
-	use a webcam for hand tracking, tracker for 6dof and a physical controller for buttons, requires the OpenGloves driver
-	
-	1, download it from steam: https://store.steampowered.com/app/1574050/OpenGloves/
+using old controllers as trackers by copying their position and rotation! this method does not require reprogramming the controller, useful if your old controller have a dead usb port like my index one
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/tracker%20emulation.png width="600">
 
-    2, and enable named pipe communication
+and many more!
+also position and rotation can be emulated independently for each device allowing for lots of combinations!
 
-	demonstration: webcam, joycon, vive wand
+# Custom Hardware:
+and if thats not enough for you, you can also send data yourself with UDP or named pipes, 
+with more communication protocols coming soon like bluetooth and serial
 
-	<a href="https://www.youtube.com/watch?v=1IrDE8JJ0mk">
-	  <img src="https://img.youtube.com/vi/1IrDE8JJ0mk/maxresdefault.jpg" width="600" alt="Watch the video">
-	</a>
+a common use case for this would be to build a custom controller with an arduino or esp32, lets say you only want to wire flex sensors and a gyro, you can use only the position part of the hand tracking or use a base station tracker and a joycon for the other inputs, or you wired everything and run out gpio ports? you could use 2 or more boards! like one for input and the other for skeletal, 
+index controller capacitive buttons are also supported so for full emulation youll need at least 9 digital and 9 analog ports, add 5 more analog for splay
 
- - tracker emulation:
+python examples for UDP and nammed pipes are available: https://github.com/DaniXmir/GlassVr/tree/master/examples/python
+with arduino coming later
 
-	convert old controllers to trackers
+ideally you would want to build your own driver but i can see some use cases where that would be kinda overkill, 
+like for prototyping or a fun weekend project, or you just scared of c++ lol
 
-	demonstration(not video): using index controller to emulate a tracker
+# The Boring Technical Staff...
+the driver is composed of 2 parts, the python "server"/ui side and the C++ driver side, 
+the python side isnt just a frontend, its used in some modes like hand tracking or controller input emulation with SDL3, 
+its sends its data via named pipes, these pipes can also be hijacked if you want to send custom data see examples: https://github.com/DaniXmir/GlassVr/tree/master/examples/python
 
-	<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/tracker%20emulation.png width="600">
+# Building:
+you can figure this out i believe in you ;P 
+just keep in mind that i used viture sdk so youll need to get the .h files from their site, if you dont care about that feature just press ctrl+f and delete everything with "//viture-"
+
+# Contributing:
+idk
+
+# Roadmap:
+ - option to emulate htc vive and oculus touch controllers (with maybe also steam frame controllers?)
+ - bluetooth and serial communication
+ - playspace offsets for emulated devices
+ - android app with ARcore
 
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
@@ -115,57 +77,16 @@ and add "activateMultipleDrivers" : true
 		 }
 3. weird flickering/objects not rendering in some games? specifically godot XR? set IPD to be greater than 0
 
-# QNA
-1. will this work with my (insert company name here aka, viture, xreal etc) glasses?
-	
-	to get an image yes the driver doesn't care which glasses you have, literally any monitor will work,
-	
-	for 3dof read 2
-   
-2. can i use the builtin 3DOF imu for rotation only?
+# QnA
+1. linux?
 
-	for now only viture glasses are supported, for everything else check this project instead: https://docs.vertoxr.com/docs/features/steamvr/
+	in the future... maybe.. (properly)
 
-3. can i use other devices like a phone instead of xr glasses?
+2. installed steam or steamvr on disk d?
 
-   yes all emulated devices(hmd, controllers and hand tracking, trackers) will work with other devices and drivers,
-   
-   if you plan you use a phone as an hmd suggest using alvr and phonevr for less latency, the driver is designed for wired displays
+	dont, you gonna have a bad time!
+	while you could get it working, steam and steamvr REALLY want to be on disk c, you can install the games on disk d no problem but i recommend keeping steam on c
 
-   alvr: https://github.com/alvr-org/ALVR
-   
-   PhoneVR: https://github.com/PhoneVR-Developers/PhoneVR
-   
-   i should also probably change the name lol
-   
-4. i don't have base station, can i use something else?
+3. name work in progress?
 
-   a lot of people asked me about ps move or quest controllers, 
-   
-   if they show in steamvr = position and rotation can be copyed and applyed with offsets to another device(even real devices with tracking overrides: https://github.com/ValveSoftware/openvr/wiki/TrackingOverrides)
-
-5. ps move?
-
-	plz read 4
-
-	i probably wont be adding support in the driver but you can use PSMoveService: https://github.com/psmoveservice/PSMoveService
-	
-	to get them in steanvr then copy their position and rotation to your device
-
-6. I only have 2 controllers...
-
-	strap one to you'r head and the other to you'r hand, keep in mind that it will be visible, buttons will still work and rumble will be active
-   
-7. linux?
-	
-	in the future, maybe
-
-8. wireless?
-	
-	option 1. find a way to stream the "headset window" to your phone, maybe Parsec or even alvr
-	
-	option 2. there are some "wireless hdmi 120hz" dongles on amazon/aliexpress but i dont know how good they actually are, especially for vr
-
-9. any more quetions?
-    
-	ask them in the discord server: https://discord.gg/WbEqvHKs
+	i cant think of any better names, if you can drop it in the discord server please!!!

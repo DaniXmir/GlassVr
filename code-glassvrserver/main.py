@@ -1,9 +1,9 @@
 #pyinstaller --noconfirm --windowed --collect-binaries "sdl3dll" --collect-all "sdl3" --collect-binaries "openvr" --collect-all "mediapipe" --collect-all "cv2" --hidden-import "sdl3dll" main.py
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpinBox, QDoubleSpinBox, QLineEdit, QTabWidget, QGridLayout, QCheckBox, QComboBox, QScrollArea
+from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpinBox, QDoubleSpinBox, QLineEdit, QTabWidget, QGridLayout, QCheckBox, QComboBox, QScrollArea, QGroupBox,QFrame
 
-from PyQt6.QtCore import Qt, QSize, QObject, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QSize, QObject, pyqtSignal, QTimer, QEvent
 
-from PyQt6.QtGui import QPixmap, QIcon, QKeySequence
+from PyQt6.QtGui import QPixmap, QIcon, QKeySequence, QColor, QPalette, QMovie
 
 import shutil
 import psutil
@@ -17,6 +17,7 @@ import openvr as vr
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import sys
+import win32api
 
 import win32file
 from typing import List, Dict, Any, Tuple
@@ -28,6 +29,7 @@ import cvzone
 from cvzone.HandTrackingModule import HandDetector
 
 import time
+import socket
 
 import sdl3 as SDL
 from sdl3 import *
@@ -46,14 +48,40 @@ from collections import deque
 
 from PyInstaller.utils.hooks import collect_dynamic_libs
 
+import win32con
+import win32gui
+import win32ui
+from flask import Flask, Response
+
 #binaries = collect_dynamic_libs('sdl3dll')
 
 app = QApplication([])#sys.argv)
 
 window = QWidget()
-window_layout = QHBoxLayout(window)
+window_layout = QVBoxLayout(window)
 
+#tab///
 tabs = QTabWidget()
+tabs.setMovable(True)
+# tabs.tabBarClicked.connect(lambda index: print(f"User clicked tab index: {index} ('{tabs.tabText(index)}')"))
+# tabs.tabBar().tabMoved.connect(lambda from_idx, to_idx: print(f"Moved tab from index {from_idx} to {to_idx}"))
+#tab///
+
+tabs.tabBarClicked.connect(lambda index: change_label_on_click(tabs.tabText(index)))
+def change_label_on_click(text):
+    match text:
+        case "Hmd":
+            help_label.findChild(QLabel).setText('headset tab! (ignore the "Direct Display Mode" popup)')
+        case "Controllers":
+            help_label.findChild(QLabel).setText("controllers tab!")
+        case "Tracker":
+            help_label.findChild(QLabel).setText("tracker tab!")
+        case "Driver":
+            help_label.findChild(QLabel).setText("driver tab!")
+        case "Credits":
+            help_label.findChild(QLabel).setText("hello!!!!")
+    
+
 #window.setWindowTitle("PuffinVR")
 window.setWindowTitle("GlassVR")
 
@@ -82,6 +110,7 @@ def create_label(dict):
 
     label = QLabel(dict.get('text',""))
     label.setAlignment(dict.get('alignment',Qt.AlignmentFlag.AlignCenter))
+
     group_layout.addWidget(label)
 
     return group_widget
@@ -106,7 +135,9 @@ def create_button(dict):
     button.setEnabled(dict.get('enabled',True))
 
     group_layout.addWidget(button)
-
+    
+    if "style" in dict:
+        button.setStyleSheet(dict.get('style', ""))
     return group_widget
 
 def create_group_button(arr = []):
@@ -879,67 +910,709 @@ def start_vr_utility():
                 trackers_dict = current_frame_dict
                 trackers_arr = current_frame_arr
 
-                if 'update_found_label' in globals():
-                    update_found_label()
+                vr_signals.devices_updated.emit(trackers_dict)
                 
                 time.sleep(0.001)
 
             except Exception as e:
-                print(f"Error in VR Loop: {e}")
                 time.sleep(0.01)
                 continue
 
     except Exception as e:
-        print(f"VR System Error: {e}. Retrying in 1s...")
         time.sleep(1)
         start_vr_utility()
 
 def end_vr_utility():
     vr.shutdown()
 
-def update_found_label():
-    global trackers_dict
-    display_text = ""
-    
-    for count, (serial, data) in enumerate(trackers_dict.items()):
-        display_text += f"[{count}] ROLE: {data['role']} | {data['model']}\n"
-        display_text += f"Serial: {serial}\n"
-        
-        conn = "CONNECTED" if data.get('connected') else "DISCONNECTED"
-        valid = "TRACKING" if data.get('pose_valid') else "SEARCHING..."
-        display_text += f"Status: {conn} | {valid}\n"
+device_widgets = {}
+
+def update_found_label(data_dict):
+    global device_widgets
+
+    for count, (serial, data) in enumerate(data_dict.items()):
+        if serial in device_widgets:
+            w = device_widgets[serial]
+            conn = data.get('connected')
+            valid = data.get('pose_valid')
+
+            if not conn:
+                w['status'].setText("DISCONNECTED")
+                w['status'].setStyleSheet("color: red; font-weight: bold;")
+            elif not valid:
+                w['status'].setText("SEARCHING...")
+                w['status'].setStyleSheet("color: yellow; font-weight: bold;")
+            else:
+                w['status'].setText("TRACKING")
+                w['status'].setStyleSheet("color: green; font-weight: bold;")
+
+            if "pos x" in data:
+                px, py, pz = data['pos x'], data['pos y'], data['pos z']
+                w['pos'].setText(f"(X:{px:+.4f}  Y:{py:+.4f}  Z:{pz:+.4f})")
+
+            if "rotation matrix" in data:
+                m = data['rotation matrix']
+                yaw, pitch, roll = R.from_matrix(m).as_euler('yxz', degrees=True)
+                w['rot'].setText(f"(Yaw:{yaw:+.1f}°  Pitch:{pitch:+.1f}°  Roll:{roll:+.1f}°)")
+            continue
+
+        # Color per device
+        hue = (count * 36) % 360
+        bg = QColor.fromHsv(hue, 40, 50)
+        border = QColor.fromHsv(hue, 120, 180)
+
+        group = QGroupBox(f"[{count}]  {data['role']}  |  {data['model']}")
+        group.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {bg.name()};
+                border: 1px solid {border.name()};
+                border-radius: 8px;
+                margin-top: 1.5ex;
+                font-weight: bold;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 10px;
+                color: {border.name()};
+            }}
+        """)
+
+        group_layout = QVBoxLayout(group)
+        group_layout.setSpacing(0)
+        group_layout.setContentsMargins(8, 8, 8, 8)
+
+        conn = data.get('connected')
+        valid = data.get('pose_valid')
+        if not conn:
+            status_text, status_color = "DISCONNECTED", "red"
+        elif not valid:
+            status_text, status_color = "SEARCHING...", "yellow"
+        else:
+            status_text, status_color = "TRACKING", "green"
+
+        status_label = QLabel(status_text)
+        status_label.setStyleSheet(f"color: {status_color}; font-weight: bold;")
+        group_layout.addWidget(status_label)
+
+        pos_label = QLabel("(X: —  Y: —  Z: —)")
+        rot_label = QLabel("(Yaw: —  Pitch: —  Roll: —)")
 
         if "pos x" in data:
             px, py, pz = data['pos x'], data['pos y'], data['pos z']
-            display_text += f"Pos: X:{px:+.3f} Y:{py:+.3f} Z:{pz:+.3f}\n"
-            
-            if "rotation matrix" in data:
-                m = data['rotation matrix']
-                display_text += f"Rot: [{m[0][0]:+.2f}, {m[0][1]:+.2f}, {m[0][2]:+.2f}]...\n"
-        
-        display_text += "-----------------------------------\n"
+            pos_label.setText(f"(X:{px:+.4f}  Y:{py:+.4f}  Z:{pz:+.4f})")
 
-    label = trackers_label1.findChild(QLabel)
-    if label:
-        label.setText(display_text)
+        if "rotation matrix" in data:
+            yaw, pitch, roll = R.from_matrix(data['rotation matrix']).as_euler('yxz', degrees=True)
+            rot_label.setText(f"(Yaw:{yaw:+.1f}°  Pitch:{pitch:+.1f}°  Roll:{roll:+.1f}°)")
+
+        serial_btn = QPushButton(f"Serial: {serial}")
+        serial_btn.setToolTip("Click to copy serial to clipboard")
+        serial_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {border.name()};
+                border-radius: 4px;
+                padding: 2px 6px;
+                margin-top: 4px;
+                color: {border.name()};
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background-color: {border.name()};
+                color: white;
+            }}
+        """)
+
+        def on_copy(_, s=serial, btn=serial_btn):
+            QApplication.clipboard().setText(s)
+            btn.setText("Copied to clipboard!")
+            QTimer.singleShot(500, lambda: btn.setText(f"Serial: {s}"))
+
+        serial_btn.clicked.connect(on_copy)
+
+        group_layout.addWidget(status_label)
+
+        pos_header = QLabel("Position:")
+        pos_header.setStyleSheet("font-weight: bold; margin-top: 4px;")
+        group_layout.addWidget(pos_header)
+        group_layout.addWidget(pos_label)
+
+        rot_header = QLabel("Rotation:")
+        rot_header.setStyleSheet("font-weight: bold; margin-top: 4px;")
+        group_layout.addWidget(rot_header)
+        group_layout.addWidget(rot_label)
+
+        group_layout.addWidget(serial_btn)
+        detected_layout.addWidget(group)
+
+        device_widgets[serial] = {
+            'group': group,
+            'status': status_label,
+            'pos': pos_label,
+            'rot': rot_label,
+        }
+
+class VRSignals(QObject):
+    devices_updated = pyqtSignal(dict)
+
+vr_signals = VRSignals()
+vr_signals.devices_updated.connect(update_found_label)
 
 #vr utility/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#style/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+def set_style(widget, style = "{ background: #242424; border: 1px solid #444; border-radius: 6px; }", name = "default"):
+    final_style = f"QWidget#{name} {style}"
+    widget.setStyleSheet(final_style)
+    widget.setObjectName(name)
+
+class HoverGroupBox(QGroupBox):
+    def __init__(self, name, text):
+        super().__init__(name)
+        self.hover_text = text
+
+    def enterEvent(self, event):
+        if self.hover_text != "":
+            help_label.findChild(QLabel).setText(self.hover_text)
+        super().enterEvent(event)
+
+group_count = 0
+def set_group(name = "Group", arr = [], box = "v", style = """
+        QGroupBox {
+            background-color: #242424;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin-top: 1ex; /* Leaves space for the title */
+            font-weight: bold;
+        }
+
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top center; /* Positions the title */
+            padding: 0 5px;
+            left: 10px;
+            color: #2470ED;
+        }
+    """, text = ""):
+
+    global group_count
+    group_count += 1
+
+    #rainbow style///
+    # hue = (group_count * 36) % 360
+    # bg = QColor.fromHsv(hue, 40 + group_count, 50)
+    # border = QColor.fromHsv(hue, 40 + group_count, 128)
+
+    # group_style = f"""
+    #     QGroupBox {{
+    #         background-color: {bg.name()};
+    #         border: 1px solid {border.name()};
+    #         border-radius: 8px;
+    #         margin-top: 1.5ex;
+    #         font-weight: bold;
+    #     }}
+
+    #     QGroupBox::title {{
+    #         subcontrol-origin: margin;
+    #         subcontrol-position: top center;
+    #         padding: 0 10px;
+    #         color: {border.name()};
+    #     }}
+    # """
+    #rainbow style///
+
+    if style == """
+        QGroupBox {
+            background-color: #242424;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin-top: 1ex; /* Leaves space for the title */
+            font-weight: bold;
+        }
+
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top center; /* Positions the title */
+            padding: 0 5px;
+            left: 10px;
+            color: #2470ED;
+        }
+    """:
+        if group_count %2 == 0:
+            style = """
+            QGroupBox {
+                background-color: #242424;
+                border: 1px solid #444;
+                border-radius: 8px;
+                margin-top: 1ex; /* Leaves space for the title */
+                font-weight: bold;
+            }
+
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center; /* Positions the title */
+                padding: 0 5px;
+                left: 10px;
+                color: #2470ED;
+            }
+        """
+        else:
+            style = """
+            QGroupBox {
+                background-color: #292929;
+                border: 1px solid #444;
+                border-radius: 8px;
+                margin-top: 1ex; /* Leaves space for the title */
+                font-weight: bold;
+            }
+
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center; /* Positions the title */
+                padding: 0 5px;
+                left: 10px;
+                color: #2470ED;
+            }
+        """
+    else:
+        pass
+
+    group_widget = HoverGroupBox(name, text)
+    if box == "v":
+        misc_layout = QVBoxLayout()
+    else:
+        misc_layout = QHBoxLayout()
+    group_widget.setLayout(misc_layout)
+
+    for n in arr:
+        misc_layout.addWidget(n)
+
+    group_widget.setStyleSheet(style)
+
+    return group_widget
+
+offsets_style = """
+        QGroupBox {
+            background-color: #1F1F1F;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin-top: 1ex; /* Leaves space for the title */
+            font-weight: bold;
+        }
+
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top center; /* Positions the title */
+            padding: 0 5px;
+            left: 10px;
+            color: #2470ED;
+        }
+    """
+
+#UDP relay/////////////////////////////////////////////////////////////////////////////////////////////////////
+packets = {} 
+packets_lock = threading.Lock()
+
+def get_latest_packet(device, prefix):
+    raw_data = get_data(device, prefix)
+    
+    if not raw_data:
+        return None
+
+    try:
+        match prefix:
+            case 'P':
+                if len(raw_data) >= 24:
+                    x, y, z = struct.unpack('3d', raw_data[:24])
+                    return {"x": x, "y": y, "z": z}
+            
+            case 'R':
+                if len(raw_data) >= 32:
+                    w, x, y, z = struct.unpack('4d', raw_data[:32])
+                    return {"w": w, "x": x, "y": y, "z": z}
+            
+            case 'I':
+                if len(raw_data) >= 76:
+                    unpacked = struct.unpack('12?8d', raw_data[:76])
+                    return {
+                        "btn": unpacked[0:5],
+                        "cap": unpacked[5:12],
+                        "joy": (unpacked[12], unpacked[13]),
+                        "touch": (unpacked[14], unpacked[15]),
+                        "trigger": unpacked[16],
+                        "force": unpacked[17:20]
+                    }
+            
+            case 'S':
+                if len(raw_data) >= 200:
+                    unpacked = struct.unpack('25d', raw_data[:200])
+                    return {
+                        "flexions": unpacked[:20],
+                        "splays": unpacked[20:]
+                    }
+            
+            case 'E':
+                if len(raw_data) >= 1:
+                    reset_flag, = struct.unpack('?', raw_data[:1])
+                    return {
+                        "reset": reset_flag
+                    }
+
+            case _:
+                return None
+                
+    except struct.error as e:
+        pass
+    
+    return None
+
+def pipe_listener_worker(device):
+    while True:
+        settings = settings_core.get_settings()
+        port = settings.get(f"{device} port")
+        
+        if not port:
+            time.sleep(1.0)
+            continue
+
+        pipe_name = f"\\\\.\\pipe\\UDP_RELAY_{port}"
+
+        with packets_lock:
+            if port not in packets:
+                packets[port] = {}
+
+        try:
+            win32pipe.WaitNamedPipe(pipe_name, 1000)
+        except pywintypes.error:
+            time.sleep(1.0)
+            continue
+
+        try:
+            handle = win32file.CreateFile(
+                pipe_name,
+                win32file.GENERIC_READ,
+                0, None,
+                win32file.OPEN_EXISTING,
+                0, None
+            )
+        except pywintypes.error:
+            time.sleep(1.0)
+            continue
+        
+        last_check_time = time.time()
+        
+        while True:
+            try:
+                _, avail, _ = win32pipe.PeekNamedPipe(handle, 0)
+                
+                if avail > 0:
+                    resp, data = win32file.ReadFile(handle, 1024)
+                    if data:
+                        prefix = data[0:1].decode('ascii', errors='ignore')
+                        payload = data[1:]
+                        with packets_lock:
+                            packets[port][prefix] = payload
+                else:
+                    current_time = time.time()
+                    if current_time - last_check_time > 1.0:
+                        last_check_time = current_time
+                        new_settings = settings_core.get_settings()
+                        new_port = new_settings.get(f"{device} port")
+                        
+                        if new_port and new_port != port:
+                            break 
+                            
+                    time.sleep(0.005) 
+                    
+            except pywintypes.error as e:
+                if e.args[0] in [109, 233]:
+                    break
+                time.sleep(0.001)
+                
+        try:
+            win32file.CloseHandle(handle)
+        except pywintypes.error:
+            pass
+
+def start_udp_thread():
+    settings = settings_core.get_settings()
+    enable_device("hmd")
+    enable_device("cr")
+    enable_device("cl")
+    
+    for n in range(settings['trackers num']):
+        enable_device(f"{n}tracker")
+
+def get_data(device, prefix):
+    settings = settings_core.get_settings()
+    port = settings.get(f"{device} port")
+    
+    if not port:
+        return None
+        
+    with packets_lock:
+        return packets.get(port, {}).get(prefix)
+#UDP relay/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#bindable button/////////////////////////////////////////////////////////////////////////////
+#example for thread with one bindable button:////////////////////////////////////////////////////////////////////////////
+# layout_controllers.addWidget(set_group("PlaySpace",[BindingGroupWidget("cr", "reset playspace")]))
+# def start_reset_playspace():
+#     thread = threading.Thread(target=reset_playspace_on_input, daemon=True)
+#     thread.start()
+# def reset_playspace_on_input():
+#     while True:
+#         settings = settings_core.get_settings()
+#         if eval_binding(settings.get(f"cr_reset playspace", "")):
+#             pass
+#         time.sleep(0.001)
+
+#bindable button!
+#layout_controllers.addWidget(BindingButton("a", "b"))
+#prefix = what device
+#mapping_name = what action
+#prefix_mapping_name in settings (cr_trigger)
+current_binding_btn = None
+
+class SingleBindButton(QPushButton):
+    def __init__(self, mapping_name, current_bind, callback, parent=None):
+        super().__init__("", parent)
+        self.mapping_name = mapping_name
+        self.current_bind = current_bind
+        self.callback = callback
+        self.is_binding = False
+        
+        self.refresh_display()
+        self.clicked.connect(self.start_binding)
+
+    def refresh_display(self):
+        self.setText(f"{self.mapping_name}: {self.current_bind}")
+
+    def start_binding(self):
+        global current_binding_btn
+        if current_binding_btn and current_binding_btn != self:
+            current_binding_btn.cancel_binding()
+            
+        current_binding_btn = self
+        self.is_binding = True
+        self.setText("Press something (ESC to unbind)")
+        self.setFocus() 
+
+    def cancel_binding(self):
+        self.is_binding = False
+        self.refresh_display()
+
+    def finish_binding(self, input_name):
+        global current_binding_btn
+        self.is_binding = False
+        current_binding_btn = None
+        self.current_bind = input_name
+        self.refresh_display()
+        
+        self.callback()
+
+    def keyPressEvent(self, event):
+        if self.is_binding:
+            if event.key() == Qt.Key.Key_Escape:
+                self.finish_binding("[Unbound]")
+            else:
+                key_name = QKeySequence(event.key()).toString()
+                self.finish_binding(f"Key_{key_name}")
+        else:
+            super().keyPressEvent(event)
+
+    def mousePressEvent(self, event):
+        if self.is_binding:
+            btn_map = {
+                Qt.MouseButton.LeftButton: "Left",
+                Qt.MouseButton.RightButton: "Right",
+                Qt.MouseButton.MiddleButton: "Middle",
+                Qt.MouseButton.XButton1: "M4",
+                Qt.MouseButton.XButton2: "M5",
+                Qt.MouseButton.BackButton: "Back",
+                Qt.MouseButton.ForwardButton: "Forward",
+                Qt.MouseButton.TaskButton: "Task"
+            }
+            
+            button_id = event.button()
+            button_name = btn_map.get(button_id, f"Extra_{button_id.value}")
+            self.finish_binding(f"Mouse_{button_name}")
+        else:
+            super().mousePressEvent(event)
+
+    def wheelEvent(self, event):
+        if self.is_binding:
+            delta = event.angleDelta().y()
+            if delta > 0:
+                self.finish_binding("Mouse_WheelUp")
+            elif delta < 0:
+                self.finish_binding("Mouse_WheelDown")
+            event.accept()
+        else:
+            super().wheelEvent(event)
+
+class BindingGroupWidget(QWidget):
+    def __init__(self, prefix, mapping_name, parent=None):
+        super().__init__(parent)
+        self.prefix = prefix
+        self.mapping_name = mapping_name
+        self.setting_key = f"{self.prefix}_{self.mapping_name}"
+        
+        self.main_layout = QHBoxLayout(self)
+        
+        self.checkbox = QCheckBox("Invert")
+        self.checkbox.stateChanged.connect(self.save_settings)
+        
+        self.buttons_layout = QHBoxLayout()
+        self.main_layout.addLayout(self.buttons_layout)
+        self.main_layout.addWidget(self.checkbox)
+        self.button_widgets = []
+        
+        self.load_settings()
+
+    def load_settings(self):
+        current_settings = settings_core.get_settings()
+        bind_data = current_settings.get(self.setting_key, {})
+        
+        if not isinstance(bind_data, dict):
+            bind_data = {}
+
+        is_inverted = bind_data.get("invert", False)
+        self.checkbox.blockSignals(True)
+        self.checkbox.setChecked(is_inverted)
+        self.checkbox.blockSignals(False)
+
+        saved_buttons = bind_data.get("buttons", [])
+        
+        active_binds = [b for b in saved_buttons if b != "[Unbound]"]
+        
+        self.render_buttons(active_binds)
+
+    def render_buttons(self, binds):
+        while self.button_widgets:
+            btn = self.button_widgets.pop()
+            self.buttons_layout.removeWidget(btn)
+            btn.setParent(None)
+            btn.deleteLater()
+        
+        display_list = binds + ["[Unbound]"]
+        
+        for bind_value in display_list:
+            btn = SingleBindButton(self.mapping_name, bind_value, self.on_button_changed)
+            self.buttons_layout.addWidget(btn)
+            self.button_widgets.append(btn)
+            btn.show()
+
+    def on_button_changed(self):
+        QTimer.singleShot(10, self.save_settings)
+
+    def save_settings(self):
+        active_binds = []
+        for btn in self.button_widgets:
+            if btn.current_bind != "[Unbound]":
+                active_binds.append(btn.current_bind)
+        new_data = {
+            "buttons": active_binds,
+            "invert": self.checkbox.isChecked()
+        }
+        
+        settings_core.update_nested(self.setting_key, new_data)
+        
+        self.render_buttons(active_binds)
+#bindable button/////////////////////////////////////////////////////////////////////////////
+
 #main/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 tab_main = QWidget()
 layout_main = QVBoxLayout(tab_main)
-layout_main.setSpacing(0)
+set_style(tab_main, "{ background: #1F1F1F; border: 0px solid #444; border-radius: 0px; }", "t")
+
+scroll_hmd = QScrollArea()
+scroll_hmd.setWidgetResizable(True)
+scroll_hmd.setWidget(tab_main)
+
+# scroll_hmd.setMinimumWidth(1800)
+# scroll_hmd.setMinimumHeight(800)
 
 check_box_hmd = create_checkbox(
     {
         "text" : "enable hmd", 
         "default" : settings_core.get_settings()['enable hmd'], 
-        "func" : lambda: settings_core.update_setting("enable hmd",check_box_hmd.findChild(QCheckBox).isChecked())
+        "func" : lambda: enable_device("hmd")
     })
-layout_main.addWidget(check_box_hmd)
+layout_main.addWidget(set_group("Enable", [check_box_hmd], text = 'enables headset emulation (ignore the "Direct Display Mode" popup)'))
 
-#hmd modes/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#pos//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+active_threads = set()  
+active_threads_lock = threading.Lock() 
+
+def enable_device(device=""):
+    ui_mapping = {
+        "hmd": check_box_hmd,
+        "cr": check_cr,
+        "cl": check_cl
+    }
+
+    should_start_thread = False
+
+    if device in ui_mapping:
+        is_checked = ui_mapping[device].findChild(QCheckBox).isChecked()
+        settings_core.update_setting(f"enable {device}", is_checked)
+        
+        if not is_checked:
+            with active_threads_lock:
+                if device in active_threads:
+                    active_threads.remove(device)
+            return
+
+        settings = settings_core.get_settings()
+        if settings.get(f"enable {device}"):
+            should_start_thread = True
+            
+    elif "tracker" in device:
+        should_start_thread = True
+
+    if should_start_thread:
+        with active_threads_lock:
+            if device in active_threads:
+                print(f"Thread for device '{device}' is already running. Skipping duplication.")
+                return
+            
+            active_threads.add(device)
+            
+        t = threading.Thread(target=pipe_listener_worker, args=(device,), daemon=True)
+        t.start()
+
+#hmd modes v2///////////////////////////////////////////////////////////////////////////
+hmd_shared_layout = None
+
+def update_hmd_shared():
+    settings = settings_core.get_settings()
+
+    p_mode = settings.get('hmdpos mode', 'copy')
+    r_mode = settings.get('hmdrot mode', 'copy')
+
+    clear_layout(hmd_shared_layout)
+
+    if p_mode == "UDP" or r_mode == "UDP":
+        t = create_group_horizontal([{
+                "type"   : "spinbox",
+                "text"   : "port",
+                "min"    : 0,
+                "max"    : 999999999,
+                "default": settings.get('hmd port', 9000),
+                "steps"  : 1,
+                "func"   : lambda: settings_core.update_setting("hmd port", t.findChildren(QSpinBox)[0].value())
+            }])
+        hmd_shared_layout.addWidget(t)
+
+    if p_mode == "named pipe" or r_mode == "named pipe":
+        t = create_label({"text" : "external named pipe require the ui to be closed"})
+        hmd_shared_layout.addWidget(t)
+
+    # if p_mode == "X" or r_mode == "X":
+    #     hmd_shared_layout.addWidget(???)
+
 def hmdpos_specific_widget(layout, combo):
     settings_core.update_setting(f'hmdpos mode', combo.currentText()) 
 
@@ -951,6 +1624,8 @@ def hmdpos_specific_widget(layout, combo):
 
     mode = combo.currentText()
     settings = settings_core.get_settings()
+
+    update_hmd_shared()
 
     match mode:
         case "copy":
@@ -992,7 +1667,7 @@ def hmdpos_specific_widget(layout, combo):
             
         #     layout.addWidget(t)
 
-        case "offsets":
+        case _:
             t = create_group_horizontal([{
                     "type" : "label",
                     "text" : "",
@@ -1000,28 +1675,6 @@ def hmdpos_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-def create_hmdpos_widget():
-    settings = settings_core.get_settings()
-
-    tab_extra = QWidget()
-    layout_extra = QHBoxLayout(tab_extra)
-
-    combo_extra = create_combobox({
-            "type" : "combobox",
-            "text": "hmd position mode",
-            "default": settings.get(f'hmdpos mode', "copy"),
-            "items": ["copy", "offsets"],# "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "index change": lambda: hmdpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-        })
-    
-    layout_extra.addWidget(combo_extra)
-    hmdpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-
-    return tab_extra
-
-layout_main.addWidget(create_hmdpos_widget())
-#pos//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#rot//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 def hmdrot_specific_widget(layout, combo):
     settings_core.update_setting(f'hmdrot mode', combo.currentText()) 
 
@@ -1033,6 +1686,8 @@ def hmdrot_specific_widget(layout, combo):
 
     mode = combo.currentText()
     settings = settings_core.get_settings()
+
+    update_hmd_shared()
 
     match mode:
         case "copy":
@@ -1122,7 +1777,7 @@ def hmdrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-        case "offsets":
+        case _:
             t = create_group_horizontal([{
                     "type" : "label",
                     "text" : "",
@@ -1130,28 +1785,82 @@ def hmdrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-def create_hmdrot_widget():
+def create_hmd_pos():
+    group_widget = QWidget()
+    group_layout = QHBoxLayout(group_widget)
+
     settings = settings_core.get_settings()
 
-    tab_extra = QWidget()
-    layout_extra = QHBoxLayout(tab_extra)
+    combo = create_combobox({
+            "type" : "combobox",
+            "text": "hmd position mode",
+            "default": settings.get(f'hmdpos mode', "copy"),
+            "items": ["copy", "offsets", "UDP", "named pipe"],# "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: hmdpos_specific_widget(group_layout, combo.findChild(QComboBox))
+        })
+    
+    group_layout.addWidget(combo)
+    hmdpos_specific_widget(group_layout, combo.findChild(QComboBox))
 
-    combo_extra = create_combobox({
+    return group_widget
+
+def create_hmd_rot():
+    group_widget = QWidget()
+    group_layout = QHBoxLayout(group_widget)
+
+    settings = settings_core.get_settings()
+    
+    combo = create_combobox({
             "type" : "combobox",
             "text": "hmd rotation mode",
             "default": settings.get(f'hmdrot mode', "copy"),
-            "items": ["copy", "offsets", "gyro", "xr glasses"],# "mouse"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "index change": lambda: hmdrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+            "items": ["copy", "offsets", "UDP", "named pipe", "gyro", "xr glasses"],# "mouse"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: hmdrot_specific_widget(group_layout, combo.findChild(QComboBox))
         })
     
-    layout_extra.addWidget(combo_extra)
-    hmdrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+    group_layout.addWidget(combo)
+    hmdrot_specific_widget(group_layout, combo.findChild(QComboBox))
 
-    return tab_extra
+    return group_widget
 
-layout_main.addWidget(create_hmdrot_widget())
-#rot//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#hmd modes/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+def create_hmd_shared():
+    global hmd_shared_layout
+
+    group_widget = QWidget()
+    group_layout = QVBoxLayout(group_widget)
+
+    hmd_shared_layout = group_layout
+    
+    group_layout.addWidget(create_label({"text" : "shared"}))
+
+    return group_widget
+
+def create_hmd_widget():
+    root_widget = QWidget()
+    root_layout = QHBoxLayout(root_widget)
+
+    modes_widget = QWidget()
+    modes_layout = QVBoxLayout(modes_widget)
+
+    settings = settings_core.get_settings()
+
+    s = create_hmd_shared()
+
+    modes_layout.addWidget(create_hmd_pos())
+    modes_layout.addWidget(create_hmd_rot())
+
+    root_layout.addWidget(modes_widget)
+    root_layout.addWidget(s)
+
+    #style///
+    modes_widget.setStyleSheet("QWidget#hmd_modes { background: #1F1F1F; border: 1px solid #444; border-radius: 6px; }")
+    modes_widget.setObjectName("hmd_modes")
+    #style///
+
+    return root_widget
+
+layout_main.addWidget(set_group("Modes", [create_hmd_widget()], text = "headset position and rotation modes"))
+#hmd modes v2 ///////////////////////////////////////////////////////////////////////////
 
 def is_prosses_running(PROCESS_NAME):
     for proc in psutil.process_iter(['name']):
@@ -1261,18 +1970,11 @@ def euler_to_quat(pitch, roll, yaw):
         "z": qz
     }
 
-HMD_PACK_FORMAT = '<9d'
-CONTROLLER_PACK_FORMAT = '=37d 6?'
-TRACKER_PACK_FORMAT = '<7d'
+POS_PACKER = struct.Struct('<3d')
+ROT_PACKER = struct.Struct('<4d')
 
-HMD_PACKER = struct.Struct(HMD_PACK_FORMAT)
-CONTROLLER_PACKER = struct.Struct(CONTROLLER_PACK_FORMAT)
-TRACKER_PACKER = struct.Struct(TRACKER_PACK_FORMAT)
-
-PIPE_HMD = r'\\.\pipe\GlassVR_HMD'
-PIPE_LEFT = r'\\.\pipe\GlassVR_Left'
-PIPE_RIGHT = r'\\.\pipe\GlassVR_Right'
-PIPE_TRACKER_PREFIX = r'\\.\pipe\GlassVR_Tracker_'
+PIPE_HMD_POS = r'\\.\pipe\GlassVR_HMD_Pos'
+PIPE_HMD_ROT = r'\\.\pipe\GlassVR_HMD_Rot'
 
 def create_pipe(pipe_name):
     return win32pipe.CreateNamedPipe(
@@ -1284,80 +1986,50 @@ def create_pipe(pipe_name):
 
 def send_hmd_data():
     while True:
-        handle = None
+        h_pos = None
+        h_rot = None
         try:
-            handle = create_pipe(PIPE_HMD)
-            win32pipe.ConnectNamedPipe(handle, None)
+            h_pos = create_pipe(PIPE_HMD_POS)
+            h_rot = create_pipe(PIPE_HMD_ROT)
+            
+            win32pipe.ConnectNamedPipe(h_pos, None)
+            win32pipe.ConnectNamedPipe(h_rot, None)
             
             while True:
                 settings = settings_core.get_settings()
+                
+                pos_x = pos_y = pos_z = 0.0
+                rot_x = rot_y = rot_z = 0.0
+                rot_w = 1.0
 
-                pos_x = 0.0
-                pos_y = 0.0
-                pos_z = 0.0
-                rot_x = 0.0
-                rot_y = 0.0
-                rot_z = 0.0
-                rot_w = 0.0
-
+                #pos///
                 try:
-                    match settings['hmdpos mode']:
-                        case "copy":
-                            pass
+                    if settings['hmdpos mode'] not in ["copy", "offsets", "keyboard"]:
+                        final_transform = get_new_transform("hmd")
+                        pos_x = final_transform['pos x']
+                        pos_y = final_transform['pos y']
+                        pos_z = final_transform['pos z']
+                except: pass
 
-                        case "offsets":
-                            pass
-
-                        case "keyboard":
-                            pass
-
-                        case _:
-                            final_transform = get_new_transform("hmd")
-
-                            pos_x = final_transform['pos x']
-                            pos_y = final_transform['pos y']
-                            pos_z = final_transform['pos z']
-                except:
-                    pass
+                #rot///
                 try:
-                    match settings['hmdrot mode']:
-                        case "copy":
-                            pass
+                    if settings['hmdrot mode'] == "gyro":
+                        quat = get_gyro(settings["hmd gyro id"])
+                        rot_x, rot_y, rot_z, rot_w = quat["x"], quat["y"], quat["z"], quat["w"]
+                    elif settings['hmdrot mode'] not in ["copy", "offsets", "mouse"]:
+                        final_transform = get_new_transform("hmd")
+                        rot_x = final_transform['rot x']
+                        rot_y = final_transform['rot y']
+                        rot_z = final_transform['rot z']
+                        rot_w = final_transform['rot w']
+                except: pass
 
-                        case "offsets":
-                            pass
-
-                        case "mouse":
-                            pass
-
-                        case "gyro":
-                            quat = get_gyro(settings["hmd gyro id"])
-
-                            rot_x = quat["x"]
-                            rot_y = quat["y"]
-                            rot_z = quat["z"]
-                            rot_w = quat["w"]
-
-                        case _:
-                            final_transform = get_new_transform("hmd")
-
-                            rot_x = final_transform['rot x']
-                            rot_y = final_transform['rot y']
-                            rot_z = final_transform['rot z']
-                            rot_w = final_transform['rot w']
-                except:
-                    pass
-                hmd_ipd = settings.get('ipd', 0.0)
-                hmd_head_to_eye_dist = settings.get('head to eye dist', 0.0)
-
-                buffer = HMD_PACKER.pack(
-                    pos_x, pos_y, pos_z,
-                    rot_w, rot_x, rot_y, rot_z,
-                    hmd_ipd, hmd_head_to_eye_dist
-                )
+                buffer_pos = POS_PACKER.pack(pos_x, pos_y, pos_z)
+                buffer_rot = ROT_PACKER.pack(rot_w, rot_x, rot_y, rot_z)
                 
                 try:
-                    win32file.WriteFile(handle, buffer)
+                    win32file.WriteFile(h_pos, buffer_pos)
+                    win32file.WriteFile(h_rot, buffer_rot)
                 except pywintypes.error as e:
                     if e.winerror in [109, 232]:
                         break
@@ -1369,11 +2041,12 @@ def send_hmd_data():
             pass
 
         finally:
-            if handle:
-                try:
-                    win32pipe.DisconnectNamedPipe(handle)
-                    win32file.CloseHandle(handle)
-                except: pass
+            for h in [h_pos, h_rot]:
+                if h:
+                    try:
+                        win32pipe.DisconnectNamedPipe(h)
+                        win32file.CloseHandle(h)
+                    except: pass
             time.sleep(1)
 
 def get_hand_world_transform(device):
@@ -1396,9 +2069,6 @@ def get_hand_world_transform(device):
             list(trackers_dict.values())[0]['pos x'],
             list(trackers_dict.values())[0]['pos y'],
             list(trackers_dict.values())[0]['pos z']
-            # trackers_arr[0]['pos x'],
-            # trackers_arr[0]['pos y'],
-            # trackers_arr[0]['pos z']
         ])
         hmd_rot = R.from_matrix(list(trackers_dict.values())[0]['rotation matrix'])
 
@@ -1537,134 +2207,127 @@ def get_vk_code(bind_str):
 
     return None
 
+INPUT_PACKER = struct.Struct("<12?8d")
+SKELETAL_PACKER = struct.Struct("<25d")
+
+PIPE_BASE = "\\\\.\\pipe\\GlassVR_CONTROLLER_{side}_{type}"
+
 def send_controller_data(is_right):
-    pipe_name = PIPE_RIGHT if is_right else PIPE_LEFT
     device_name = "cr" if is_right else "cl"
-    side = "right" if is_right else "left"
+    prefix      = device_name
+    side        = "RIGHT" if is_right else "LEFT"
+
+    pipe_pos_name      = PIPE_BASE.format(side=side, type="Pos")
+    pipe_rot_name      = PIPE_BASE.format(side=side, type="Rot")
+    pipe_input_name    = PIPE_BASE.format(side=side, type="Input")
+    pipe_skeletal_name = PIPE_BASE.format(side=side, type="Skeletal")
 
     while True:
-        handle = None
+        handles = {}
         try:
-            handle = create_pipe(pipe_name)
-            win32pipe.ConnectNamedPipe(handle, None)
-            
+            handles['pos']      = create_pipe(pipe_pos_name)
+            handles['rot']      = create_pipe(pipe_rot_name)
+            handles['input']    = create_pipe(pipe_input_name)
+            handles['skeletal'] = create_pipe(pipe_skeletal_name)
+
+            for h in handles.values():
+                win32pipe.ConnectNamedPipe(h, None)
+
             while True:
                 settings = settings_core.get_settings()
 
-                pos_x = 0.0
-                pos_y = 0.0
-                pos_z = 0.0
-                rot_x = 0.0
-                rot_y = 0.0
-                rot_z = 0.0
-                rot_w = 0.0
-
+                #pos///
+                pos_x = pos_y = pos_z = 0.0
                 try:
-                    match settings[f'{device_name}pos mode']:
-                        case "copy":
-                            pass
-
-                        case "offsets":
+                    match settings.get(f'{device_name}pos mode', ''):
+                        case "copy" | "offsets":
                             pass
 
                         case "hand tracking":
-                            if settings_core.get_settings()['hand tracking'] != False:
-                                final_transform = get_hand_world_transform(device_name)
-
-                                pos_x = final_transform['pos x']
-                                pos_y = final_transform['pos y']
-                                pos_z = final_transform['pos z']
+                            if settings_core.get_settings().get('hand tracking', False):
+                                t = get_hand_world_transform(device_name)
                             else:
-                                final_transform = get_new_transform(device_name)
-
-                                pos_x = final_transform['pos x']
-                                pos_y = final_transform['pos y']
-                                pos_z = final_transform['pos z']
-                        case _:
-                            final_transform = get_new_transform(device_name)
-
-                            pos_x = final_transform['pos x']
-                            pos_y = final_transform['pos y']
-                            pos_z = final_transform['pos z']
-
-                except:
-                    pass
-                try:
-                    match settings[f'{device_name}rot mode']:
-                        case "copy":
-                            pass
-
-                        case "offsets":
-                            pass
-
-                        case "hand tracking":
-                            if settings_core.get_settings()['hand tracking'] != False:
-                                final_transform = get_hand_world_transform(device_name)
-
-                                rot_x = final_transform['rot x']
-                                rot_y = final_transform['rot y']
-                                rot_z = final_transform['rot z']
-                                rot_w = final_transform['rot w']
-                            else:
-                                final_transform = get_new_transform(device_name)
-
-                                rot_x = final_transform['rot x']
-                                rot_y = final_transform['rot y']
-                                rot_z = final_transform['rot z']
-                                rot_w = final_transform['rot w']
-
-                        case "gyro":
-                            quat = get_gyro(settings[f'{device_name} gyro id'])
-
-                            rot_x = quat["x"]
-                            rot_y = quat["y"]
-                            rot_z = quat["z"]
-                            rot_w = quat["w"]
+                                t = get_new_transform(device_name)
+                            pos_x, pos_y, pos_z = t['pos x'], t['pos y'], t['pos z']
 
                         case _:
-                            final_transform = get_new_transform(device_name)
-
-                            rot_x = final_transform['rot x']
-                            rot_y = final_transform['rot y']
-                            rot_z = final_transform['rot z']
-                            rot_w = final_transform['rot w']
-                except:
+                            t = get_new_transform(device_name)
+                            pos_x, pos_y, pos_z = t['pos x'], t['pos y'], t['pos z']
+                except Exception:
                     pass
                 
-                prefix = "cl" if side == "left" else "cr"
-                settings = settings_core.get_settings()
+                #rot///
+                rot_w, rot_x, rot_y, rot_z = 1.0, 0.0, 0.0, 0.0
+                try:
+                    match settings.get(f'{device_name}rot mode', ''):
+                        case "copy" | "offsets":
+                            pass
 
-                trigger = eval_binding(settings.get(f"{prefix}_trigger", ""))
-                a       = eval_binding(settings.get(f"{prefix}_a", "")) > 0.5
-                b       = eval_binding(settings.get(f"{prefix}_b", "")) > 0.5
-                grip    = eval_binding(settings.get(f"{prefix}_grip", "")) > 0.5
-                menu    = eval_binding(settings.get(f"{prefix}_menu", "")) > 0.5
+                        case "hand tracking":
+                            if settings_core.get_settings().get('hand tracking', False):
+                                t = get_hand_world_transform(device_name)
+                            else:
+                                t = get_new_transform(device_name)
+                            rot_x, rot_y, rot_z, rot_w = t['rot x'], t['rot y'], t['rot z'], t['rot w']
 
-                touch_mod = eval_binding(settings.get(f"{prefix}_touch mod", "")) > 0.5
+                        case "gyro":
+                            q = get_gyro(settings[f'{device_name} gyro id'])
+                            rot_x, rot_y, rot_z, rot_w = q['x'], q['y'], q['z'], q['w']
 
-                joy_x = eval_binding(settings.get(f"{prefix}_joy right", "")) - eval_binding(settings.get(f"{prefix}_joy left", ""))
-                joy_y = eval_binding(settings.get(f"{prefix}_joy up", "")) - eval_binding(settings.get(f"{prefix}_joy down", ""))
-                joy_btn   = eval_binding(settings.get(f"{prefix}_joy click", "")) > 0.5
+                        case _:
+                            t = get_new_transform(device_name)
+                            rot_x, rot_y, rot_z, rot_w = t['rot x'], t['rot y'], t['rot z'], t['rot w']
+                except Exception:
+                    pass
 
-                touch_x = eval_binding(settings.get(f"{prefix}_touch right", "")) - eval_binding(settings.get(f"{prefix}_touch left", ""))
-                touch_y = eval_binding(settings.get(f"{prefix}_touch up", "")) - eval_binding(settings.get(f"{prefix}_touch down", ""))
-                touch_btn = eval_binding(settings.get(f"{prefix}_touch click", "")) > 0.5
+                #input(index)
+                trigger     = eval_binding(settings.get(f"{prefix}_trigger", ""))
+                a           = eval_binding(settings.get(f"{prefix}_a", "")) > 0.5
+                b           = eval_binding(settings.get(f"{prefix}_b", "")) > 0.5
+                system      = eval_binding(settings.get(f"{prefix}_menu", "")) > 0.5
+                touch_mod   = eval_binding(settings.get(f"{prefix}_touch mod", "")) > 0.5
 
-                #touch: if no dedicated input for touch pad is mapped, you can hold the touch mode key and joy input will became touch input(index controller)
+                joy_x   = eval_binding(settings.get(f"{prefix}_joy right", "")) - eval_binding(settings.get(f"{prefix}_joy left",  ""))
+                joy_y   = eval_binding(settings.get(f"{prefix}_joy up", "")) - eval_binding(settings.get(f"{prefix}_joy down",  ""))
+                joy_btn = eval_binding(settings.get(f"{prefix}_joy click", "")) > 0.5
+
+                touch_x   = eval_binding(settings.get(f"{prefix}_touch right", "")) - eval_binding(settings.get(f"{prefix}_touch left",  ""))
+                touch_y   = eval_binding(settings.get(f"{prefix}_touch up", "")) - eval_binding(settings.get(f"{prefix}_touch down",  ""))
+
+                touch_force = eval_binding(settings.get(f"{prefix}_touch click",  ""))
+                
+                raw_input = eval_binding(settings.get(f"{prefix}_grip", ""))
+                grip_pull = min(1.0, raw_input * 2.0)
+                grip_force = max(0.0, (raw_input - 0.5) / 0.5)
+                
                 if touch_mod:
                     touch_x = joy_x
                     touch_y = joy_y
-                    touch_btn = joy_btn
+                    
+                    touch_force = max(eval_binding(settings.get(f"{prefix}_touch click",  "")), joy_btn)
 
-                    joy_x = 0.0
-                    joy_y = 0.0
+                    joy_x = joy_y = 0.0
+                    joy_btn = False
 
-                #skeletal input
+                trigger_btn = trigger > 0.99
+
+                #capacitive buttons
+                a_cap = a
+                b_cap = b
+                system_cap = system
+
+                trigger_cap = trigger > 0.01
+                grip_cap = grip_pull > 0.01
+
+                joy_cap = joy_btn or abs(joy_x) > 0.1 or abs(joy_y) > 0.1
+
+                touch_cap = (touch_force > 0.01) or abs(touch_x) > 0.1 or abs(touch_y) > 0.1
+
+                #skeletal
                 fingers = ["thumb", "index", "middle", "ring", "pinky"]
 
-                if settings.get("curl",True):
-                    flexion  = list(hand_data["l flexion"] if prefix == "cl" else hand_data["r flexion"])
-
+                if settings.get("curl", True):
+                    flexion = list(hand_data["l flexion"] if prefix == "cl" else hand_data["r flexion"])
                     for i, finger in enumerate(fingers):
                         val = eval_binding(settings.get(f"{prefix}_{finger}", ""))
                         if val > 0.01:
@@ -1676,125 +2339,114 @@ def send_controller_data(is_right):
 
                     if settings.get("other=grip", False):
                         highest = max(flexion[8], flexion[12], flexion[16])
-                        if grip < highest - 0.7:
-                            grip = highest - 0.7
-
+                        if grip_pull < highest - 0.7:
+                            grip_pull = highest - 0.7
                 else:
                     flexion = [0.0] * 20
-
                     for i, finger in enumerate(fingers):
                         val = eval_binding(settings.get(f"{prefix}_{finger}", ""))
                         if val > 0.01:
                             flexion[i * 4] = val
 
-                if settings.get("splay",True):
-                    splays_5 = list(hand_data["l splay"]   if prefix == "cl" else hand_data["r splay"])
+                if settings.get("splay", True):
+                    splays_5 = list(hand_data["l splay"] if prefix == "cl" else hand_data["r splay"])
+                else:
+                    splays_5 = [0.0] * 5
 
-                    if prefix == "cl":
-                        splays_5 = hand_data["l splay"]
-                    else:
-                        splays_5 = hand_data["r splay"]
+                #buffer
+                buf_pos = POS_PACKER.pack(pos_x, pos_y, pos_z)
 
-                # flexion[0] = 1.0 #thumb
-                # flexion[4] = 1.0 #index
-                # flexion[8] = 1.0 #middle
-                # flexion[12] = 1.0 #ring
-                # flexion[16] = 1.0 #pinky
+                buf_rot = ROT_PACKER.pack(rot_w, rot_x, rot_y, rot_z)
 
-                buffer = CONTROLLER_PACKER.pack(
-                    float(pos_x), float(pos_y), float(pos_z),
-                    float(rot_w), float(rot_x), float(rot_y), float(rot_z),
+                buf_input = INPUT_PACKER.pack(
+                    bool(a), bool(b), bool(system),
+                    bool(joy_btn), bool(trigger_btn),
+                    bool(a_cap), bool(b_cap), bool(system_cap),
+                    bool(joy_cap), bool(trigger_cap),
+                    bool(touch_cap), bool(grip_cap),
                     float(joy_x), float(joy_y),
                     float(touch_x), float(touch_y),
                     float(trigger),
+                    float(touch_force),
+                    float(grip_pull),
+                    float(grip_force),
+                )
+
+                buf_skeletal = SKELETAL_PACKER.pack(
                     *[float(f) for f in flexion],
                     *[float(s) for s in splays_5],
-                    bool(a), bool(b), bool(menu),
-                    bool(joy_btn), bool(touch_btn), bool(grip)
                 )
 
                 try:
-                    win32file.WriteFile(handle, buffer)
+                    win32file.WriteFile(handles['pos'], buf_pos)
+                    win32file.WriteFile(handles['rot'], buf_rot)
+                    win32file.WriteFile(handles['input'], buf_input)
+                    win32file.WriteFile(handles['skeletal'], buf_skeletal)
                 except pywintypes.error as e:
-                    if e.winerror in [109, 232]:
+                    if e.winerror in (109, 232):
                         break
                     raise
+
                 time.sleep(0.001)
-                
-        except Exception as e:
+
+        except Exception:
             pass
         finally:
-            if handle:
+            for h in handles.values():
                 try:
-                    win32pipe.DisconnectNamedPipe(handle)
-                    win32file.CloseHandle(handle)
-                except: pass
+                    win32pipe.DisconnectNamedPipe(h)
+                    win32file.CloseHandle(h)
+                except Exception:
+                    pass
             time.sleep(1)
 
 def send_tracker_data(tracker_id):
-    pipe_name = f"{PIPE_TRACKER_PREFIX}{tracker_id}"
+    pipe_pos_name = f"\\\\.\\pipe\\GlassVR_TRACKER_{tracker_id}_Pos"
+    pipe_rot_name = f"\\\\.\\pipe\\GlassVR_TRACKER_{tracker_id}_Rot"
     
     while True:
-        handle = None
+        h_pos = None
+        h_rot = None
         try:
-            handle = create_pipe(pipe_name)
-            win32pipe.ConnectNamedPipe(handle, None)
+            h_pos = create_pipe(pipe_pos_name)
+            h_rot = create_pipe(pipe_rot_name)
+            
+            win32pipe.ConnectNamedPipe(h_pos, None)
+            win32pipe.ConnectNamedPipe(h_rot, None)
             
             while True:
                 settings = settings_core.get_settings()
+                device_key = f'{tracker_id}tracker'
 
-                final_transform = get_new_transform(f'{tracker_id}tracker')
-                pos_x = final_transform['pos x']
-                pos_y = final_transform['pos y']
-                pos_z = final_transform['pos z']
-                rot_x = final_transform['rot x']
-                rot_y = final_transform['rot y']
-                rot_z = final_transform['rot z']
-                rot_w = final_transform['rot w']
+                final_transform = get_new_transform(device_key)
+                pos_x, pos_y, pos_z = final_transform['pos x'], final_transform['pos y'], final_transform['pos z']
+                rot_x, rot_y, rot_z, rot_w = final_transform['rot x'], final_transform['rot y'], final_transform['rot z'], final_transform['rot w']
+
+                #pos///
                 try:
-                    match settings.get(f"{tracker_id}trackerpos mode", "copy"):
-                        case "copy":
-                            pass
+                    pos_mode = settings.get(f"{device_key}pos mode", "copy")
+                    if pos_mode == "bad apple":
+                        data = BAD_APPLE_STATE.get(device_key, {"pos x": 0, "pos y": 0, "pos z": 0})
+                        pos_x, pos_y, pos_z = data["pos x"], data["pos y"], data["pos z"]
+                except: pass
 
-                        case "offsets":
-                            pass
-
-                        case "hip emulation":
-                            pass
-
-                        case _:
-                            final_transform = get_new_transform(f'{tracker_id}tracker')
-
-                            pos_x = final_transform['pos x']
-                            pos_x = final_transform['pos y']
-                            pos_x = final_transform['pos z']
-                except:
-                    pass
+                #rot///
                 try:
-                    match settings.get(f"{tracker_id}trackerrot mode", "copy"):
-                        case "copy":
-                            pass
+                    rot_mode = settings.get(f"{device_key}rot mode", "copy")
+                    if rot_mode == "gyro":
+                        quat = get_gyro(settings.get(f'{device_key} gyro id', ""))
+                        rot_x, rot_y, rot_z, rot_w = quat["x"], quat["y"], quat["z"], quat["w"]
+                    elif rot_mode == "bad apple":
+                        data = BAD_APPLE_STATE.get(device_key, {"on": False})
+                        rot_x = 1.0 if data["on"] else 0.0
+                except: pass
 
-                        case "offsets":
-                            pass
-
-                        case "gyro":
-                            quat = get_gyro(settings.get(f'{tracker_id}tracker gyro id',""))
-
-                            rot_x = quat["x"]
-                            rot_y = quat["y"]
-                            rot_z = quat["z"]
-                            rot_w = quat["w"]
-
-                except:
-                    pass
-                buffer = TRACKER_PACKER.pack(
-                    float(pos_x), float(pos_y), float(pos_z),
-                    float(rot_w), float(rot_x), float(rot_y), float(rot_z)
-                )
+                buffer_pos = POS_PACKER.pack(float(pos_x), float(pos_y), float(pos_z))
+                buffer_rot = ROT_PACKER.pack(float(rot_w), float(rot_x), float(rot_y), float(rot_z))
                 
                 try:
-                    win32file.WriteFile(handle, buffer)
+                    win32file.WriteFile(h_pos, buffer_pos)
+                    win32file.WriteFile(h_rot, buffer_rot)
                 except pywintypes.error as e:
                     if e.winerror in [109, 232]:
                         break
@@ -1803,13 +2455,16 @@ def send_tracker_data(tracker_id):
                 time.sleep(0.001)
                 
         except Exception as e:
-            pass
+            print(f"Error in tracker {tracker_id} pipe: {e}")
+            pass 
+
         finally:
-            if handle:
-                try:
-                    win32pipe.DisconnectNamedPipe(handle)
-                    win32file.CloseHandle(handle)
-                except: pass
+            for h in [h_pos, h_rot]:
+                if h:
+                    try:
+                        win32pipe.DisconnectNamedPipe(h)
+                        win32file.CloseHandle(h)
+                    except: pass
             time.sleep(1)
 
 def start_send_data():
@@ -2004,10 +2659,10 @@ def _process_hand(lm_list, is_right, img_w, img_h):
     splay_range = 0.1
     splay = [0.0] * 5
 
-    p_w = np.array(P3[0],  dtype=float) 
+    p_w = np.array(P3[0], dtype=float) 
     tips = [
-        np.array(P3[4],  dtype=float),#thumb
-        np.array(P3[8],  dtype=float),#index
+        np.array(P3[4], dtype=float),#thumb
+        np.array(P3[8], dtype=float),#index
         np.array(P3[12], dtype=float),#mid
         np.array(P3[16], dtype=float),#ring
         np.array(P3[20], dtype=float)#pinky
@@ -2124,7 +2779,6 @@ def camera_loop():
             time.sleep(0.0001)
 
     except Exception as e:
-        import traceback
         camera_running = False
     finally:
         cap.release()
@@ -2150,16 +2804,6 @@ def start_camera():
         if not camera_ready.wait(timeout=3.0):
             camera_running = False
 #camera//////////////////////////////////////////////////////////////////////////////////////////////////
-
-first_label = create_label({
-    "text" : "steamvr is not running :(", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-})
-
-layout_main.addWidget(create_label({
-    "text" : "---------Resolution---------", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-}))
 
 res = create_group_horizontal([
     {
@@ -2190,12 +2834,8 @@ res = create_group_horizontal([
         "func"  : lambda: settings_core.update_setting("refresh rate", res.findChildren(QSpinBox)[2].value())
     }
 ])
-layout_main.addWidget(res)
+layout_main.addWidget(set_group("Display", [res], text = "set how tall, wide and fast you want the display to be! refrash rate also locks your max fps"))
 
-layout_main.addWidget(create_label({
-    "text" : "---------Misc---------", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-}))
 misc_group1 = create_group_checkbox([
     {
         "text" : "Stereoscopic(SBS)", 
@@ -2208,8 +2848,6 @@ misc_group1 = create_group_checkbox([
         "func"  : lambda: settings_core.update_setting("fullscreen", misc_group1.findChildren(QCheckBox)[1].isChecked())
     }
 ])
-layout_main.addWidget(misc_group1)
-
 misc = create_group_doublespinbox([
     {
         "text" : "IPD", 
@@ -2228,7 +2866,6 @@ misc = create_group_doublespinbox([
         "func" : lambda: settings_core.update_setting("head to eye dist", misc.findChildren(QDoubleSpinBox)[1].value()) 
     }
 ])
-layout_main.addWidget(misc)
 
 def calculate_vr_fov():
     settings_core.update_setting("convergence", recommended_label.findChildren(QDoubleSpinBox)[0].value())
@@ -2289,137 +2926,341 @@ recommended_label = create_group_horizontal([
         "func"  : lambda: calculate_vr_fov()
     }])
 
-layout_main.addWidget(recommended_label)
+layout_main.addWidget(set_group("Misc", [misc_group1,misc,recommended_label], 
+                                text = "if using stereo(SBS), resolution becomes per eye so dont use 3840 and use 1920 instead, also some specific games will not work if ipd is set to 0.0"))
 
-layout_main.addWidget(create_label({
-    "text" : "---------Offsets---------", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-}))
-offsets_world = create_group_horizontal([
-    {
-        "type" : "label",
-        "text":"world",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "X", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset world x'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset world x", offsets_world.findChildren(QDoubleSpinBox)[0].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Y", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset world y'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset world y", offsets_world.findChildren(QDoubleSpinBox)[1].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Z", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset world z'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset world z", offsets_world.findChildren(QDoubleSpinBox)[2].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Yaw", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset world yaw'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset world yaw", offsets_world.findChildren(QDoubleSpinBox)[3].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Pitch", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset world pitch'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset world pitch", offsets_world.findChildren(QDoubleSpinBox)[4].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Roll", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset world roll'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset world roll", offsets_world.findChildren(QDoubleSpinBox)[5].value())
-    }
-])
-layout_main.addWidget(offsets_world)
+#offsets ui//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+offsets_ui_dict = {}
+def create_offset_ui(device, style = None):
+    settings = settings_core.get_settings()
 
-offsets_local = create_group_horizontal([
-    {
-        "type" : "label",
-        "text":"local",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "X", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset local x'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset local x", offsets_local.findChildren(QDoubleSpinBox)[0].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Y", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset local y'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset local y", offsets_local.findChildren(QDoubleSpinBox)[1].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Z", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset local z'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset local z", offsets_local.findChildren(QDoubleSpinBox)[2].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Yaw", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset local yaw'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset local yaw", offsets_local.findChildren(QDoubleSpinBox)[3].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Pitch", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset local pitch'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset local pitch", offsets_local.findChildren(QDoubleSpinBox)[4].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Roll", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['hmd offset local roll'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("hmd offset local roll", offsets_local.findChildren(QDoubleSpinBox)[5].value())
-    }
-])
-layout_main.addWidget(offsets_local)
+    if style == None:
+        style = offsets_style
+
+    world = create_group_horizontal([
+        {
+            "type" : "doublespinbox",
+            "text" : "X", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset world x", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset world x", world.findChildren(QDoubleSpinBox)[0].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Y", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset world y", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset world y", world.findChildren(QDoubleSpinBox)[1].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Z", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset world z", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset world z", world.findChildren(QDoubleSpinBox)[2].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Yaw", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset world yaw", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset world yaw", world.findChildren(QDoubleSpinBox)[3].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Pitch", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset world pitch", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset world pitch", world.findChildren(QDoubleSpinBox)[4].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Roll", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset world roll", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset world roll", world.findChildren(QDoubleSpinBox)[5].value())
+        }
+    ])
+
+    local = create_group_horizontal([
+        {
+            "type" : "doublespinbox",
+            "text" : "X", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset local x", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset local x", local.findChildren(QDoubleSpinBox)[0].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Y", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset local y", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset local y", local.findChildren(QDoubleSpinBox)[1].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Z", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset local z", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset local z", local.findChildren(QDoubleSpinBox)[2].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Yaw", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset local yaw", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset local yaw", local.findChildren(QDoubleSpinBox)[3].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Pitch", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset local pitch", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset local pitch", local.findChildren(QDoubleSpinBox)[4].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Roll", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} offset local roll", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} offset local roll", local.findChildren(QDoubleSpinBox)[5].value())
+        }
+    ])
+
+    playspace_widget = QWidget()
+    playspace_layout = QHBoxLayout(playspace_widget)
+
+    reset_method = create_combobox({
+        "text" : "Reset Source", #add reset by serial
+        "default" : settings.get(f"{device} playspace reset method","Headset"),
+        "items" : ["Headset", "Fixed Position"],
+        "index change" : lambda: settings_core.update_setting(f"{device} playspace reset method", reset_method.findChildren(QComboBox)[0].currentText())
+    })
+
+    playspace = create_group_horizontal([
+        {
+            "type" : "doublespinbox",
+            "text" : "X", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} playspace x", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} playspace x", playspace.findChildren(QDoubleSpinBox)[0].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Y", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} playspace y", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} playspace y", playspace.findChildren(QDoubleSpinBox)[1].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Z", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} playspace z", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} playspace z", playspace.findChildren(QDoubleSpinBox)[2].value())
+        },
+        {
+            "type" : "doublespinbox",
+            "text" : "Yaw", 
+            "min":-999999999, 
+            "max":999999999, 
+            "default": settings.get(f"{device} playspace yaw", 0.0),
+            "steps" : 0.01,
+            "func"  : lambda: settings_core.update_setting(f"{device} playspace yaw", playspace.findChildren(QDoubleSpinBox)[3].value())
+        },
+    ])
+
+    playspace_layout.addWidget(BindingGroupWidget(device, "reset playspace"))
+    playspace_layout.addWidget(reset_method)
+    playspace_layout.addWidget(playspace)
+
+    hover = ""
+    match device:
+        case "hmd":
+            group_name = "Offsets"
+            hover = "Reset Method should be set to 'Fixed Position' here, increment y and click reset until your floor level feels correct"
+        case "cr":
+            group_name = "Offsets(Right)"
+            hover = "Reset Method should be set to 'Headset' here, to reset move your controller(target) above or below your headset so that its x and z are aligned with your headset(source) change y to adjust how high or low the reset point (avoid changing x z)"
+        case "cl":
+            group_name = "Offsets(Left)"
+            hover = "Reset Method should be set to 'Headset' here, to reset move your controller(target) above or below your headset so that its x and z are aligned with your headset(source) change y to adjust how high or low the reset point (avoid changing x z)"
+        case _:
+            group_name = "Offsets"
+            hover = "Reset Method should be set to 'Headset' here, to reset move your tracker(target) above or below your headset so that its x and z are aligned with your headset(source) change y to adjust how high or low the reset point (avoid changing x z)"
+
+    world_group = set_group("World", [world],"h",style, text = "this moves a device world position and rotation")
+    local_group = set_group("Local", [local],"h",style, text = "imagin that your source position or rotation is the parent and your emulated device is the child connected to them, if the parent changes its rotation the child will change both its position and rotation")
+    playspace_group = set_group("Play Space", [playspace_widget],"h",style, text = hover)
+
+    final_widget = set_group(group_name, [world_group, local_group, playspace_group],"v",style)
+    
+    offsets_ui_dict.update({device: {"world" : world_group, "local" : local_group, "playspace" : playspace_group}})
+
+    return final_widget
+
+def update_offsets_ui():
+    settings = settings_core.get_settings()
+    
+    for device, ui_groups in offsets_ui_dict.items():
+        
+        if "world" in ui_groups and ui_groups["world"]:
+            world_spinboxes = ui_groups["world"].findChildren(QDoubleSpinBox)
+            if len(world_spinboxes) >= 6:
+                for sb in world_spinboxes[:6]: sb.blockSignals(True)
+                
+                world_spinboxes[0].setValue(settings.get(f"{device} offset world x", 0.0))
+                world_spinboxes[1].setValue(settings.get(f"{device} offset world y", 0.0))
+                world_spinboxes[2].setValue(settings.get(f"{device} offset world z", 0.0))
+                world_spinboxes[3].setValue(settings.get(f"{device} offset world yaw", 0.0))
+                world_spinboxes[4].setValue(settings.get(f"{device} offset world pitch", 0.0))
+                world_spinboxes[5].setValue(settings.get(f"{device} offset world roll", 0.0))
+                
+                for sb in world_spinboxes[:6]: sb.blockSignals(False)
+
+        if "local" in ui_groups and ui_groups["local"]:
+            local_spinboxes = ui_groups["local"].findChildren(QDoubleSpinBox)
+            if len(local_spinboxes) >= 6:
+                for sb in local_spinboxes[:6]: sb.blockSignals(True)
+                
+                local_spinboxes[0].setValue(settings.get(f"{device} offset local x", 0.0))
+                local_spinboxes[1].setValue(settings.get(f"{device} offset local y", 0.0))
+                local_spinboxes[2].setValue(settings.get(f"{device} offset local z", 0.0))
+                local_spinboxes[3].setValue(settings.get(f"{device} offset local yaw", 0.0))
+                local_spinboxes[4].setValue(settings.get(f"{device} offset local pitch", 0.0))
+                local_spinboxes[5].setValue(settings.get(f"{device} offset local roll", 0.0))
+                
+                for sb in local_spinboxes[:6]: sb.blockSignals(False)
+
+        if "playspace" in ui_groups and ui_groups["playspace"]:
+            playspace_spinboxes = ui_groups["playspace"].findChildren(QDoubleSpinBox)
+            if len(playspace_spinboxes) >= 4:
+                for sb in playspace_spinboxes[:4]: sb.blockSignals(True)
+                
+                playspace_spinboxes[0].setValue(settings.get(f"{device} playspace x", 0.0))
+                playspace_spinboxes[1].setValue(settings.get(f"{device} playspace y", 0.0))
+                playspace_spinboxes[2].setValue(settings.get(f"{device} playspace z", 0.0))
+                playspace_spinboxes[3].setValue(settings.get(f"{device} playspace yaw", 0.0))
+                
+                for sb in playspace_spinboxes[:4]: sb.blockSignals(False)
+
+#expand on this!
+class UiUpdater(QObject):
+    trigger_ui_update = pyqtSignal()
+ui_updater = UiUpdater()
+ui_updater.trigger_ui_update.connect(update_offsets_ui)
+#offsets ui//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#streaming/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+def create_streaming():
+    dynamic_container = QWidget()
+    settings = settings_core.get_settings()
+
+    streaming = create_group_horizontal([
+        {
+            "type" : "checkbox", 
+            "text" : "mirror to window", 
+            "default": settings.get("mirror window", False),
+            "enabled" : True,
+            "func"  : lambda: settings_core.update_setting("mirror window", streaming.findChildren(QCheckBox)[0].isChecked())
+        },
+        {
+            "type" : "checkbox", 
+            "text" : "mirror to web", 
+            "default": settings.get("mirror web", False),
+            "enabled" : True,
+            "func"  : lambda: settings_core.update_setting("mirror web", streaming.findChildren(QCheckBox)[1].isChecked())
+        },
+
+        {
+            "type" : "checkbox", 
+            "text" : "start mirrored window fullscreen", 
+            "default": settings.get("start mirror window fullscreen", False),
+            "enabled" : True,
+            "func"  : lambda: settings_core.update_setting("start mirror window fullscreen", streaming.findChildren(QCheckBox)[2].isChecked())
+        },
+        {
+            "type"   : "spinbox",
+            "text"   : "start mirror window monitor index",
+            "min"    : 0,
+            "max"    : 999999999,
+            "default": settings.get('start mirror window monitor index', 1),
+            "steps"  : 1,
+            "func"   : lambda: settings_core.update_setting("start mirror window monitor index", streaming.findChildren(QSpinBox)[0].value())
+        },
+        {
+            "type"   : "spinbox",
+            "text"   : "web port",
+            "min"    : 0,
+            "max"    : 999999999,
+            "default": settings.get('mirror web port', 9999),
+            "steps"  : 1,
+            "func"   : lambda: settings_core.update_setting("mirror web port", streaming.findChildren(QSpinBox)[1].value())
+        },
+        {
+            "type"   : "spinbox",
+            "text"   : "bitrate",
+            "min"    : 1,
+            "max"    : 100,
+            "default": settings.get('mirror web bitrate', 100),
+            "steps"  : 1,
+            "func"   : lambda: settings_core.update_setting("mirror web bitrate", streaming.findChildren(QSpinBox)[2].value())
+        },
+        {
+            "type"   : "doublespinbox",
+            "text"   : "res scale",
+            "min"    : 0.1,
+            "max"    : 1.0,
+            "default": settings.get('mirror web scale', 1.0),
+            "steps"  : 0.1,
+            "func"   : lambda: settings_core.update_setting("mirror web scale", streaming.findChildren(QDoubleSpinBox)[0].value())
+        },
+        {
+            "type" : "button", 
+            "text" : "open stream", 
+            "enabled" : True,
+            "func"  : lambda: webbrowser.open(f"http://127.0.0.1:{settings.get('mirror web port', 9999)}")
+        }
+    ])
+
+    return streaming
+
+streaming_block = create_streaming()
+layout_main.addWidget(set_group("Streaming", [streaming_block], 
+                                text = "(experimental: slow please avoid!!!) mirror to window: pops out the 'headset window' (alt+enter to fullscreen) mirror to url: streams the 'headset window' to a web page(lower bitrate/res = faster streaming), you can also use Sunshine + moonlight-web-stream for faster performance"))
+#streaming/////////////////////////////////////////////////////////////////////////////////////////////////////////////\
+offsets_hmd = create_offset_ui("hmd")
+layout_main.addWidget(offsets_hmd)
 #main/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #driver/////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2473,6 +3314,7 @@ def get_activateMultipleDrivers_true():
 
 set_activateMultipleDrivers_true()
 
+#HOW DO PEOPLE KEEP INSTALLING STEAMVR ON DISK D????????????????????????????????????????????????????????????????????????
 def install_driver():
     if getattr(sys, 'frozen', False):
         script_dir = os.path.dirname(sys.executable)
@@ -2480,35 +3322,41 @@ def install_driver():
         script_dir = os.path.dirname(os.path.abspath(__file__))
 
     source_folder = os.path.join(script_dir, "assets", "driver to copy")
-
     destination_folder = settings_core.get_settings()['drivers path']
     
     if not os.path.exists(source_folder):
-        update_install_and_config_label(True)
+        update_install_and_config_label("driver folder 'assets/driver to copy' is missing!")
+        return
+
+    if not os.path.exists(destination_folder):
+        update_install_and_config_label("destination path does not exist! is steamvr on disk c?")
         return
 
     try:
         shutil.copytree(source_folder, destination_folder, dirs_exist_ok=True)
-        update_install_and_config_label(False)
+        update_install_and_config_label(None)
+    except PermissionError:
+        update_install_and_config_label("permission denied! close Steam and SteamVR completely!")
     except Exception as e:
-        update_install_and_config_label(True)
+        update_install_and_config_label(f"install failed: {str(e)}")
 
 def remove_driver():
     folder_path = settings_core.get_settings()['drivers path'] + '/glassvrdriver'
 
     if not os.path.exists(folder_path):
-            return
+        return
 
     try:
         shutil.rmtree(folder_path)
-        update_install_and_config_label(False)
-
-    except:
-        update_install_and_config_label(True)
+        update_install_and_config_label(None)
+    except PermissionError:
+        update_install_and_config_label("permission denied! close Steam and SteamVR completely!")
+    except Exception as e:
+        update_install_and_config_label(f"uninstall failed: {str(e)}")
 
 tab_driver = QWidget()
 layout_driver = QVBoxLayout(tab_driver)
-layout_driver.setSpacing(0)
+set_style(tab_driver, "{ background: #1F1F1F; border: 0px solid #444; border-radius: 0px; }", "t")
 
 def folder_exist(path: str):
     return os.path.isdir(path)
@@ -2528,25 +3376,21 @@ driver_path = create_lineedit({
     "default" : settings_core.get_settings()['drivers path'],
     "func" : lambda: driver_path_changed()
 })
-layout_driver.addWidget(driver_path)
 vr_config_path = create_lineedit({
     "text" : "steam config folder path",
     "default" : settings_core.get_settings()['vrsettings path'],
     "func" : lambda: config_path_changed()
 })
-layout_driver.addWidget(vr_config_path)
 
 install_label = create_label({
     "text" : "driver is not installed, click to install to install!", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-layout_driver.addWidget(install_label)
 
 config_label = create_label({
     "text" : "config", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-layout_driver.addWidget(config_label)
 
 install_buttons = create_group_horizontal([
     {
@@ -2562,46 +3406,50 @@ install_buttons = create_group_horizontal([
         "func"  : lambda: remove_driver()
     }
 ])
-layout_driver.addWidget(install_buttons)
 
-def update_install_and_config_label(failed = False):
-    install_leb =  install_label.findChild(QLabel)
-    config_leb =  config_label.findChild(QLabel)
+layout_driver.addWidget(set_group("Driver", [driver_path, vr_config_path, install_label, config_label, install_buttons], text = "click reinstall on every new version to update the driver! also if you somehow installed steamvr not on disk c youll need to change the steamvr drivers folder path(normaly steam wont let you do that but some people just dont play by the rules ;P)"))
 
-    if failed:
-        install_leb.setText("action failed, close steam completely and try again")
+def update_install_and_config_label(error_message = None):
+    install_leb = install_label.findChild(QLabel)
+    config_leb = config_label.findChild(QLabel)
+
+    if error_message is not None:
+        install_leb.setText(f"ACTION FAILED: {error_message}")
+        install_leb.setStyleSheet("color: red;")
         install_buttons.findChildren(QPushButton)[0].setText("install")
+        
     else:
         if folder_exist(settings_core.get_settings()['drivers path'] + "/glassvrdriver"):
-            install_leb.setText("driver is installed!")
+            install_leb.setText("driver is installed ;P")
+            install_leb.setStyleSheet("color: green")
+
             install_buttons.findChildren(QPushButton)[0].setText("reinstall")
             install_buttons.findChildren(QPushButton)[1].setEnabled(True)
         else:
-            install_leb.setText("driver is not installed, click to install to install!")
+            install_leb.setText("driver not found, click to install to install/update!")
+            install_leb.setStyleSheet("color: yellow")
+
             install_buttons.findChildren(QPushButton)[0].setText("install")
             install_buttons.findChildren(QPushButton)[1].setEnabled(False)
 
-    #//////////////////////////////////////////////////////////////////////////////////////////////
-
     if get_activateMultipleDrivers_true():
-        config_leb.setText("steamvr.vrsettings has activateMultipleDrivers : true, all good ;P")
+        config_leb.setText('steamvr.vrsettings has: ("activateMultipleDrivers" : true) all good ;P')
+        config_leb.setStyleSheet("color: green")
     else:
         if folder_exist(settings_core.get_settings()['drivers path'] + "/glassvrdriver"):
-            config_leb.setText("steamvr.vrsettings is missing: activateMultipleDrivers : false, set the correct path and click to reinstall to add it!")
+            config_leb.setText('steamvr.vrsettings is missing: ("activateMultipleDrivers" : true) set the correct path and click to reinstall to add it!')
+            config_leb.setStyleSheet("color: yellow")
         else:
-            config_leb.setText("steamvr.vrsettings is missing: activateMultipleDrivers : false, set the correct path and click to install to add it!")
+            config_leb.setText('steamvr.vrsettings is missing: ("activateMultipleDrivers" : true) set the correct path and click to install to add it!')
+            config_leb.setStyleSheet("color: yellow")
 
 update_install_and_config_label()
 
-layout_driver.addWidget(create_label({
-    "text" : "---------Config---------", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-}))
-layout_driver.addWidget(create_button({
+c_button = create_button({
         "text" : "reset config(ui won't update)",
         "enabled" : True,
         "func"  : lambda: settings_core.reset_settings()
-    }))
+    })
 config = create_group_horizontal([{
         "type" : "button", 
         "text" : "open config", 
@@ -2612,7 +3460,6 @@ config = create_group_horizontal([{
      "text" :settings_core.get_path().removesuffix("\settings.json"),
      "alignment" : Qt.AlignmentFlag.AlignCenter
     }])
-layout_driver.addWidget(config)
 
 config2 = create_group_horizontal([{
         "type" : "button", 
@@ -2624,10 +3471,12 @@ config2 = create_group_horizontal([{
      "text" : settings_core.get_settings()["vrsettings path"],
      "alignment" : Qt.AlignmentFlag.AlignCenter
     }])
-layout_driver.addWidget(config2)
+
+layout_driver.addWidget(set_group("Config", [c_button, config, config2], text = "if you hate graphical user interfaces(gui's) you can manually change each setting in settings.json file"))
 
 #credits/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 def get_public_ip():
+    #for "network staff" ofcourse ;P
     try:
         response = requests.get('https://api.ipify.org')
         return response.text
@@ -2782,7 +3631,7 @@ def create_credits():
     create_group = QWidget()
     layout_credits1 = QVBoxLayout(create_group)
 
-    label = QLabel("Made by: DaniXmir")# ;P
+    label = QLabel("Made by: DaniXmir") # ;P
     label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
     layout_credits1.addWidget(label)
 
@@ -2791,40 +3640,54 @@ def create_credits():
     else:
         script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    image_path = os.path.join(script_dir, "assets", "fix")
+    image_path = os.path.join(script_dir, "assets", "fix anim.gif")
 
-    image_button = QPushButton()
-    image = QPixmap(image_path)
-    scaled_pixmap = image.scaled(
-        100, 100, 
-        Qt.AspectRatioMode.KeepAspectRatio, 
-        Qt.TransformationMode.FastTransformation
-    )
-    image_button.setIcon(QIcon(scaled_pixmap))
-    image_button.setIconSize(QSize(100, 100))
-    image_button.setStyleSheet("QPushButton { border: none; background: none; }")
-    image_button.clicked.connect(lambda: click())
-    layout_credits1.addWidget(image_button, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
+    gif_label = QLabel()
+    gif_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    
+    movie = QMovie(image_path)
+    
+    gif_label.movie_ref = movie 
+    
+    def handle_frame_changed(frame_number):
+        current_pixmap = movie.currentPixmap()
+        scaled_pixmap = current_pixmap.scaled(
+            100, 100, 
+            Qt.AspectRatioMode.KeepAspectRatio, 
+            Qt.TransformationMode.FastTransformation
+        )
+        gif_label.setPixmap(scaled_pixmap)
+
+    movie.frameChanged.connect(handle_frame_changed)
+    movie.start()
+
+    gif_label.mousePressEvent = lambda event: click()
+    gif_label.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    layout_credits1.addWidget(gif_label, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
 
     group_links = QWidget()
     layout_link = QHBoxLayout(group_links)
     
-    #todo: add icons!
-    link = '<a href="https://github.com/DaniXmir/GlassVr" style="color: #4da6ff;">github!</a>'
-    label1 = QLabel("open the project on " + link)
+    link1 = '<a href="https://github.com/DaniXmir/GlassVr" style="color: #4da6ff;">github!</a>'
+    label1 = QLabel("open the project on " + link1)
     label1.setTextFormat(Qt.TextFormat.RichText)
     label1.setOpenExternalLinks(True)
     label1.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
-    layout_link.addWidget(label1)
 
-    link = '<a href="https://discord.gg/jyvWdKBpPj" style="color: #4da6ff;">discord server!</a>'
-    label2 = QLabel("join the " + link)
+    link2 = '<a href="https://discord.gg/jyvWdKBpPj" style="color: #4da6ff;">discord server!</a>'
+    label2 = QLabel("join the " + link2)
     label2.setTextFormat(Qt.TextFormat.RichText)
     label2.setOpenExternalLinks(True)
     label2.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
-    layout_link.addWidget(label2)
 
-    layout_credits1.addWidget(group_links)
+    link3 = '<a href="https://www.youtube.com/@danixmir106" style="color: #4da6ff;">youtube!</a>'
+    label3 = QLabel("subscribe on " + link3)
+    label3.setTextFormat(Qt.TextFormat.RichText)
+    label3.setOpenExternalLinks(True)
+    label3.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter)
+
+    layout_credits1.addWidget(set_group("Links", [label1, label2, label3], "h", text = "you did subscribe right????"))
 
     return create_group
 layout_credits.addWidget(create_credits())
@@ -2841,36 +3704,108 @@ scroll_controllers.setWidget(tab_controllers)
 
 scroll_controllers.setMinimumWidth(1800)
 
-#/////////////
-tab_enable = QWidget()
-layout_enable = QHBoxLayout(tab_enable)
-
-check_cr = create_checkbox(
+check_cl = create_checkbox(
     {
         "text" : "enable left controller", 
         "default" : settings_core.get_settings()['enable cl'], 
-        "func" : lambda: settings_core.update_setting("enable cl",check_cr.findChild(QCheckBox).isChecked())
+        "func" : lambda: enable_device("cl")
     })
-layout_enable.addWidget(check_cr)
 
-label3 = create_label({
-    "text" : "<- left (enable) right ->", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-})
-layout_enable.addWidget(label3)
-
-check_cl = create_checkbox(
+check_cr = create_checkbox(
     {
         "text" : "enable right controller", 
         "default" : settings_core.get_settings()['enable cr'], 
-        "func" : lambda: settings_core.update_setting("enable cr",check_cl.findChild(QCheckBox).isChecked())
+        "func" : lambda: enable_device("cr")
     })
-layout_enable.addWidget(check_cl)
-layout_controllers.addWidget(tab_enable)
 
-#////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#cr modes//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#pos////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+layout_controllers.addWidget(set_group("Enable", [check_cr, check_cl], text = "enables right and left controller emulation respectively"))
+
+#controllers modes v2////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+cr_shared_layout = None
+cl_shared_layout = None
+
+def update_cr_shared():
+    settings = settings_core.get_settings()
+    p_mode = settings.get('crpos mode', 'copy')
+    r_mode = settings.get('crrot mode', 'copy')
+
+    clear_layout(cr_shared_layout)
+
+    #always///
+    input_comm = create_combobox({
+        "text"   : "input communication method",
+        "default": settings.get("crinput mode","app (named pipe)"),
+        "items" : ["app (named pipe)", "UDP"],
+        "index change" : lambda: settings_core.update_setting("crinput mode", input_comm.findChildren(QComboBox)[0].currentText())
+    })
+    cr_shared_layout.addWidget(input_comm)
+
+    skeletal_comm = create_combobox({
+        "text"   : "skeletal communication method",
+        "default": settings.get("crskeletal mode","app (named pipe)"),
+        "items" : ["app (named pipe)", "UDP"],
+        "index change" : lambda: settings_core.update_setting("crskeletal mode", skeletal_comm.findChildren(QComboBox)[0].currentText())
+    })
+    cr_shared_layout.addWidget(skeletal_comm)
+    #always///
+
+    if p_mode == "UDP" or r_mode == "UDP":
+        t = create_group_horizontal([{
+                "type"   : "spinbox",
+                "text"   : "port",
+                "min"    : 0,
+                "max"    : 999999999,
+                "default": settings.get('cr port', 9001),
+                "steps"  : 1,
+                "func"   : lambda: settings_core.update_setting("cr port", t.findChildren(QSpinBox)[0].value())
+            }])
+        cr_shared_layout.addWidget(t)
+
+    if p_mode == "named pipe" or r_mode == "named pipe":
+        t = create_label({"text" : "external named pipe require the ui to be closed"})
+        cr_shared_layout.addWidget(t)
+
+def update_cl_shared():
+    settings = settings_core.get_settings()
+    p_mode = settings.get('clpos mode', 'copy')
+    r_mode = settings.get('clrot mode', 'copy')
+
+    clear_layout(cl_shared_layout)
+
+    #always///
+    input_comm = create_combobox({
+        "text"   : "input communication method",
+        "default": settings.get("clinput mode","app (named pipe)"),
+        "items" : ["app (named pipe)", "UDP"],
+        "index change"   : lambda: settings_core.update_setting("clinput mode", input_comm.findChildren(QComboBox)[0].currentText()),
+    })
+    cl_shared_layout.addWidget(input_comm)
+
+    skeletal_comm = create_combobox({
+        "text"   : "skeletal communication method",
+        "default": settings.get("clskeletal mode","app (named pipe)"),
+        "items" : ["app (named pipe)", "UDP"],
+        "index change"   : lambda: settings_core.update_setting("clskeletal mode", skeletal_comm.findChildren(QComboBox)[0].currentText()),
+    })
+    cl_shared_layout.addWidget(skeletal_comm)
+    #always///
+
+    if p_mode == "UDP" or r_mode == "UDP":
+        t = create_group_horizontal([{
+                "type"   : "spinbox",
+                "text"   : "port",
+                "min"    : 0,
+                "max"    : 999999999,
+                "default": settings.get('cl port', 9002),
+                "steps"  : 1,
+                "func"   : lambda: settings_core.update_setting("cl port", t.findChildren(QSpinBox)[0].value())
+            }])
+        cl_shared_layout.addWidget(t)
+
+    if p_mode == "named pipe" or r_mode == "named pipe":
+        t = create_label({"text" : "external named pipe require the ui to be closed"})
+        cl_shared_layout.addWidget(t)
+
 def crpos_specific_widget(layout, combo):
     settings_core.update_setting(f'crpos mode', combo.currentText()) 
 
@@ -2883,6 +3818,8 @@ def crpos_specific_widget(layout, combo):
     mode = combo.currentText()
 
     settings = settings_core.get_settings()
+
+    update_cr_shared()
 
     match mode:
         case "copy":
@@ -2924,11 +3861,6 @@ def crpos_specific_widget(layout, combo):
             
             layout.addWidget(t)
 
-        case "hand tracking":
-            t = create_label({"text" : ""})
-            
-            layout.addWidget(t)
-
         case "marker":
             t = create_group_horizontal([{
             "type" : "spinbox", 
@@ -2941,7 +3873,7 @@ def crpos_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-        case "offsets":
+        case _:
             t = create_group_horizontal([{
                     "type" : "label",
                     "text" : "",
@@ -2949,28 +3881,6 @@ def crpos_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-def create_crpos_widget():
-    settings = settings_core.get_settings()
-
-    tab_extra = QWidget()
-    layout_extra = QHBoxLayout(tab_extra)
-
-    combo_extra = create_combobox({
-            "type" : "combobox",
-            "text": "right position mode",
-            "default": settings.get(f'crpos mode', "copy"),
-            "items": ["copy", "offsets", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "index change": lambda: crpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-        })
-    
-    layout_extra.addWidget(combo_extra)
-    crpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-
-    return tab_extra
-
-layout_controllers.addWidget(create_crpos_widget())
-#pos///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#rot///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 def crrot_specific_widget(layout, combo):
     settings_core.update_setting(f'crrot mode', combo.currentText()) 
 
@@ -2983,6 +3893,8 @@ def crrot_specific_widget(layout, combo):
     mode = combo.currentText()
 
     settings = settings_core.get_settings()
+
+    update_cr_shared()
 
     match mode:
         case "copy":
@@ -3027,7 +3939,7 @@ def crrot_specific_widget(layout, combo):
             t = create_group_horizontal([{
                     "type" : "button",
                     "enabled" : True,
-                    "text" :"apply recommendet offsets", 
+                    "text" :"apply recommendet offsets (right)", 
                     "func"  : lambda: apply_hand_offsets("cr")
                 }])
             layout.addWidget(t)
@@ -3062,7 +3974,7 @@ def crrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)      
 
-        case "offsets":
+        case _:
             t = create_group_horizontal([{
                     "type" : "label",
                     "text" : "",
@@ -3070,30 +3982,6 @@ def crrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-def create_crrot_widget():
-    settings = settings_core.get_settings()
-
-    tab_extra = QWidget()
-    layout_extra = QHBoxLayout(tab_extra)
-
-    combo_extra = create_combobox({
-            "type" : "combobox",
-            "text": "right rotation mode",
-            "default": settings.get(f'crrot mode', "copy"),
-            "items": ["copy", "offsets", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro",#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "index change": lambda: crrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-        })
-    
-    layout_extra.addWidget(combo_extra)
-    crrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-
-    return tab_extra
-
-layout_controllers.addWidget(create_crrot_widget())
-#rot//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#cr modes////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#cl modes////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#pos//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 def clpos_specific_widget(layout, combo):
     settings_core.update_setting(f'clpos mode', combo.currentText()) 
 
@@ -3106,6 +3994,8 @@ def clpos_specific_widget(layout, combo):
     mode = combo.currentText()
 
     settings = settings_core.get_settings()
+
+    update_cl_shared()
 
     match mode:
         case "copy":
@@ -3147,11 +4037,6 @@ def clpos_specific_widget(layout, combo):
             
             layout.addWidget(t)
 
-        case "hand tracking":
-            t = create_label({"text" : ""})
-            
-            layout.addWidget(t)
-
         case "marker":
             t = create_group_horizontal([{
             "type" : "spinbox", 
@@ -3164,7 +4049,7 @@ def clpos_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-        case "offsets":
+        case _:
             t = create_group_horizontal([{
                     "type" : "label",
                     "text" : "",
@@ -3172,28 +4057,6 @@ def clpos_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-def create_clpos_widget():
-    settings = settings_core.get_settings()
-
-    tab_extra = QWidget()
-    layout_extra = QHBoxLayout(tab_extra)
-
-    combo_extra = create_combobox({
-            "type" : "combobox",
-            "text": "left position mode",
-            "default": settings.get(f'clpos mode', "copy"),
-            "items": ["copy", "offsets", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
-            "index change": lambda: clpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-        })
-    
-    layout_extra.addWidget(combo_extra)
-    clpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-
-    return tab_extra
-
-layout_controllers.addWidget(create_clpos_widget())
-#pos//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#rot//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 def clrot_specific_widget(layout, combo):
     settings_core.update_setting(f'clrot mode', combo.currentText()) 
 
@@ -3206,6 +4069,8 @@ def clrot_specific_widget(layout, combo):
     mode = combo.currentText()
 
     settings = settings_core.get_settings()
+
+    update_cl_shared()
 
     match mode:
         case "copy":
@@ -3250,7 +4115,7 @@ def clrot_specific_widget(layout, combo):
             t = create_group_horizontal([{
                     "type" : "button",
                     "enabled" : True,
-                    "text" :"apply recommendet offsets", 
+                    "text" :"apply recommendet offsets (left)", 
                     "func"  : lambda: apply_hand_offsets("cl")
                 }])
             layout.addWidget(t)
@@ -3285,7 +4150,7 @@ def clrot_specific_widget(layout, combo):
                 })
             layout.addWidget(combo_extra)
 
-        case "offsets":
+        case _:
             t = create_group_horizontal([{
                     "type" : "label",
                     "text" : "",
@@ -3293,9 +4158,115 @@ def clrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
+def create_cr_shared():
+    global cr_shared_layout
+    w = QWidget()
+    cr_shared_layout = QVBoxLayout(w)
+    return w
+
+def create_cl_shared():
+    global cl_shared_layout
+    w = QWidget()
+    cl_shared_layout = QVBoxLayout(w)
+    return w
+
+def create_cr_widget():
+    root_widget = QWidget()
+    root_layout = QHBoxLayout(root_widget)
+
+    modes_widget = QWidget()
+    modes_layout = QVBoxLayout(modes_widget)
+
+    s = create_cr_shared()
+
+    modes_layout.addWidget(create_crpos_widget())
+    modes_layout.addWidget(create_crrot_widget())
+
+    root_layout.addWidget(modes_widget)
+    root_layout.addWidget(s)
+
+    #style///
+    modes_widget.setStyleSheet("QWidget#cr_modes { background: #1F1F1F; border: 1px solid #444; border-radius: 6px; }")
+    modes_widget.setObjectName("cr_modes")
+    #style///
+
+    return root_widget
+
+def create_cl_widget():
+    root_widget = QWidget()
+    root_layout = QHBoxLayout(root_widget)
+
+    modes_widget = QWidget()
+    modes_layout = QVBoxLayout(modes_widget)
+
+    s = create_cl_shared()
+
+    modes_layout.addWidget(create_clpos_widget())
+    modes_layout.addWidget(create_clrot_widget())
+
+    root_layout.addWidget(modes_widget)
+    root_layout.addWidget(s)
+
+    #style///
+    modes_widget.setStyleSheet("QWidget#cl_modes { background: #1F1F1F; border: 1px solid #444; border-radius: 6px; }")
+    modes_widget.setObjectName("cl_modes")
+    #style///
+
+    return root_widget
+
+def create_crpos_widget():
+    settings = settings_core.get_settings()
+    tab_extra = QWidget()
+    layout_extra = QHBoxLayout(tab_extra)
+
+    combo_extra = create_combobox({
+            "type" : "combobox",
+            "text": "right position mode",
+            "default": settings.get(f'crpos mode', "copy"),
+            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: crpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+        })
+    
+    layout_extra.addWidget(combo_extra)
+    crpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+    return tab_extra
+
+def create_crrot_widget():
+    settings = settings_core.get_settings()
+    tab_extra = QWidget()
+    layout_extra = QHBoxLayout(tab_extra)
+
+    combo_extra = create_combobox({
+            "type" : "combobox",
+            "text": "right rotation mode",
+            "default": settings.get(f'crrot mode', "copy"),
+            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro",#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: crrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+        })
+    
+    layout_extra.addWidget(combo_extra)
+    crrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+    return tab_extra
+
+def create_clpos_widget():
+    settings = settings_core.get_settings()
+    tab_extra = QWidget()
+    layout_extra = QHBoxLayout(tab_extra)
+
+    combo_extra = create_combobox({
+            "type" : "combobox",
+            "text": "left position mode",
+            "default": settings.get(f'clpos mode', "copy"),
+            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "index change": lambda: clpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+        })
+    
+    layout_extra.addWidget(combo_extra)
+    clpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
+    return tab_extra
+
 def create_clrot_widget():
     settings = settings_core.get_settings()
-
     tab_extra = QWidget()
     layout_extra = QHBoxLayout(tab_extra)
 
@@ -3303,78 +4274,44 @@ def create_clrot_widget():
             "type" : "combobox",
             "text": "left rotation mode",
             "default": settings.get(f'clrot mode', "copy"),
-            "items": ["copy", "offsets", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "index change": lambda: clrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
     layout_extra.addWidget(combo_extra)
     clrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
-
     return tab_extra
 
-layout_controllers.addWidget(create_clrot_widget())
-#rot///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#cl modes/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+layout_controllers.addWidget(set_group("Right Modes", [create_cr_widget()], text = "right controller position and rotation modes"))
+layout_controllers.addWidget(set_group("Left Modes", [create_cl_widget()], text = "left controller position and rotation modes"))
+#controllers modes v2////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def apply_hand_offsets(device):
     if device == "cr":
+        spinboxes = offsets_cr.findChildren(QDoubleSpinBox)
+
         settings_core.update_setting(f"{device} offset world yaw", 1.660)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(1.660)
+        spinboxes[3].setValue(1.660)
 
         settings_core.update_setting(f"{device} offset world pitch", -0.680)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(-0.680)
+        spinboxes[4].setValue(-0.680)
 
         settings_core.update_setting(f"{device} offset world roll", 0.670)
-        cr_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(0.670)
+        spinboxes[5].setValue(0.670)
 
     else:
+        spinboxes = offsets_cl.findChildren(QDoubleSpinBox)
+
         settings_core.update_setting(f"{device} offset world yaw", -1.660)
-        cl_offsets_world.findChildren(QDoubleSpinBox)[3].setValue(-1.660)
+        spinboxes[3].setValue(1.660)
 
         settings_core.update_setting(f"{device} offset world pitch", 0.680)
-        cl_offsets_world.findChildren(QDoubleSpinBox)[4].setValue(0.680)
+        spinboxes[4].setValue(-0.680)
 
         settings_core.update_setting(f"{device} offset world roll", 0.670)
-        cl_offsets_world.findChildren(QDoubleSpinBox)[5].setValue(0.670)
+        spinboxes[5].setValue(0.670)
 
 #mapping v2/////////////////////////////////////////////////////////////////////
-
-button_config = [    
-    ("a", "a"),
-    ("b", "b"),
-    ("x", "x"),
-    ("y", "y"),
-    
-    ("d-pad down", "dpdown"),
-    ("d-pad left", "dpleft"),
-    ("d-pad right", "dpright"),
-    ("d-pad up", "dpup"),
-
-    ("left trigger", "lefttrigger"),
-    ("left bumper", "leftshoulder"),
-    ("right trigger", "righttrigger"),
-    ("right bumper", "rightshoulder"),
-
-    ("left joy x", "leftx"),
-    ("left joy y", "lefty"),
-    ("left stick click", "leftstick"),
-
-    ("right joy x", "rightx"),
-    ("right joy y", "righty"),
-    ("right stick click", "rightstick"),
-
-    ("paddle 1", "paddle1"),
-    ("paddle 2", "paddle2"),
-    ("paddle 3", "paddle3"),
-    ("paddle 4", "paddle4"),
-
-    ("back", "back"),
-    ("start", "start"),
-    ("guide", "guide"),
-]
-
-combos = []
 
 mapping = ["a", "b", "trigger", "grip", "menu", 
            "joy up", "joy down", "joy left", "joy right", "joy click", 
@@ -3382,167 +4319,9 @@ mapping = ["a", "b", "trigger", "grip", "menu",
            "thumb", "index", "middle", "ring", "pinky", 
            "touch mod"]
 
-current_binding_btn = None
-
-class SingleBindButton(QPushButton):
-    def __init__(self, mapping_name, current_bind, callback, parent=None):
-        super().__init__("", parent)
-        self.mapping_name = mapping_name
-        self.current_bind = current_bind
-        self.callback = callback
-        self.is_binding = False
-        
-        self.refresh_display()
-        self.clicked.connect(self.start_binding)
-
-    def refresh_display(self):
-        self.setText(f"{self.mapping_name}: {self.current_bind}")
-
-    def start_binding(self):
-        global current_binding_btn
-        if current_binding_btn and current_binding_btn != self:
-            current_binding_btn.cancel_binding()
-            
-        current_binding_btn = self
-        self.is_binding = True
-        self.setText("Press something (ESC to unbind)")
-        self.setFocus() 
-
-    def cancel_binding(self):
-        self.is_binding = False
-        self.refresh_display()
-
-    def finish_binding(self, input_name):
-        global current_binding_btn
-        self.is_binding = False
-        current_binding_btn = None
-        self.current_bind = input_name
-        self.refresh_display()
-        
-        self.callback()
-
-    def keyPressEvent(self, event):
-        if self.is_binding:
-            if event.key() == Qt.Key.Key_Escape:
-                self.finish_binding("[Unbound]")
-            else:
-                key_name = QKeySequence(event.key()).toString()
-                self.finish_binding(f"Key_{key_name}")
-        else:
-            super().keyPressEvent(event)
-
-    def mousePressEvent(self, event):
-        if self.is_binding:
-            btn_map = {
-                Qt.MouseButton.LeftButton: "Left",
-                Qt.MouseButton.RightButton: "Right",
-                Qt.MouseButton.MiddleButton: "Middle",
-                Qt.MouseButton.XButton1: "M4",
-                Qt.MouseButton.XButton2: "M5",
-                Qt.MouseButton.BackButton: "Back",
-                Qt.MouseButton.ForwardButton: "Forward",
-                Qt.MouseButton.TaskButton: "Task"
-            }
-            
-            button_id = event.button()
-            button_name = btn_map.get(button_id, f"Extra_{button_id.value}")
-            self.finish_binding(f"Mouse_{button_name}")
-        else:
-            super().mousePressEvent(event)
-
-    def wheelEvent(self, event):
-        if self.is_binding:
-            delta = event.angleDelta().y()
-            if delta > 0:
-                self.finish_binding("Mouse_WheelUp")
-            elif delta < 0:
-                self.finish_binding("Mouse_WheelDown")
-            event.accept()
-        else:
-            super().wheelEvent(event)
-
-#bindable button!
-#layout_controllers.addWidget(BindingButton("a", "b"))
-#prefix = what device
-#mapping_name = what action
-#prefix_mapping_name in settings (cr_trigger)
-class BindingGroupWidget(QWidget):
-    def __init__(self, prefix, mapping_name, parent=None):
-        super().__init__(parent)
-        self.prefix = prefix
-        self.mapping_name = mapping_name
-        self.setting_key = f"{self.prefix}_{self.mapping_name}"
-        
-        self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.checkbox = QCheckBox("Invert")
-        self.checkbox.stateChanged.connect(self.save_settings)
-        
-        self.buttons_layout = QHBoxLayout()
-        self.main_layout.addLayout(self.buttons_layout)
-        self.main_layout.addWidget(self.checkbox)
-        self.button_widgets = []
-        
-        self.load_settings()
-
-    def load_settings(self):
-        current_settings = settings_core.get_settings()
-        bind_data = current_settings.get(self.setting_key, {})
-        
-        if not isinstance(bind_data, dict):
-            bind_data = {}
-
-        is_inverted = bind_data.get("invert", False)
-        self.checkbox.blockSignals(True)
-        self.checkbox.setChecked(is_inverted)
-        self.checkbox.blockSignals(False)
-
-        saved_buttons = bind_data.get("buttons", [])
-        
-        active_binds = [b for b in saved_buttons if b != "[Unbound]"]
-        
-        self.render_buttons(active_binds)
-
-    def render_buttons(self, binds):
-        while self.button_widgets:
-            btn = self.button_widgets.pop()
-            self.buttons_layout.removeWidget(btn)
-            btn.setParent(None)
-            btn.deleteLater()
-        
-        display_list = binds + ["[Unbound]"]
-        
-        for bind_value in display_list:
-            btn = SingleBindButton(self.mapping_name, bind_value, self.on_button_changed)
-            self.buttons_layout.addWidget(btn)
-            self.button_widgets.append(btn)
-            btn.show()
-
-    def on_button_changed(self):
-        QTimer.singleShot(10, self.save_settings)
-
-    def save_settings(self):
-        active_binds = []
-        for btn in self.button_widgets:
-            if btn.current_bind != "[Unbound]":
-                active_binds.append(btn.current_bind)
-        new_data = {
-            "buttons": active_binds,
-            "invert": self.checkbox.isChecked()
-        }
-        
-        settings_core.update_nested(self.setting_key, new_data)
-        
-        self.render_buttons(active_binds)
-
 def make_mapping_buttons(prefix):
     group_widget = QWidget()
     group_layout = QVBoxLayout(group_widget)
-
-    label = QLabel(f"{prefix} mapping")
-    label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    group_layout.addWidget(label)
 
     for n in mapping:
         group_layout.addWidget(BindingGroupWidget(prefix, n))
@@ -3553,15 +4332,15 @@ def make_mapping():
     group_widget = QWidget()
     main_layout = QHBoxLayout(group_widget)
 
-    main_layout.addWidget(make_mapping_buttons("cl"))
+    main_layout.addWidget(set_group("Left Mapping", [make_mapping_buttons("cl")]))
     
     main_layout.addWidget(create_image({"path" : "index black", "size x" : 681, "size y" : 418}))
-    
-    main_layout.addWidget(make_mapping_buttons("cr"))
+
+    main_layout.addWidget(set_group("Right Mapping", [make_mapping_buttons("cr")]))
 
     return group_widget
 
-layout_controllers.addWidget(make_mapping())
+layout_controllers.addWidget(set_group("Index Controller Mapping", [make_mapping()], text = "you can bind multiple physical controllers/keyboards/mice to one action, option to invert an axis or button state is also available"))
 
 #real controllers settings/////////////////////////////////////////////////////////////////////////////
 scroll_content_layout = None
@@ -3575,8 +4354,6 @@ def make_controller_block(ctrl):
 
     group_widget = QWidget()
     group_layout = QVBoxLayout(group_widget)
-
-    group_layout.addWidget(create_label({"text": f"Name: {c_name}\nID: {c_id}"}))
 
     #todo: add images later!
     #group_layout.addWidget(create_image({"path": "fix.png", "size x": 100, "size y": 100}))
@@ -3618,9 +4395,10 @@ def make_controller_block(ctrl):
     }))
 
     group_layout.addWidget(BindingGroupWidget(c_id, "reset_gyro"))
-    #group_layout.addWidget(BindingButton(c_id, "reset_gyro"))
 
-    return group_widget
+    final_widget = set_group(f"Name:({c_name}) ID:({c_id})", [group_widget])
+
+    return final_widget
 
 def update_controller_ui():
     global scroll_content_layout
@@ -3649,19 +4427,13 @@ def make_base_scroll():
     scroll_content_layout = QHBoxLayout(scroll_content)
     scroll_area.setWidget(scroll_content)
 
-    layout_controllers.addWidget(scroll_area)
+    layout_controllers.addWidget(set_group("Detected Real Controllers", [scroll_area]))
     update_controller_ui()
 
 make_base_scroll()
 #real controllers settings/////////////////////////////////////////////////////////////////////////////
 
 #//////////////////////////////////////////////////////////
-label5 = create_label({
-    "text" : "---------camera(super experimental!!!)---------", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-})
-layout_controllers.addWidget(label5)
-
 webcam = create_group_horizontal([
     {
         "type" : "checkbox", 
@@ -3692,14 +4464,8 @@ webcam = create_group_horizontal([
         "text" : "other curl effects grip",
         "default" : settings_core.get_settings().get("other=grip", False),
         "func" : lambda: settings_core.update_setting("other=grip",webcam.findChildren(QCheckBox)[4].isChecked())
-    },
-    {#spacing label!
-        "type" : "label",
-        "text":"",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
     }
 ])
-layout_controllers.addWidget(webcam)
 
 webcam1 = create_group_horizontal([
     {
@@ -3737,14 +4503,10 @@ webcam1 = create_group_horizontal([
         "default":settings_core.get_settings()['camera index'], 
         "steps" : 1,
         "func"  : lambda: settings_core.update_setting("camera index", webcam1.findChildren(QSpinBox)[0].value())
-    },
-    {#spacing label!
-        "type" : "label",
-        "text":"",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
     }
 ])
-layout_controllers.addWidget(webcam1)
+
+layout_controllers.addWidget(set_group("Hand Tracking",[webcam, webcam1], text = "this is inside-out tracking meaning the camera need be on your face, also dont expect anything crazy.. ok"))
 
 def start_hand_tracking():
     enabled = webcam.findChild(QCheckBox).isChecked()
@@ -3843,13 +4605,11 @@ def start_hand_tracking():
         
 #         if ids is not None:
 #             for i in range(len(ids)):
-#                 # 1. Calculate Pose
 #                 success, rvec, tvec = cv2.solvePnP(
 #                     marker_3d_edges, corners[i][0], camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_IPPE_SQUARE
 #                 )
                 
 #                 if success:
-#                     # 2. Prepare Data
 #                     rot_matrix, _ = cv2.Rodrigues(rvec)
 #                     quat = R.from_matrix(rot_matrix).as_quat() 
                     
@@ -4045,293 +4805,200 @@ def start_hand_tracking():
 
 #camera markers/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-layout_controllers.addWidget(create_label({
-    "text" : "---------Right offsets---------",
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-}))
+#playspace/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+def start_reset_playspace():
+    thread = threading.Thread(target=reset_playspace_on_input, daemon=True)
+    thread.start()
 
-cr_offsets_world = create_group_horizontal([
-    {
-        "type" : "label",
-        "text":"world",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "X", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset world x'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset world x", cr_offsets_world.findChildren(QDoubleSpinBox)[0].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Y", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset world y'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset world y", cr_offsets_world.findChildren(QDoubleSpinBox)[1].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Z", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset world z'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset world z", cr_offsets_world.findChildren(QDoubleSpinBox)[2].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Yaw", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset world yaw'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset world yaw", cr_offsets_world.findChildren(QDoubleSpinBox)[3].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Pitch", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset world pitch'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset world pitch", cr_offsets_world.findChildren(QDoubleSpinBox)[4].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Roll", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset world roll'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset world roll", cr_offsets_world.findChildren(QDoubleSpinBox)[5].value())
-    },
-    {#spacing label!
-        "type" : "label",
-        "text":"",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    }
-])
-layout_controllers.addWidget(cr_offsets_world)
+def send_reset_to_phone(device):
+    try:
+        settings = settings_core.get_settings()
+        print(settings.get(f"{device} playspace reset method", ""))
 
-cr_offsets_local = create_group_horizontal([
-    {
-        "type" : "label",
-        "text":"local",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "X", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset local x'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset local x", cr_offsets_local.findChildren(QDoubleSpinBox)[0].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Y", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset local y'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset local y", cr_offsets_local.findChildren(QDoubleSpinBox)[1].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Z", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset local z'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset local z", cr_offsets_local.findChildren(QDoubleSpinBox)[2].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Yaw", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset local yaw'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset local yaw", cr_offsets_local.findChildren(QDoubleSpinBox)[3].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Pitch", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset local pitch'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset local pitch", cr_offsets_local.findChildren(QDoubleSpinBox)[4].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Roll", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cr offset local roll'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cr offset local roll", cr_offsets_local.findChildren(QDoubleSpinBox)[5].value())
-    },
-    {#spacing label!
-        "type" : "label",
-        "text":"",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    }
-])
-layout_controllers.addWidget(cr_offsets_local)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        
+        sock.sendto(b"RESET", ("<broadcast>", settings.get(f"{device} port", 9002)))
+        sock.close()
 
-layout_controllers.addWidget(create_label({
-    "text" : "---------Left offsets---------", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-}))
+    except Exception as e:
+        pass
 
-cl_offsets_world = create_group_horizontal([
-    {
-        "type" : "label",
-        "text":"world",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "X", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset world x'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset world x", cl_offsets_world.findChildren(QDoubleSpinBox)[0].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Y", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset world y'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset world y", cl_offsets_world.findChildren(QDoubleSpinBox)[1].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Z", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset world z'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset world z", cl_offsets_world.findChildren(QDoubleSpinBox)[2].value())
-    },    
-    {
-        "type" : "doublespinbox",
-        "text" : "Yaw", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset world yaw'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset world yaw", cl_offsets_world.findChildren(QDoubleSpinBox)[3].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Pitch", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset world pitch'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset world pitch", cl_offsets_world.findChildren(QDoubleSpinBox)[4].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Roll", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset world roll'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset world roll", cl_offsets_world.findChildren(QDoubleSpinBox)[5].value())
-    },
-    {#spacing label!
-        "type" : "label",
-        "text":"",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    }
-])
-layout_controllers.addWidget(cl_offsets_world)
+def reset_playspace_on_input():
+    device_states = {}
 
-cl_offsets_local = create_group_horizontal([
-    {
-        "type" : "label",
-        "text":"local",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "X", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset local x'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset local x", cl_offsets_local.findChildren(QDoubleSpinBox)[0].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Y", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset local y'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset local y", cl_offsets_local.findChildren(QDoubleSpinBox)[1].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Z", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset local z'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset local z", cl_offsets_local.findChildren(QDoubleSpinBox)[2].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Yaw", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset local yaw'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset local yaw", cl_offsets_local.findChildren(QDoubleSpinBox)[3].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Pitch", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset local pitch'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset local pitch", cl_offsets_local.findChildren(QDoubleSpinBox)[4].value())
-    },
-    {
-        "type" : "doublespinbox",
-        "text" : "Roll", 
-        "min":-999999999, 
-        "max":999999999, 
-        "default":settings_core.get_settings()['cl offset local roll'], 
-        "steps" : 0.01,
-        "func"  : lambda: settings_core.update_setting("cl offset local roll", cl_offsets_local.findChildren(QDoubleSpinBox)[5].value())
-    },
-    {#spacing label!
-        "type" : "label",
-        "text":"",
-        "alignment" : Qt.AlignmentFlag.AlignCenter
-    }
-])
-layout_controllers.addWidget(cl_offsets_local)
+    while True:
+        try:
+            settings = settings_core.get_settings()
+            devices = ["hmd", "cr", "cl"]
+
+            tracker_keys = [
+                key.replace("_reset playspace", "")
+                for key in settings.keys()
+                if "tracker_reset playspace" in key
+            ]
+            devices.extend(tracker_keys)
+
+            for n in devices:
+                if n not in device_states:
+                    device_states[n] = {"packet_triggered": False, "ui_triggered": False}
+                
+                raw_e_packet = get_latest_packet(n, 'E')
+                packet_reset_requested = False
+                
+                if raw_e_packet is not None:
+                    packet_reset_requested = raw_e_packet.get("reset", False)
+
+                packet_fired = False
+                if packet_reset_requested:
+                    if not device_states[n]["packet_triggered"]:
+                        packet_fired = True
+                        device_states[n]["packet_triggered"] = True
+                else:
+                    device_states[n]["packet_triggered"] = False
+
+                setting_key = f"{n}_reset playspace"
+                ui_binding_expr = settings.get(setting_key, "")
+                
+                ui_reset_requested = False
+                if ui_binding_expr:
+                    ui_reset_requested = bool(eval_binding(ui_binding_expr))
+
+                ui_fired = False
+                if ui_reset_requested:
+                    if not device_states[n]["ui_triggered"]:
+                        ui_fired = True
+                        device_states[n]["ui_triggered"] = True
+                else:
+                    device_states[n]["ui_triggered"] = False
+
+                if packet_fired:
+                    reset_playspace(n)
+
+                elif ui_fired:
+                    send_reset_to_phone(n)
+                    reset_playspace(n)
+
+            time.sleep(0.001)
+
+        except Exception as e:
+            time.sleep(0.001)
+
+#works but need restarting arcore everytime, need more testing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+def reset_playspace(device):
+    settings = settings_core.get_settings()
+    
+    match settings.get(f"{device} playspace reset method", ""):
+        case "Headset":
+            ps_x = settings.get(f"{device} playspace x", 0.0)
+            ps_y = settings.get(f"{device} playspace y", 0.0)
+            ps_z = settings.get(f"{device} playspace z", 0.0)
+    
+            hmd_dict = list(trackers_dict.values())[0]
+            raw_p_packet = {"x" : ps_x,"y" : 0.0,"z" : ps_z}#get_latest_packet(device, 'P')
+            raw_r_packet = {"x" : 0.0,"y" : 0.0,"z" : 0.0,"w":0.0}#get_latest_packet(device, 'R')
+
+            if raw_p_packet is None:
+                raw_p_packet = {"x": 0.0, "y": 0.0, "z": 0.0}
+            if raw_r_packet is None:
+                raw_r_packet = {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
+
+            hmd_x = hmd_dict.get('pos x', 0.0) if hmd_dict else 0.0
+            hmd_y = hmd_dict.get('pos y', 0.0) if hmd_dict else 0.0
+            hmd_z = hmd_dict.get('pos z', 0.0) if hmd_dict else 0.0
+
+            hmd_yaw = 0.0
+            if hmd_dict and 'rotation matrix' in hmd_dict:
+                hmd_mat = hmd_dict['rotation matrix']
+                hmd_yaw = math.atan2(hmd_mat[0][2], hmd_mat[0][0])
+            
+            ps_yaw = hmd_yaw
+
+            w = raw_r_packet["w"]
+            x = raw_r_packet["x"]
+            y = raw_r_packet["y"]
+            z = raw_r_packet["z"]
+            w_prime = w + x
+            y_prime = y - z
+            raw_yaw = 2.0 * math.atan2(y_prime, w_prime)
+
+            world_offset_yaw = -raw_yaw
+            world_offset_yaw = (world_offset_yaw + math.pi) % (2 * math.pi) - math.pi
+
+            cos_hmd = math.cos(hmd_yaw)
+            sin_hmd = math.sin(hmd_yaw)
+            unrotated_hmd_x = hmd_x * cos_hmd - hmd_z * sin_hmd
+            unrotated_hmd_z = hmd_x * sin_hmd + hmd_z * cos_hmd
+
+            mid_x = unrotated_hmd_x# - ps_x
+            mid_z = unrotated_hmd_z# - ps_z
+            mid_y = hmd_y + ps_y
+
+            offset_x = mid_x - raw_p_packet["x"]
+            offset_y = mid_y - raw_p_packet["y"]
+            offset_z = mid_z - raw_p_packet["z"]
+
+            settings_core.update_setting(f"{device} playspace yaw", ps_yaw)
+            settings_core.update_setting(f"{device} offset world yaw", world_offset_yaw)
+
+            settings_core.update_setting(f"{device} offset world x", offset_x)
+            settings_core.update_setting(f"{device} offset world y", offset_y)
+            settings_core.update_setting(f"{device} offset world z", offset_z)
+
+            ui_updater.trigger_ui_update.emit()
+
+        case "Fixed Position":
+            ps_x = settings.get(f"{device} playspace x", 0.0)
+            ps_y = settings.get(f"{device} playspace y", 0.0)
+            ps_z = settings.get(f"{device} playspace z", 0.0)
+
+            raw_p_packet = {"x" : 0.0,"y" : 0.0,"z" : 0.0}#get_latest_packet(device, 'P')
+            raw_r_packet = {"x" : 0.0,"y" : 0.0,"z" : 0.0,"w":0.0}#get_latest_packet(device, 'R')
+
+            if raw_p_packet is None:
+                raw_p_packet = {"x": 0.0, "y": 0.0, "z": 0.0}
+            if raw_r_packet is None:
+                raw_r_packet = {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
+
+            w = raw_r_packet["w"]
+            x = raw_r_packet["x"]
+            y = raw_r_packet["y"]
+            z = raw_r_packet["z"]
+            w_prime = w + x
+            y_prime = y - z
+            raw_yaw = 2.0 * math.atan2(y_prime, w_prime)
+
+            world_offset_yaw = -raw_yaw
+            world_offset_yaw = (world_offset_yaw + math.pi) % (2 * math.pi) - math.pi
+
+            mid_x = ps_x
+            mid_y = ps_y
+            mid_z = ps_z
+
+            offset_x = mid_x - raw_p_packet["x"]
+            offset_y = mid_y - raw_p_packet["y"]
+            offset_z = mid_z - raw_p_packet["z"]
+
+            settings_core.update_setting(f"{device} offset world yaw", world_offset_yaw)
+
+            settings_core.update_setting(f"{device} offset world x", offset_x)
+            settings_core.update_setting(f"{device} offset world y", offset_y)
+            settings_core.update_setting(f"{device} offset world z", offset_z)
+
+            ui_updater.trigger_ui_update.emit()
+
+#playspace/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+offsets_cr = create_offset_ui("cr")
+offsets_cl = create_offset_ui("cl")
+layout_controllers.addWidget(offsets_cr)
+layout_controllers.addWidget(offsets_cl)
+
 #controllers/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #trackers/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 tab_trackers = QWidget()
 layout_trackers = QVBoxLayout(tab_trackers)
-layout_trackers.setSpacing(0)
-
+set_style(tab_trackers, "{ background: #1F1F1F; border: 0px solid #444; border-radius: 0px; }", "t")
 
 def trackerpos_specific_widget(index, layout, combo):
     settings_core.update_setting(f'{index}trackerpos mode', combo.currentText()) 
@@ -4364,33 +5031,7 @@ def trackerpos_specific_widget(index, layout, combo):
                 })
             layout.addWidget(combo_extra)
 
-        case "hip emulation":
-
-            t = create_group_spinbox([{
-                "text" : "hmd index",
-                "min": 0,
-                "max": 999999,
-                "steps" : 1,
-                "default": settings.get(f'{index}tracker hmd index', 0),
-                "func": lambda: settings_core.update_setting(f'{index}tracker hmd index', t.findChildren(QSpinBox)[0].value())
-            },{
-                "text" : "left foot index",
-                "min": 0,
-                "max": 999999,
-                "steps" : 1,
-                "default": settings.get(f'{index}tracker left foot index', 0),
-                "func": lambda: settings_core.update_setting(f'{index}tracker left foot index', t.findChildren(QSpinBox)[1].value())
-            },{
-                "text" : "right foot index",
-                "min": 0,
-                "max": 999999,
-                "steps" : 1,
-                "default": settings.get(f'{index}tracker right foot index', 0),
-                "func": lambda: settings_core.update_setting(f'{index}tracker right foot index', t.findChildren(QSpinBox)[2].value())
-            }])
-            layout.addWidget(t)
-
-        case "offsets":
+        case _:
             t = create_group_horizontal([{
                     "type" : "label",
                     "text" : "",
@@ -4429,31 +5070,6 @@ def trackerrot_specific_widget(index, layout, combo):
                 })
             layout.addWidget(combo_extra)
 
-        case "hip emulation":
-            t = create_group_spinbox([{
-                "text" : "hmd index",
-                "min": 0,
-                "max": 999999,
-                "steps" : 1,
-                "default": settings.get(f'{index}tracker hmd index', 0),
-                "func": lambda: settings_core.update_setting(f'{index}tracker hmd index', t.findChildren(QSpinBox)[0].value())
-            },{
-                "text" : "left foot index",
-                "min": 0,
-                "max": 999999,
-                "steps" : 1,
-                "default": settings.get(f'{index}tracker left foot index', 0),
-                "func": lambda: settings_core.update_setting(f'{index}tracker left foot index', t.findChildren(QSpinBox)[1].value())
-            },{
-                "text" : "right foot index",
-                "min": 0,
-                "max": 999999,
-                "steps" : 1,
-                "default": settings.get(f'{index}tracker right foot index', 0),
-                "func": lambda: settings_core.update_setting(f'{index}tracker right foot index', t.findChildren(QSpinBox)[2].value())
-            }])
-            layout.addWidget(t)
-
         case "gyro":
             combo_extra = create_combobox({
                     "type" : "combobox",
@@ -4472,7 +5088,7 @@ def trackerrot_specific_widget(index, layout, combo):
                 })
             layout.addWidget(combo_extra)
 
-        case "offsets":
+        case _:
             t = create_group_horizontal([{
                     "type" : "label",
                     "text" : "",
@@ -4480,169 +5096,210 @@ def trackerrot_specific_widget(index, layout, combo):
                 }])
             layout.addWidget(t)
 
-def create_tracker_widget(index = 0):
+#trackers widget v2//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+def create_tracker_widget(index=0):
     settings = settings_core.get_settings()
 
-    widget_group = QWidget()
-    layout_group = QVBoxLayout(widget_group)
+    tracker_shared_layout = [None]
 
-    t = create_label({"text" : f"---index {index}---",
-                    "alignment" : Qt.AlignmentFlag.AlignCenter
-    })
-    layout_group.addWidget(t)
+    #style///
+    hue = (index * 36) % 360
+    bg = QColor.fromHsv(hue, 40 + index, 50)
+    border = QColor.fromHsv(hue, 120 + index, 180)
 
+    group_style = f"""
+        QGroupBox {{
+            background-color: {bg.name()};
+            border: 1px solid {border.name()};
+            border-radius: 8px;
+            margin-top: 1.5ex;
+            font-weight: bold;
+        }}
+
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            subcontrol-position: top center;
+            padding: 0 10px;
+            color: {border.name()};
+        }}
+    """
+    #style///
+
+    def update_tracker_shared():
+        if tracker_shared_layout[0] is None:
+            return
+        p_mode = settings_core.get_settings().get(f'{index}trackerpos mode', 'copy')
+        r_mode = settings_core.get_settings().get(f'{index}trackerrot mode', 'copy')
+
+        clear_layout(tracker_shared_layout[0])
+
+        if p_mode == "UDP" or r_mode == "UDP":
+            t = create_group_horizontal([{
+                    "type"   : "spinbox",
+                    "text"   : "port",
+                    "min"    : 0,
+                    "max"    : 999999999,
+                    "default": settings_core.get_settings().get(f'{index}tracker port', 9003 + index),
+                    "steps"  : 1,
+                    "func"   : lambda: settings_core.update_setting(f'{index}tracker port', t.findChildren(QSpinBox)[0].value())
+                }])
+            tracker_shared_layout[0].addWidget(t)
+
+        if p_mode == "named pipe" or r_mode == "named pipe":
+            t = create_label({"text" : "external named pipe require the ui to be closed"})
+            tracker_shared_layout[0].addWidget(t)
+
+    def _trackerpos_specific(layout, combo):
+        settings_core.update_setting(f'{index}trackerpos mode', combo.currentText())
+
+        while layout.count() > 1:
+            item = layout.takeAt(1)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        mode = combo.currentText()
+        s = settings_core.get_settings()
+
+        update_tracker_shared()
+
+        match mode:
+            case "copy":
+                combo_extra = create_combobox({
+                        "type" : "combobox",
+                        "text": "Copy Serial",
+                        "default": s.get(f'{index}trackerpos copy serial'),
+                        "items": list(set([s.get(f'{index}trackerpos copy serial')] + list(trackers_dict))),
+                        "index change": lambda: settings_core.update_setting(f'{index}trackerpos copy serial', combo_extra.findChildren(QComboBox)[0].currentText()),
+                        "pre show": lambda cb: (
+                            saved := s.get(f'{index}trackerpos copy serial'),
+                            val := cb.currentText(),
+                            cb.clear(),
+                            cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)),
+                            cb.setCurrentText(val),
+                            None
+                        )[-1]
+                    })
+                layout.addWidget(combo_extra)
+            case _:
+                layout.addWidget(create_group_horizontal([{"type":"label","text":"","alignment":Qt.AlignmentFlag.AlignCenter}]))
+
+    def _trackerrot_specific(layout, combo):
+        settings_core.update_setting(f'{index}trackerrot mode', combo.currentText())
+
+        while layout.count() > 1:
+            item = layout.takeAt(1)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        mode = combo.currentText()
+        s = settings_core.get_settings()
+
+        update_tracker_shared()
+
+        match mode:
+            case "copy":
+                combo_extra = create_combobox({
+                        "type" : "combobox",
+                        "text": "Copy Serial",
+                        "default": s.get(f'{index}trackerrot copy serial'),
+                        "items": list(set([s.get(f'{index}trackerrot copy serial')] + list(trackers_dict))),
+                        "index change": lambda: settings_core.update_setting(f'{index}trackerrot copy serial', combo_extra.findChildren(QComboBox)[0].currentText()),
+                        "pre show": lambda cb: (
+                            saved := s.get(f'{index}trackerrot copy serial'),
+                            val := cb.currentText(),
+                            cb.clear(),
+                            cb.addItems(list({saved, *trackers_dict}) if saved else list(trackers_dict)),
+                            cb.setCurrentText(val),
+                            None
+                        )[-1]
+                    })
+                layout.addWidget(combo_extra)
+            case "gyro":
+                combo_extra = create_combobox({
+                        "type" : "combobox",
+                        "text": "gyro id",
+                        "default": s.get(f'{index}tracker gyro id', ""),
+                        "items": list({str(s.get(f'{index}tracker gyro id', "")), *controllers_dict}) if s.get(f'{index}tracker gyro id') else list(controllers_dict),
+                        "index change": lambda: settings_core.update_setting(f'{index}tracker gyro id', combo_extra.findChild(QComboBox).currentText()),
+                        "pre show": lambda cb: (
+                            saved := str(s.get(f'{index}tracker gyro id', "")),
+                            val := cb.currentText(),
+                            cb.clear(),
+                            cb.addItems(list({saved, *controllers_dict}) if saved else list(controllers_dict)),
+                            cb.setCurrentText(val),
+                            None
+                        )[-1]
+                    })
+                layout.addWidget(combo_extra)
+            case _:
+                layout.addWidget(create_group_horizontal([{"type":"label","text":"","alignment":Qt.AlignmentFlag.AlignCenter}]))
+
+    outer_widget = QWidget()
+    outer_layout = QVBoxLayout(outer_widget)
+
+    root_widget = QWidget()
+    root_layout = QHBoxLayout(root_widget)
+
+    modes_widget = QWidget()
+    modes_layout = QVBoxLayout(modes_widget)
+
+    shared_widget = QWidget()
+    sl = QVBoxLayout(shared_widget)
+    tracker_shared_layout[0] = sl
+
+    #pos
     tab_extrapos = QWidget()
     layout_extrapos = QHBoxLayout(tab_extrapos)
     combopos_extra = create_combobox({
             "type" : "combobox",
             "text": f'{index} position mode',
             "default": settings.get(f'{index}trackerpos mode', "copy"),
-            "items": ["copy", "offsets"],
-            "index change": lambda: trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))
+            "items": ["copy", "offsets", "UDP", "named pipe"],
+            "index change": lambda: _trackerpos_specific(layout_extrapos, combopos_extra.findChild(QComboBox))
         })
     layout_extrapos.addWidget(combopos_extra)
-    trackerpos_specific_widget(index, layout_extrapos, combopos_extra.findChild(QComboBox))
-    layout_group.addWidget(tab_extrapos)
+    _trackerpos_specific(layout_extrapos, combopos_extra.findChild(QComboBox))
+    modes_layout.addWidget(tab_extrapos)
 
+    #rot
     tab_extrarot = QWidget()
     layout_extrarot = QHBoxLayout(tab_extrarot)
     comborot_extra = create_combobox({
             "type" : "combobox",
             "text": f'{index} rotation mode',
             "default": settings.get(f'{index}trackerrot mode', "copy"),
-            "items": ["copy", "offsets", "gyro"],
-            "index change": lambda: trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))
+            "items": ["copy", "offsets", "UDP", "named pipe", "gyro"],
+            "index change": lambda: _trackerrot_specific(layout_extrarot, comborot_extra.findChild(QComboBox))
         })
     layout_extrarot.addWidget(comborot_extra)
-    trackerrot_specific_widget(index, layout_extrarot, comborot_extra.findChild(QComboBox))
-    layout_group.addWidget(tab_extrarot)
+    _trackerrot_specific(layout_extrarot, comborot_extra.findChild(QComboBox))
+    modes_layout.addWidget(tab_extrarot)
 
-    tracker_offsets_world = create_group_horizontal([
-        {
-            "type" : "label",
-            "text":"world",
-            "alignment" : Qt.AlignmentFlag.AlignCenter
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "X", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset world x', 0.0),
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset world x', tracker_offsets_world.findChildren(QDoubleSpinBox)[0].value())
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "Y", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset world y', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset world y', tracker_offsets_world.findChildren(QDoubleSpinBox)[1].value())
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "Z", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset world z', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset world z', tracker_offsets_world.findChildren(QDoubleSpinBox)[2].value())
-        },    
-        {
-            "type" : "doublespinbox",
-            "text" : "Yaw", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset world yaw', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset world yaw', tracker_offsets_world.findChildren(QDoubleSpinBox)[3].value())
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "Pitch", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset world pitch', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset world pitch', tracker_offsets_world.findChildren(QDoubleSpinBox)[4].value())
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "Roll", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset world roll', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset world roll', tracker_offsets_world.findChildren(QDoubleSpinBox)[5].value())
-        }
-    ])
-    layout_group.addWidget(tracker_offsets_world)
+    root_layout.addWidget(modes_widget)
+    root_layout.addWidget(shared_widget)
+    
+    offsets_tracker = create_offset_ui(f"{index}tracker", group_style)
 
-    tracker_offsets_local = create_group_horizontal([
-        {
-            "type" : "label",
-            "text":"local",
-            "alignment" : Qt.AlignmentFlag.AlignCenter
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "X", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset local x', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset local x', tracker_offsets_local.findChildren(QDoubleSpinBox)[0].value())
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "Y", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset local y', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset local y', tracker_offsets_local.findChildren(QDoubleSpinBox)[1].value())
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "Z", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset local z', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset local z', tracker_offsets_local.findChildren(QDoubleSpinBox)[2].value())
-        },    
-        {
-            "type" : "doublespinbox",
-            "text" : "Yaw", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset local yaw', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset local yaw', tracker_offsets_local.findChildren(QDoubleSpinBox)[3].value())
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "Pitch", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset local pitch', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset local pitch', tracker_offsets_local.findChildren(QDoubleSpinBox)[4].value())
-        },
-        {
-            "type" : "doublespinbox",
-            "text" : "Roll", 
-            "min":-999999999, 
-            "max":999999999, 
-            "default": settings.get(f'{index}tracker offset local roll', 0.0), 
-            "steps" : 0.01,
-            "func"  : lambda: settings_core.update_setting(f'{index}tracker offset local roll', tracker_offsets_local.findChildren(QDoubleSpinBox)[5].value())
-        }
-    ])
-    layout_group.addWidget(tracker_offsets_local)
-    return widget_group
+    outer_layout.addWidget(set_group("Modes", [root_widget], "v", group_style, text = f"tracker {index} position and rotation modes"))
+
+    outer_layout.addWidget(offsets_tracker)
+
+    modes_widget.setObjectName(f"tracker_root_{index}")
+    modes_widget.setStyleSheet(
+        f"QWidget#tracker_root_{index} {{"
+        f" background: {bg.name()};"
+        f" border: 1px solid {border.name()};"
+        f" border-radius: 6px; }}"
+    )
+
+    final_widget = set_group(f"Tracker {index}", [outer_widget], "v", group_style)
+    
+    enable_device(f"{index}tracker")
+    
+    return final_widget
+#trackers widget v2//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 tab_devices = QWidget()
 layout_devices = QVBoxLayout(tab_devices)
@@ -4655,13 +5312,20 @@ def create_trackers_display():
     devices_arr.clear()
     clear_layout(layout_devices)
 
+    if settings['trackers num'] == 64:
+        b = create_button({
+        "text" : "PLAY BAD APPLE!!!",
+        "enabled" : True,
+        "func"  : lambda: start_bad_apple()
+        })
+        layout_devices.addWidget(b)
+
     if settings['trackers num'] > 0:
         for n in range(settings['trackers num']):
             devices_arr.append(create_tracker_widget(n))
 
         container = QWidget()
         container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
         for widget in devices_arr:
             container_layout.addWidget(widget)
 
@@ -4672,9 +5336,9 @@ def create_trackers_display():
         layout_devices.addWidget(scroll_area)
 
 tracker_num = create_spinbox({
-        "text" : "tracker number",
+        "text" : "create trackers",
         "min":0, 
-        "max":999999999, 
+        "max":64, 
         "default":settings_core.get_settings()['trackers num'], 
         "steps" : 1,
         "func"  : lambda: create_trackers_display()
@@ -4685,41 +5349,58 @@ layout_trackers.addWidget(tracker_num)
 layout_trackers.addWidget(tab_devices)
 #trackers/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#////////////////////////////////////////////////////
-group_widget = QWidget()
-group_layout = QVBoxLayout(group_widget)
+#found trackers display////////////////////////////////////////////////////
+first_widget = QWidget()
+first_layout = QHBoxLayout(first_widget)
 
-group_layout.addWidget(first_label)
-
-tracker_title_label1 = create_label({
-    "text" : "---------Trackers---------", 
+first_label = create_label({
+    "text" : "steamvr is not running :(", 
     "alignment" : Qt.AlignmentFlag.AlignCenter
 })
-group_layout.addWidget(tracker_title_label1)
 
-#////////////////////////////////////////////////////
+first_button = create_button({
+        "text": "Toggle Found Devices",
+        "func": lambda: flip_vis_found()
+    })
+
+def flip_vis_found():
+    if scroll_detected.isVisible():
+        scroll_detected.hide()
+    else:
+        scroll_detected.show()
+
+    settings_core.update_setting("show detected", scroll_detected.isVisible())
+
+first_layout.addWidget(first_label)
+first_layout.addWidget(first_button)
+
+# found_widget = QWidget()
+# found_layout = QVBoxLayout(found_widget)
+
 scroll_detected = QScrollArea()
 scroll_detected.setWidgetResizable(True)
 
-scroll_detected.setMinimumHeight(720)
-# scroll_detected.setMaximumHeight(720)
+# scroll_detected.setMinimumHeight(190)
+scroll_detected.setMaximumHeight(190)
 
-scroll_detected.setMinimumWidth(250)
-# scroll_detected.setMaximumWidth(250)
+# scroll_detected.setMinimumWidth(190)
+# scroll_detected.setMaximumWidth(190)
 
-container = QWidget()
-layout = QVBoxLayout(container)
+detected_widget = QWidget()
+detected_layout = QHBoxLayout(detected_widget)
 
-trackers_label1 = create_label({
-    "text" : "0 found", 
-    "alignment" : Qt.AlignmentFlag.AlignCenter
-})
-layout.addWidget(trackers_label1)
+scroll_detected.setWidget(detected_widget)
+# found_layout.addWidget(scroll_detected)
+# found_layout.addWidget(first_widget)
 
-scroll_detected.setWidget(container)
+def boot_change_detected_vis():
+    if settings_core.get_settings().get("show detected", True):
+        scroll_detected.show()
+    else:
+        scroll_detected.hide()
 
-group_layout.addWidget(scroll_detected)
-#////////////////////////////////////////////////////
+boot_change_detected_vis()
+#found trackers display////////////////////////////////////////////////////
 
 def start_reset_gyro():
     thread = threading.Thread(target=reset_gyro_on_input, daemon=True)
@@ -4740,6 +5421,388 @@ def reset_gyro_on_input():
 
         time.sleep(0.001)
 
+#bad apple/////////////////////////////////////////////////////////////////////////////////////////////////////
+BAD_APPLE_STATE = {}
+
+def start_bad_apple():
+    for n in range(64):
+        settings_core.update_setting(f"{n}trackerpos mode", "bad apple")
+
+        if settings_core.get_settings().get("bad apple ui", True):
+            settings_core.update_setting(f"{n}trackerrot mode", "bad apple")
+        else:
+            settings_core.update_setting(f"{n}trackerrot mode", "good apple")
+
+    thread = threading.Thread(target=bad_apple, daemon=True)
+    thread.start()
+
+def bad_apple(): 
+    
+    speed = settings_core.get_settings().get("bad apple speed", 10.0) #speed(higher == slower)
+    # 1 == normal(best but steamvr will crash if rot mode is enabled)
+    # 10 == stable(looks ok)
+    # 40 == good for ui(so youtube lol)
+    
+    global BAD_APPLE_STATE
+    video_path = os.path.join(os.getcwd(), "assets", "Bad Apple.mp4")
+    cap = cv2.VideoCapture(video_path)
+    
+    if not cap.isOpened():
+        return
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps <= 0: fps = 30.0
+    
+    frame_duration = (1.0 / fps) * speed
+    
+    grid_w, grid_h = 7, 8
+    start_index = 2
+    total_trackers = 64
+    mod = 0.1 
+
+    try:
+        start_time = time.perf_counter()
+        frame_count = 0
+
+        while cap.isOpened():
+            target_time = start_time + (frame_count * frame_duration)
+            
+            ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                start_time = time.perf_counter()
+                frame_count = 0
+                continue
+
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            
+            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            next_frame_state = {}
+            try:
+                hmd_data = list(trackers_dict.values())[0]
+                hmd_pos = np.array([hmd_data['pos x'], hmd_data['pos y'], hmd_data['pos z']])
+                hmd_rot = R.from_matrix(hmd_data['rotation matrix'])
+                world_backward_pos = hmd_pos + hmd_rot.apply(np.array([0, 0, 10]))
+            except:
+                world_backward_pos = np.array([0, 0, 10])
+
+            for i in range(total_trackers):
+                next_frame_state[f"{i}tracker"] = {
+                    "on": False,
+                    "pos x": float(world_backward_pos[0]), 
+                    "pos y": float(world_backward_pos[1]),
+                    "pos z": float(world_backward_pos[2])
+                }
+
+            h, w = thresh.shape
+            cell_h, cell_w = h // grid_h, w // grid_w
+
+            current_tracker = start_index
+            for y in range(grid_h):
+                for x in range(grid_w):
+                    y0, y1 = y * cell_h, (y + 1) * cell_h
+                    x0, x1 = x * cell_w, (x + 1) * cell_w
+                    
+                    cell = thresh[y0:y1, x0:x1]
+                    
+                    if np.mean(cell) < 127:
+                        next_frame_state[f"{current_tracker}tracker"] = {
+                            "on": True,
+                            "pos x": float(x * mod), 
+                            "pos y": float((grid_h - 1 - y) * mod),
+                            "pos z": 0.0
+                        }
+                    current_tracker += 1
+
+            BAD_APPLE_STATE.update(next_frame_state)
+            cv2.imshow("Bad Apple!!!", frame)
+            cv2.waitKey(1) 
+
+            frame_count += 1
+            while time.perf_counter() < target_time:
+                remaining = target_time - time.perf_counter()
+                if remaining > 0.005:
+                    time.sleep(0.001)
+                else:
+                    pass 
+
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+#bad apple/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#dark mode/////////////////////////////////////////////////////////////////////////////////////////////////////
+def is_dark_mode():
+    palette = QApplication.instance().palette()
+    bg = palette.color(QPalette.ColorRole.Window)
+    return bg.lightness() < 128
+
+def start_dark_mode():
+    thread = threading.Thread(target=dark_mode, daemon=True)
+    thread.start()
+
+def dark_mode():
+    try:
+        while True:
+            if not is_dark_mode():
+                WHY_LIGHT_MODE()
+            else:
+                thank_you()
+
+            time.sleep(5)
+    except:
+        pass
+
+def WHY_LIGHT_MODE():
+    pass
+    #print(is_dark_mode())
+
+def thank_you():
+    pass
+    #print(is_dark_mode())
+
+#dark mode/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#streaming//////////////////////////////////////////////////////////////////////////////////////////////////////
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+except Exception:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
+flask_app = Flask(__name__)
+
+latest_raw_frame     = None
+latest_encoded_frame = None
+_capture_started     = False
+
+class WindowMirror:
+
+    def __init__(self, window_name):
+        self.hwnd = win32gui.FindWindow(None, window_name)
+        if not self.hwnd:
+            raise Exception(f"Could not find '{window_name}'.")
+
+        rect = win32gui.GetWindowRect(self.hwnd)
+        self.w = rect[2] - rect[0]
+        self.h = rect[3] - rect[1]
+        if self.w <= 0 or self.h <= 0:
+            self.w, self.h = 1280, 720
+
+    def capture_frame(self):
+        hwnd_dc = win32gui.GetWindowDC(self.hwnd)
+        mfc_dc  = win32ui.CreateDCFromHandle(hwnd_dc)
+        save_dc = mfc_dc.CreateCompatibleDC()
+
+        rect = win32gui.GetWindowRect(self.hwnd)
+        w = rect[2] - rect[0]
+        h = rect[3] - rect[1]
+        if w > 0 and h > 0:
+            self.w, self.h = w, h
+
+        bitmap = win32ui.CreateBitmap()
+        bitmap.CreateCompatibleBitmap(mfc_dc, self.w, self.h)
+        save_dc.SelectObject(bitmap)
+        save_dc.BitBlt((0, 0), (self.w, self.h), mfc_dc, (0, 0), win32con.SRCCOPY)
+
+        raw = bitmap.GetBitmapBits(True)
+        img = np.frombuffer(raw, dtype="uint8").reshape((self.h, self.w, 4))
+
+        win32gui.DeleteObject(bitmap.GetHandle())
+        save_dc.DeleteDC()
+        mfc_dc.DeleteDC()
+        win32gui.ReleaseDC(self.hwnd, hwnd_dc)
+
+        return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
+def _shared_capture_loop():
+    global latest_raw_frame, latest_encoded_frame
+
+    while True:
+        mirror = None
+        while mirror is None:
+            try:
+                mirror = WindowMirror("Headset Window")
+            except Exception as e:
+                print(f"[Capture] Waiting for window... ({e})", end="\r", flush=True)
+                time.sleep(2)
+
+        while True:
+            try:
+                settings = settings_core.get_settings()
+
+                frame = mirror.capture_frame()
+                latest_raw_frame = frame
+
+                scale = settings.get("mirror web scale", 100)  #resolution scale here///
+                small = cv2.resize(frame, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+                ok, enc = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, settings.get("mirror web bitrate", 100)])#bitrate here///
+                if ok:
+                    latest_encoded_frame = enc.tobytes()
+            except Exception as e:
+                print(f"\n[Capture] Lost: {e}")
+                time.sleep(2)
+                break
+
+def _ensure_capture_running():
+    global _capture_started
+    if not _capture_started:
+        _capture_started = True
+        threading.Thread(target=_shared_capture_loop, daemon=True).start()
+
+def generate_stream_bytes():
+    global latest_encoded_frame
+    yield b"--frame\r\n"
+    while True:
+        if latest_encoded_frame is not None:
+            yield b"Content-Type: image/jpeg\r\n\r\n" + latest_encoded_frame + b"\r\n--frame\r\n"
+        time.sleep(0.0)
+
+@flask_app.route("/")
+def index():
+    return """<!DOCTYPE html>
+<html><head><title>Headset Window Stream</title><style>
+body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;user-select:none}
+canvas{width:100vw;height:100vh;object-fit:contain;image-rendering:pixelated;cursor:pointer}
+</style></head><body>
+<canvas id="c"></canvas>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+function load(){const i=new Image();i.onload=()=>{c.width=i.naturalWidth;c.height=i.naturalHeight;ctx.drawImage(i,0,0);setTimeout(()=>load(),1)};i.onerror=()=>setTimeout(()=>load(),1000);i.src='/frame.jpg?t='+Date.now()}
+c.addEventListener('dblclick',()=>{if(!document.fullscreenElement)c.requestFullscreen();else document.exitFullscreen()});
+window.onload=load;
+</script></body></html>"""
+
+@flask_app.route("/frame.jpg")
+def single_frame():
+    if latest_encoded_frame is None:
+        return "", 204
+    return Response(latest_encoded_frame, mimetype="image/jpeg")
+
+@flask_app.route("/stream")
+def video_feed():
+    return Response(generate_stream_bytes(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+def start_mirror_window():
+    threading.Thread(target=mirror_window, daemon=True).start()
+
+def start_mirror_web():
+    threading.Thread(target=mirror_web, daemon=True).start()
+
+import tkinter as tk
+
+def get_monitor_position(index=1):
+    root = tk.Tk()
+    root.withdraw()
+    monitors = []
+    for m in root.tk.call('wm', 'maxsize', '.'):
+        pass
+    root.destroy()
+    from screeninfo import get_monitors
+    monitors = get_monitors()
+    if index < len(monitors):
+        return monitors[index].x, monitors[index].y
+    return 0, 0
+
+def mirror_window():
+    settings = settings_core.get_settings()
+    window_open = False
+    fullscreen = settings.get("start mirror window fullscreen", False)
+    win_name = "Mirror - Headset Window"
+    alt_enter_prev = False
+
+    pre_monitor_index = settings.get("start mirror window monitor index", 0)
+    while True:
+        settings = settings_core.get_settings()
+        enabled  = settings.get("mirror window", False)
+
+        if not enabled:
+            if window_open:
+                cv2.destroyWindow(win_name)
+                window_open = False
+                fullscreen = False
+                alt_enter_prev = False
+            time.sleep(0.5)
+            continue
+
+        _ensure_capture_running()
+
+        if not window_open:
+            cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
+            window_open = True
+            x, y = get_monitor_position(settings.get("start mirror window monitor index", 0))
+            cv2.moveWindow(win_name, x, y)
+            if settings.get("start mirror window fullscreen", False):
+                cv2.setWindowProperty(win_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+        if latest_raw_frame is not None:
+            cv2.imshow(win_name, latest_raw_frame)
+        cv2.waitKey(1)
+
+        alt_held = win32api.GetAsyncKeyState(0x12) & 0x8000
+        enter_held = win32api.GetAsyncKeyState(0x0D) & 0x8000
+        alt_enter_now = bool(alt_held and enter_held)
+
+        if alt_enter_now and not alt_enter_prev:
+            fullscreen = not fullscreen
+            if fullscreen:
+                cv2.setWindowProperty(win_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            else:
+                cv2.setWindowProperty(win_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+
+        alt_enter_prev = alt_enter_now
+
+        current_monitor_index = settings.get("start mirror window monitor index", 0)
+        if pre_monitor_index != current_monitor_index:
+            x, y = get_monitor_position(settings.get("start mirror window monitor index", 0))
+            cv2.moveWindow(win_name, x, y)
+            pre_monitor_index = settings.get("start mirror window monitor index", 0)
+
+def mirror_web():
+    settings = settings_core.get_settings()
+    
+    flask_started = False
+    PORT = settings.get("mirror web port", 9999)
+
+    while True:
+        enabled = settings_core.get_settings().get("mirror web", False)
+
+        if not enabled:
+            time.sleep(0.5)
+            continue
+
+        _ensure_capture_running()
+
+        if not flask_started:
+            flask_started = True
+            LOCAL_IP = get_local_ip()
+            print("=" * 70)
+            print(f"  LOCAL ACCESS URL:   http://localhost:{PORT}/")
+            print(f"  NETWORK STREAM URL: http://{LOCAL_IP}:{PORT}/")
+            print("=" * 70)
+
+            threading.Thread(
+                target=lambda: flask_app.run(host="0.0.0.0", port=PORT, threaded=True,
+                                             debug=False, use_reloader=False),
+                daemon=True
+            ).start()
+
+        time.sleep(1)
+#streaming//////////////////////////////////////////////////////////////////////////////////////////////////////
+
 if __name__ == '__main__':
     if settings_core.get_settings()['hand tracking']:
         start_camera()
@@ -4751,19 +5814,30 @@ if __name__ == '__main__':
     start_send_data()
     start_update_vrlabel()
 
-    # start_wiimote_threads()
-
     start_reset_gyro()
 
-tabs.addTab(tab_main, "Hmd")
+    start_reset_playspace()
+
+    start_udp_thread()
+
+    start_mirror_window()
+    start_mirror_web()
+
+    #start_bad_apple()
+    #start_dark_mode()
+
+tabs.addTab(scroll_hmd, "Hmd")
 tabs.addTab(scroll_controllers, "Controllers")
 
 tabs.addTab(tab_trackers, "Trackers")
 tabs.addTab(tab_driver, "Driver")
 tabs.addTab(tab_credits, "Credits")
 
+help_label = create_label({"text" : "hi!!! ;P"})
+window_layout.addWidget(help_label)
 window_layout.addWidget(tabs)
-window_layout.addWidget(group_widget)
+window_layout.addWidget(scroll_detected)#found_widget)
+
 window.show()
 app.exec()
 

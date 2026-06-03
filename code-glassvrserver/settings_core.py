@@ -12,7 +12,7 @@ default_settings = {
 
     "stereoscopic" : False,
     
-    #fov///////////////////////////
+    #fov///////////////////////////////////////////////
     "fov" : 90.0,
     "convergence" : 0.0,
 
@@ -27,11 +27,6 @@ default_settings = {
     "inner stereo" : 41.070,
     "top stereo" : 26.120,
     "bottom stereo" : 26.120,
-
-    # "ip sending": "127.0.0.1",
-    # "port sending": 9999,
-    # "ip receiving": "127.0.0.1",
-    # "port receiving": 9999,
 
     "prediction time" : 0.011,
 
@@ -82,6 +77,8 @@ default_settings = {
     "cr offset local pitch": 0.0,
     "cr offset local roll": 0.0,
 
+    "cr playspace yaw": 0.0,
+
     "clpos copy serial": "",
     "clrot copy serial": "",
 
@@ -101,6 +98,8 @@ default_settings = {
     "cl offset local yaw": 0.0,
     "cl offset local pitch": 0.0,
     "cl offset local roll": 0.0,
+
+    "cl playspace yaw": 0.0,
 
     "cr_a" : "",
     "cr_b" : "",
@@ -148,7 +147,7 @@ default_settings = {
     "enable cr": False,
     "enable cl": False,
 
-    #hand tracking///////////////////////////
+    #hand tracking//////////////////////////////////////
     "hand tracking": False,
     "curl" : True,
     "splay" : True,
@@ -168,9 +167,37 @@ default_settings = {
     # "clrot marker id" : 40,
 
     "trackers num": 0,
+
+    "bad apple speed" : 10.0,
+    "bad apple ui" : True,
+
+    "crinput mode" : "app (named pipe)",
+    "crskeletal mode" : "app (named pipe)",
+
+    "clinput mode" : "app (named pipe)",
+    "clskeletal mode" : "app (named pipe)",
+
+    "hmd port" : 9000,
+    "cr port" : 9001,
+    "cl port" : 9002,
+    #"0tracker port" : 9003
+
+    #streaming////////////////////////////////////////
+    "mirror window" : False,
+    "mirror web" : False,
+    "mirror web port" : 9999,
+    "mirror web bitrate" : 100,
+    "mirror web scale" : 1.0,
+
+    #arcore playspace sync/////////////////////////////
+    "hmd playspace reset method": "Fixed Position",
+    "hmd playspace y": -0.25,
+    "cr playspace reset method": "Headset",
+    "cr playspace y" : 0.2,
+    "cr playspace reset method": "Headset",
+    "cl playspace y" : 0.2,
 }
 
-##################################################################################################
 def get_path():
     appdata_path = os.getenv('APPDATA')
     folder_name = 'glassvr'
@@ -185,17 +212,19 @@ def get_path():
     return file_path
 
 file_path = get_path()
-#file_path = 'settings.json'
-##################################################################################################
 
 def reset_settings():
     with open(file_path, 'w') as f:
         json.dump(default_settings, f, indent=4)
 
+last_good_settings = None
+
 def get_settings():
+    global last_good_settings
     try:
         if not os.path.exists(file_path):
             reset_settings()
+            last_good_settings = default_settings
             return default_settings
 
         with open(file_path, 'r') as f:
@@ -206,16 +235,18 @@ def get_settings():
         if missing_keys:
             updated_settings = default_settings.copy()
             updated_settings.update(current_settings)
-            
+
             with open(file_path, 'w') as f:
                 json.dump(updated_settings, f, indent=4)
-            
+
+            last_good_settings = updated_settings
             return updated_settings
-        
+
+        last_good_settings = current_settings
         return current_settings
-        
+
     except (json.JSONDecodeError, OSError) as e:
-        return default_settings
+        return last_good_settings if last_good_settings is not None else default_settings
 
 def update_setting(key, new_value):
     settings = get_settings()
