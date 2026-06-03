@@ -1,0 +1,2 @@
+get vitures header files from: https://www.viture.com/developer
+if you dont care about that feature, delete rotmode "xr glasses", press ctrl+f "//viture-" and youll find it!

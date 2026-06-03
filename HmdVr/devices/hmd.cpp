@@ -1,0 +1,610 @@
+﻿#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
+#include "hmd.h"
+#include "settings.h" 
+#include "basics.h"
+
+#include <math.h>
+#include <string>
+#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <limits>
+#include <cmath> 
+#include <cstring> 
+#include <cstdlib>
+#include <cstdio>
+#include <sstream>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+using namespace vr;
+using namespace std;
+
+const float k_fRadFactor = (float)M_PI / 180.0f;
+
+float HeadToEyeDist = 0.0f;
+bool Stereoscopic = false;
+float ResolutionX = 1920.0f;
+float ResolutionY = 1080.0f;
+bool FullScreen = false;
+float RefreshRate = 90.0f;
+
+CSampleDeviceDriver::CSampleDeviceDriver()
+{
+    //viture-
+    m_pVitureDevice = nullptr;
+    //viture-
+    m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
+    m_ulPropertyContainer = vr::k_ulInvalidPropertyContainer;
+
+    m_flIPD = vr::VRSettings()->GetFloat(k_pch_SteamVR_Section, k_pch_SteamVR_IPD_Float);
+
+    char buf[1024];
+
+    vr::VRSettings()->GetString(k_pch_Sample_Section, k_pch_Sample_SerialNumber_String, buf, sizeof(buf));
+    m_sSerialNumber = buf;
+
+    vr::VRSettings()->GetString(k_pch_Sample_Section, k_pch_Sample_ModelNumber_String, buf, sizeof(buf));
+    m_sModelNumber = buf;
+
+    m_flSecondsFromVsyncToPhotons = 0.008;
+    m_flDisplayFrequency = RefreshRate;
+}
+
+//viture-
+CSampleDeviceDriver::~CSampleDeviceDriver() {
+    if (m_pVitureDevice) {
+        delete m_pVitureDevice;
+        m_pVitureDevice = nullptr;
+    }
+}
+//viture-
+
+EVRInitError CSampleDeviceDriver::Activate(TrackedDeviceIndex_t unObjectId)
+{
+    Stereoscopic = GetBoolFromSettingsByKey("stereoscopic");
+    ResolutionX = GetFloatFromSettingsByKey("resolution x");
+    ResolutionY = GetFloatFromSettingsByKey("resolution y");
+    FullScreen = GetBoolFromSettingsByKey("fullscreen");
+    RefreshRate = GetFloatFromSettingsByKey("refresh rate");
+    m_flDisplayFrequency = RefreshRate;
+
+    m_nWindowX = 0;
+    m_nWindowY = 0;
+
+    if (Stereoscopic) {
+        m_nWindowWidth = (uint32_t)(ResolutionX * 2);
+        m_nRenderWidth = (uint32_t)(ResolutionX);
+    }
+    else {
+        m_nWindowWidth = (uint32_t)ResolutionX;
+        m_nRenderWidth = (uint32_t)ResolutionX;
+    }
+    m_nWindowHeight = (uint32_t)ResolutionY;
+    m_nRenderHeight = (uint32_t)ResolutionY;
+
+    m_unObjectId = unObjectId;
+    m_ulPropertyContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(m_unObjectId);
+
+    //needed for VRC for some reason
+    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, Prop_ModelNumber_String, "oculus_hmd");
+    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, Prop_ManufacturerName_String, "Oculus");
+    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, Prop_RenderModelName_String, "oculus_hmd");
+    vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, Prop_SerialNumber_String, "1WMHH000X00000");
+    //
+
+    vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_UserIpdMeters_Float, m_flIPD);
+    vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_UserHeadToEyeDepthMeters_Float, HeadToEyeDist);
+    vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_DisplayFrequency_Float, m_flDisplayFrequency);
+    vr::VRProperties()->SetFloatProperty(m_ulPropertyContainer, Prop_SecondsFromVsyncToPhotons_Float, m_flSecondsFromVsyncToPhotons);
+    vr::VRProperties()->SetUint64Property(m_ulPropertyContainer, Prop_CurrentUniverseId_Uint64, 2);
+    vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_IsOnDesktop_Bool, false);
+    vr::VRProperties()->SetBoolProperty(m_ulPropertyContainer, Prop_DisplayDebugMode_Bool, !FullScreen);
+
+    //viture-
+    m_pVitureDevice = new Viture();
+    //viture-
+
+    //connections
+    m_comm.AddUDP(GetIntFromSettingsByKey("hmd port"));
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_HMD_Pos");
+    m_comm.AddPipe("\\\\.\\pipe\\GlassVR_HMD_Rot");
+    //connections
+
+    return VRInitError_None;
+}
+
+void CSampleDeviceDriver::Deactivate()
+{
+
+    //viture-
+    if (m_pVitureDevice) {
+        delete m_pVitureDevice;
+        m_pVitureDevice = nullptr;
+    }
+    m_poseInitialized = false;
+    m_startupInverse = { 1, 0, 0, 0 };
+    //viture-
+
+    m_comm.StopAll();
+}
+
+void CSampleDeviceDriver::EnterStandby()
+{
+
+}
+
+void CSampleDeviceDriver::PowerOff()
+{
+
+}
+
+void* CSampleDeviceDriver::GetComponent(const char* pchComponentNameAndVersion)
+{
+    if (!_stricmp(pchComponentNameAndVersion, vr::IVRDisplayComponent_Version)) {
+        return (vr::IVRDisplayComponent*)this;
+    }
+    return NULL;
+}
+
+
+void CSampleDeviceDriver::DebugRequest(const char* pchRequest, char* pchResponseBuffer, uint32_t unResponseBufferSize)
+{
+    if (unResponseBufferSize >= 1) {
+
+        pchResponseBuffer[0] = 0;
+    }
+}
+
+void CSampleDeviceDriver::GetWindowBounds(int32_t* pnX, int32_t* pnY, uint32_t* pnWidth, uint32_t* pnHeight)
+{
+    *pnX = m_nWindowX;
+    *pnY = m_nWindowY;
+    *pnWidth = m_nWindowWidth;
+    *pnHeight = m_nWindowHeight;
+}
+
+bool CSampleDeviceDriver::IsDisplayOnDesktop()
+{
+    return !FullScreen;
+}
+
+bool CSampleDeviceDriver::IsDisplayRealDisplay()
+{
+    return false;
+}
+
+void CSampleDeviceDriver::GetRecommendedRenderTargetSize(uint32_t* pnWidth, uint32_t* pnHeight)
+{
+    *pnWidth = m_nRenderWidth;
+    *pnHeight = m_nRenderHeight;
+}
+
+void CSampleDeviceDriver::GetEyeOutputViewport(EVREye eEye, uint32_t* pnX, uint32_t* pnY, uint32_t* pnWidth, uint32_t* pnHeight)
+{
+    *pnY = m_nWindowY;
+    *pnHeight = m_nWindowHeight;
+
+    if (Stereoscopic)
+    {
+        *pnWidth = m_nWindowWidth / 2;
+        if (eEye == Eye_Left)
+        {
+            *pnX = m_nWindowX;
+        }
+        else
+        {
+            *pnX = m_nWindowX + m_nWindowWidth / 2;
+        }
+    }
+    else
+    {
+        *pnX = m_nWindowX;
+        *pnWidth = m_nWindowWidth;
+    }
+}
+
+void CSampleDeviceDriver::GetProjectionRaw(EVREye eEye, float* pfLeft, float* pfRight, float* pfTop, float* pfBottom)
+{
+    float k_fAngleOuterH_Deg = 0.0;
+    float k_fAngleInnerH_Deg = 0.0;
+    float k_fAngleTopV_Deg = 0.0;
+    float k_fAngleBottomV_Deg = 0.0;
+
+    if (Stereoscopic) {
+        k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("outer stereo");
+        k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("inner stereo");
+        k_fAngleTopV_Deg = GetFloatFromSettingsByKey("top stereo");
+        k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("bottom stereo");
+    }
+    else {
+        k_fAngleOuterH_Deg = GetFloatFromSettingsByKey("outer mono");
+        k_fAngleInnerH_Deg = GetFloatFromSettingsByKey("inner mono");
+        k_fAngleTopV_Deg = GetFloatFromSettingsByKey("top mono");
+        k_fAngleBottomV_Deg = GetFloatFromSettingsByKey("bottom mono");
+    }
+
+    float k_fTangentTopV = std::tan(k_fAngleTopV_Deg * k_fRadFactor);
+    float k_fTangentBottomV = std::tan(k_fAngleBottomV_Deg * k_fRadFactor);
+    float k_fTangentOuterH = std::tan(k_fAngleOuterH_Deg * k_fRadFactor);
+    float k_fTangentInnerH = std::tan(k_fAngleInnerH_Deg * k_fRadFactor);
+
+    *pfTop = -k_fTangentTopV;
+    *pfBottom = k_fTangentBottomV;
+
+    if (eEye == vr::Eye_Left)
+    {
+        *pfLeft = -k_fTangentOuterH;
+        *pfRight = k_fTangentInnerH;
+    }
+    else
+    {
+        *pfLeft = -k_fTangentInnerH;
+        *pfRight = k_fTangentOuterH;
+    }
+}
+
+vr::HmdMatrix34_t CSampleDeviceDriver::GetEyeToHeadTransform(vr::EVREye eEye)
+{
+    //test later
+    vr::HmdMatrix34_t matrix = {
+        1.0f, 0.0f, 0.0f, 0.0f,//x right-left
+        0.0f, 1.0f, 0.0f, 0.0f,//y up-down
+        0.0f, 0.0f, 1.0f, 0.0f//z forward-back
+    };
+
+    float fHalfIPD = m_flIPD / 2.0f;
+
+    if (eEye == vr::Eye_Left)
+    {
+        matrix.m[0][3] = -fHalfIPD;
+    }
+    else
+    {
+        matrix.m[0][3] = fHalfIPD;
+    }
+
+    return matrix;
+}
+
+vr::DistortionCoordinates_t CSampleDeviceDriver::ComputeDistortion(EVREye eEye, float fU, float fV)
+{
+    vr::DistortionCoordinates_t coordinates;
+    coordinates.rfRed[0] = fU;
+    coordinates.rfRed[1] = fV;
+    coordinates.rfGreen[0] = fU;
+    coordinates.rfGreen[1] = fV;
+    coordinates.rfBlue[0] = fU;
+    coordinates.rfBlue[1] = fV;
+    return coordinates;
+}
+
+bool CSampleDeviceDriver::ComputeInverseDistortion(vr::HmdVector2_t* pA, vr::EVREye eEye, uint32_t unElement, float fU, float fV)
+{
+    pA[unElement].v[0] = fU;
+    pA[unElement].v[1] = fV;
+    return true;
+}
+
+//pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static uint32_t g_foundTrackers[vr::k_unMaxTrackedDeviceCount];
+static uint32_t g_trackerCount = 0;
+static int g_selectedIndex = 0;
+
+static void UpdateTrackers() {
+    g_trackerCount = 0;
+    for (uint32_t i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
+        g_foundTrackers[g_trackerCount] = i;
+        g_trackerCount++;
+    }
+}
+
+static vr::HmdQuaternion_t GetRotationFromMatrix(const vr::HmdMatrix34_t& matrix) {
+    vr::HmdQuaternion_t q;
+    q.w = sqrt(fmax(0, 1 + matrix.m[0][0] + matrix.m[1][1] + matrix.m[2][2])) / 2;
+    q.x = sqrt(fmax(0, 1 + matrix.m[0][0] - matrix.m[1][1] - matrix.m[2][2])) / 2;
+    q.y = sqrt(fmax(0, 1 - matrix.m[0][0] + matrix.m[1][1] - matrix.m[2][2])) / 2;
+    q.z = sqrt(fmax(0, 1 - matrix.m[0][0] - matrix.m[1][1] + matrix.m[2][2])) / 2;
+    q.x = _copysign(q.x, matrix.m[2][1] - matrix.m[1][2]);
+    q.y = _copysign(q.y, matrix.m[0][2] - matrix.m[2][0]);
+    q.z = _copysign(q.z, matrix.m[1][0] - matrix.m[0][1]);
+    return q;
+}
+
+static void RotateVectorByQuat(const vr::HmdQuaternion_t& q, const float vIn[3], double vOut[3]) {
+    float x = q.x, y = q.y, z = q.z, w = q.w;
+    float vx = vIn[0], vy = vIn[1], vz = vIn[2];
+
+    vOut[0] = vx * (1 - 2 * y * y - 2 * z * z) + vy * (2 * x * y - 2 * w * z) + vz * (2 * x * z + 2 * w * y);
+    vOut[1] = vx * (2 * x * y + 2 * w * z) + vy * (1 - 2 * x * x - 2 * z * z) + vz * (2 * y * z - 2 * w * x);
+    vOut[2] = vx * (2 * x * z - 2 * w * y) + vy * (2 * y * z + 2 * w * x) + vz * (1 - 2 * x * x - 2 * y * y);
+}
+
+static vr::HmdQuaternion_t QuatMul(const vr::HmdQuaternion_t& q, const vr::HmdQuaternion_t& r) {
+    vr::HmdQuaternion_t res;
+    res.w = q.w * r.w - q.x * r.x - q.y * r.y - q.z * r.z;
+    res.x = q.w * r.x + q.x * r.w + q.y * r.z - q.z * r.y;
+    res.y = q.w * r.y - q.x * r.z + q.y * r.w + q.z * r.x;
+    res.z = q.w * r.z + q.x * r.y - q.y * r.x + q.z * r.w;
+    return res;
+}
+
+static vr::HmdQuaternion_t EulerToQuatZYX(float roll, float yaw, float pitch) {
+    float cr = cos(roll * 0.5f);  float sr = sin(roll * 0.5f);
+    float cy = cos(yaw * 0.5f);   float sy = sin(yaw * 0.5f);
+    float cp = cos(pitch * 0.5f); float sp = sin(pitch * 0.5f);
+
+    vr::HmdQuaternion_t q;
+    q.w = cr * cy * cp + sr * sy * sp;
+    q.x = cr * cy * sp - sr * sy * cp;
+    q.y = cr * sy * cp + sr * cy * sp;
+    q.z = sr * cy * cp - cr * sy * sp;
+    return q;
+}
+
+static int GetTrackerIndexBySerial(const std::string& targetSerial) {
+    if (targetSerial.empty()) return -1;
+
+    for (uint32_t i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
+        vr::PropertyContainerHandle_t container = vr::VRProperties()->TrackedDeviceToPropertyContainer(i);
+        if (container == vr::k_ulInvalidPropertyContainer) continue;
+
+        char serialBuf[256];
+        vr::ETrackedPropertyError err;
+        vr::VRProperties()->GetStringProperty(container, vr::Prop_SerialNumber_String, serialBuf, sizeof(serialBuf), &err);
+
+        if (err == vr::TrackedProp_Success && targetSerial == serialBuf) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
+//c++ moment
+//switch (posmode) {
+//case "copy":
+//    // code block
+//    break;
+//case "test":
+//    // code block
+//    break;
+//default:
+//    // code block
+//}
+//switch (rotmode) {
+//case "copy":
+//    // code block
+//    break;
+//case "test":
+//    // code block
+//    break;
+//default:
+//    // code block
+//}
+
+vr::DriverPose_t CSampleDeviceDriver::GetPose()
+{
+    UpdateTrackers();
+
+    std::string device = "hmd";
+
+    vr::DriverPose_t pose = { 0 };
+    pose.poseIsValid = true;
+    pose.result = vr::TrackingResult_Running_OK;
+    pose.deviceIsConnected = true;
+    pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
+    pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
+
+    std::string posmode = GetStringFromSettingsByKey(device + "pos mode");
+    std::string rotmode = GetStringFromSettingsByKey(device + "rot mode");
+
+    vr::TrackedDevicePose_t rawPoses[vr::k_unMaxTrackedDeviceCount];
+    vr::VRServerDriverHost()->GetRawTrackedDevicePoses(0, rawPoses, vr::k_unMaxTrackedDeviceCount);
+
+    //connections
+    udp_pos = m_comm.GetUdpPos();
+    udp_rot = m_comm.GetUdpRot();
+
+    pipe_pos = m_comm.GetPipePos();
+    pipe_rot = m_comm.GetPipeRot();
+    //connections
+
+    //pos here///////////////////////////////////////////////////////
+    if (posmode == "copy") {
+        std::string targetSerial = GetStringFromSettingsByKey(device + "pos copy serial");
+        int tracker_pos_idx = GetTrackerIndexBySerial(targetSerial);
+
+        if (tracker_pos_idx >= 0 && tracker_pos_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_pos_idx].bPoseIsValid)
+        {
+            auto& m = rawPoses[tracker_pos_idx].mDeviceToAbsoluteTracking;
+            vr::HmdQuaternion_t device_rotation = GetRotationFromMatrix(m);
+
+            float offset_local[3] = {
+                GetFloatFromSettingsByKey(device + " offset local x"),
+                GetFloatFromSettingsByKey(device + " offset local y"),
+                GetFloatFromSettingsByKey(device + " offset local z")
+            };
+
+            double rotated_local_offset[3];
+            RotateVectorByQuat(device_rotation, offset_local, rotated_local_offset);
+
+            float offset_world[3] = {
+                GetFloatFromSettingsByKey(device + " offset world x"),
+                GetFloatFromSettingsByKey(device + " offset world y"),
+                GetFloatFromSettingsByKey(device + " offset world z")
+            };
+
+            pose.vecPosition[0] = m.m[0][3] + rotated_local_offset[0] + offset_world[0];
+            pose.vecPosition[1] = m.m[1][3] + rotated_local_offset[1] + offset_world[1];
+            pose.vecPosition[2] = m.m[2][3] + rotated_local_offset[2] + offset_world[2];
+
+            pose.vecVelocity[0] = rawPoses[tracker_pos_idx].vVelocity.v[0];
+            pose.vecVelocity[1] = rawPoses[tracker_pos_idx].vVelocity.v[1];
+            pose.vecVelocity[2] = rawPoses[tracker_pos_idx].vVelocity.v[2];
+        }
+        else {
+            pose.vecPosition[0] = 0.0f;
+            pose.vecPosition[1] = 0.0f;
+            pose.vecPosition[2] = 0.0f;
+        }
+    }
+    else if (posmode == "offsets") {
+        pose.vecPosition[0] = GetFloatFromSettingsByKey(device + " offset world x");
+        pose.vecPosition[1] = GetFloatFromSettingsByKey(device + " offset world y");
+        pose.vecPosition[2] = GetFloatFromSettingsByKey(device + " offset world z");
+    }
+    else if (posmode == "UDP") {
+        Transform FinalTransform = GetNewTransform(device, udp_pos.x, udp_pos.y, udp_pos.z, pose.qRotation.x, pose.qRotation.y, pose.qRotation.z, pose.qRotation.w);
+
+        pose.vecPosition[0] = FinalTransform.pos_x;
+        pose.vecPosition[1] = FinalTransform.pos_y;
+        pose.vecPosition[2] = FinalTransform.pos_z;
+    }
+    else if (posmode == "test") {
+        //
+    }
+    else {
+        pose.vecPosition[0] = pipe_pos.x;
+        pose.vecPosition[1] = pipe_pos.y;
+        pose.vecPosition[2] = pipe_pos.z;
+    }
+
+    //rot here///////////////////////////////////////////////////////
+    if (rotmode == "copy") {
+        std::string targetRotSerial = GetStringFromSettingsByKey(device + "rot copy serial");
+        int tracker_rot_idx = GetTrackerIndexBySerial(targetRotSerial);
+
+        if (tracker_rot_idx >= 0 && tracker_rot_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_rot_idx].bPoseIsValid)
+        {
+            auto& m = rawPoses[tracker_rot_idx].mDeviceToAbsoluteTracking;
+            vr::HmdQuaternion_t device_rotation = GetRotationFromMatrix(m);
+
+            vr::HmdQuaternion_t offset_local_rotation = EulerToQuatZYX(
+                GetFloatFromSettingsByKey(device + " offset local roll"),
+                GetFloatFromSettingsByKey(device + " offset local yaw"),
+                GetFloatFromSettingsByKey(device + " offset local pitch")
+            );
+
+            vr::HmdQuaternion_t offset_world_rotation = EulerToQuatZYX(
+                GetFloatFromSettingsByKey(device + " offset world roll"),
+                GetFloatFromSettingsByKey(device + " offset world yaw"),
+                GetFloatFromSettingsByKey(device + " offset world pitch")
+            );
+
+            vr::HmdQuaternion_t combined = QuatMul(offset_world_rotation, device_rotation);
+            pose.qRotation = QuatMul(combined, offset_local_rotation);
+
+            pose.vecAngularVelocity[0] = rawPoses[tracker_rot_idx].vAngularVelocity.v[0];
+            pose.vecAngularVelocity[1] = rawPoses[tracker_rot_idx].vAngularVelocity.v[1];
+            pose.vecAngularVelocity[2] = rawPoses[tracker_rot_idx].vAngularVelocity.v[2];
+        }
+        else {
+            pose.qRotation.w = 1.0f;
+            pose.qRotation.x = 0.0f;
+            pose.qRotation.y = 0.0f;
+            pose.qRotation.z = 0.0f;
+        }
+    }
+    else if (rotmode == "offsets") {
+        float yaw = GetFloatFromSettingsByKey(device + " offset world yaw");
+        float pitch = GetFloatFromSettingsByKey(device + " offset world pitch");
+        float roll = GetFloatFromSettingsByKey(device + " offset world roll");
+
+        vr::HmdQuaternion_t offsetQuat = EulerToQuatZYX(roll, yaw, pitch);
+
+        pose.qRotation.w = offsetQuat.w;
+        pose.qRotation.x = offsetQuat.x;
+        pose.qRotation.y = offsetQuat.y;
+        pose.qRotation.z = offsetQuat.z;
+    }
+    //viture-
+    else if (rotmode == "xr glasses") {
+        if (m_pVitureDevice && m_pVitureDevice->is_connected()) {
+
+            if (GetAsyncKeyState('0') & 0x8000) {
+                m_pVitureDevice->recenter();
+            }
+
+            float euler[3], quat[4], gyro[3];
+            m_pVitureDevice->get_imu_data(euler, quat, gyro);
+
+            pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
+            pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
+
+            vr::HmdQuaternion_t device_rotation;
+            device_rotation.x = quat[1];
+            device_rotation.y = -quat[0];
+            device_rotation.z = -quat[2];
+            device_rotation.w = quat[3];
+
+            vr::HmdQuaternion_t offset_local_rotation = EulerToQuatZYX(
+                GetFloatFromSettingsByKey(device + " offset local roll"),
+                GetFloatFromSettingsByKey(device + " offset local yaw"),
+                GetFloatFromSettingsByKey(device + " offset local pitch")
+            );
+
+            vr::HmdQuaternion_t offset_world_rotation = EulerToQuatZYX(
+                GetFloatFromSettingsByKey(device + " offset world roll"),
+                GetFloatFromSettingsByKey(device + " offset world yaw"),
+                GetFloatFromSettingsByKey(device + " offset world pitch")
+            );
+
+            vr::HmdQuaternion_t combined = QuatMul(offset_world_rotation, device_rotation);
+            pose.qRotation = QuatMul(combined, offset_local_rotation);
+
+            pose.vecAngularVelocity[0] = gyro[1];
+            pose.vecAngularVelocity[1] = -gyro[0];
+            pose.vecAngularVelocity[2] = -gyro[2];
+        }
+    }
+    //viture-
+    else if (rotmode == "UDP") {
+        Transform FinalTransform = GetNewTransform(device, pose.vecPosition[0], pose.vecPosition[1], pose.vecPosition[2], udp_rot.x, udp_rot.y, udp_rot.z, udp_rot.w);
+
+        pose.qRotation.w = FinalTransform.rot_w;
+        pose.qRotation.x = FinalTransform.rot_x;
+        pose.qRotation.y = FinalTransform.rot_y;
+        pose.qRotation.z = FinalTransform.rot_z;
+    }
+    else if (rotmode == "test") {
+        //get from server!
+    }
+    else {
+        pose.qRotation.w = pipe_rot.w;
+        pose.qRotation.x = pipe_rot.x;
+        pose.qRotation.y = pipe_rot.y;
+        pose.qRotation.z = pipe_rot.z;
+    }
+
+    pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");
+
+    return pose;
+}
+
+//pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void CSampleDeviceDriver::RunFrame()
+{
+    g_selectedIndex = GetIntFromSettingsByKey("hmd index");
+
+    if (m_unObjectId != vr::k_unTrackedDeviceIndexInvalid) {
+        vr::VRServerDriverHost()->TrackedDevicePoseUpdated(m_unObjectId, GetPose(), sizeof(DriverPose_t));
+
+        m_flIPD = GetFloatFromSettingsByKey("ipd");
+        vr::VRProperties()->SetFloatProperty(
+            m_ulPropertyContainer,
+            vr::Prop_UserIpdMeters_Float,
+            m_flIPD
+        );
+        HeadToEyeDist = GetFloatFromSettingsByKey("head to eye dist");
+        vr::VRProperties()->SetFloatProperty(
+            m_ulPropertyContainer,
+            vr::Prop_UserHeadToEyeDepthMeters_Float,
+            HeadToEyeDist
+        );
+    }
+}

@@ -1,0 +1,151 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="misc\basics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\hmd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="globals\main.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="misc\cwatchdogdriver_sample.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="misc\driverlog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="globals\settings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\indexcontroller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\openvr\openvr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\openvr\openvr_capi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\openvr\openvr_driver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\tracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\hidapi\hidapi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\hidapi\hidapi_winapi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\viture headers\viture_device.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\viture headers\viture_device_carina.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\viture headers\viture_glasses_provider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\viture headers\viture_macros_public.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\viture headers\viture_protocol_public.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\viture headers\viture_version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="viture\viture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\hand_simulation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="misc\vrmath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="globals\packets.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="globals\comm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="globals\globals.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="misc\default.vrsettings" />
+    <None Include="headers\openvr\openvr_api.cs" />
+    <None Include="headers\openvr\openvr_api.json" />
+    <None Include="x64\viture x64\carina_vio.dll" />
+    <None Include="x64\viture x64\glasses.dll" />
+    <None Include="x64\viture x64\glew32.dll" />
+    <None Include="x64\viture x64\hidapi.dll" />
+    <None Include="x64\viture x64\hidapi.pdb" />
+    <None Include="x64\viture x64\libusb-1.0.dll" />
+    <None Include="x64\viture x64\opencv_world4100.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="devices\hmd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="globals\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="misc\cwatchdogdriver_sample.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="misc\driver_sample.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="misc\driverlog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="misc\basics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="globals\settings.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\indexcontroller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\tracker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="viture\viture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\hand_simulation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="globals\globals.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="globals\comm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="x64\viture x64\glasses.lib" />
+    <Library Include="x64\viture x64\hidapi.lib" />
+  </ItemGroup>
+</Project>
