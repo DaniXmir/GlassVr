@@ -24,13 +24,13 @@ lots of people suggested using 2 computer mice for each hand.
 
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/hand%20tracking%20gif.gif width="600">
 
-custom controllers! full index controller emulation is supported including capacitive buttons!
-
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/vr%20spinner.gif width="600">
-
 use your phones as controllers, trackers or a headset with android's ARcore!
 
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/arcore%20gif.gif width="600">
+
+custom controllers! full index controller emulation is supported including capacitive buttons!
+
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/vr%20spinner.gif width="600">
 
 using old controllers as trackers by copying their position and rotation! this method does not require reprogramming the controller, useful if your old controller have a dead usb port like my index one
 
