@@ -16,15 +16,11 @@ youll also need to do lots of configuring because of the modular approach of the
 
 # Some Features:
 headset emulation with xr glasses imu(only viture glasses are supported for now) or a controller gyro like strapping a joycon to a hat for 3dof with static offsets for position
-		
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/viture%20pro%20gif.gif width="600">
 
 pcvr hand tracking with just a normal camera! you can also emulate input with keyboard and mouse or physical controllers that compatible with SDL3(basically everything)
 lots of people suggested using 2 computer mice for each hand.
-	
-<a href="https://www.youtube.com/watch?v=mYdC2gVEi6Y">
-  <img src="https://img.youtube.com/vi/mYdC2gVEi6Y/maxresdefault.jpg" width="600" alt="Watch the video">
-</a>
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/hand%20tracking%20gif.gif width="600">
 
 custom controllers! full index controller emulation is supported including capacitive buttons!
 <img src=https://github.com/DaniXmir/GlassVr/blob/master/media/vr%20spinner.gif width="600">
