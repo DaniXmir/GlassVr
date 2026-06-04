@@ -18,7 +18,7 @@ youll also need to do lots of configuring because of the modular approach of the
 headset emulation with xr glasses imu(only viture glasses are supported for now) or a controller gyro like strapping a joycon to a hat for 3dof with static offsets for position
 		
 <a href="https://www.youtube.com/watch?v=K8fJ-rsfZ1U">
-  <img src="https://img.youtube.com/vi/K8fJ-rsfZ1U/maxresdefault.jpg" width="600" alt="Watch the video">
+  <img src="https://github.com/DaniXmir/GlassVr/blob/master/media/viture%20pro%20gif.gif" width="600" alt="Watch the video">
 </a>
 
 pcvr hand tracking with just a normal camera! you can also emulate input with keyboard and mouse or physical controllers that compatible with SDL3(basically everything)
