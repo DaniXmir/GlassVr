@@ -65,10 +65,13 @@ just keep in mind that i used viture sdk so youll need to get the .h files from 
 idk
 
 # Roadmap:
- - option to emulate htc vive and oculus touch controllers (with maybe also steam frame controllers?)
+ - option to emulate htc vive and oculus touch controllers(with maybe also steam frame controllers?)
  - bluetooth and serial communication
- - playspace offsets for emulated devices
- - android app with ARcore
+ - android app: add an option for 3dof only and improve video streaming, also add camera streaming
+ - improve hand tracking, currently its very jittery and left right gets confused sometimes
+ - add support for viture luma ultra 6dof and viture beast 3dof
+ - add warp correction for headset emu, currently the driver expect you to have perfect lenses(flat screen or birdbath optics)
+ - rename the project lol
 
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
