@@ -44,10 +44,10 @@ android {
 dependencies {
     //ARCore (newer versions dont work on older phones!!!)
     //modern(for now) (works great on android 16)
-    //implementation("com.google.ar:core:1.54.0")
+    implementation("com.google.ar:core:1.54.0")
     //old (last working on android 13)
-    implementation("com.google.ar:core:1.34.0")
-    //super old (crashes on android 10)
+//    implementation("com.google.ar:core:1.34.0")
+    //super old (crashes on android 10 DO NOT USE)
     //implementation("com.google.ar:core:1.26.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
