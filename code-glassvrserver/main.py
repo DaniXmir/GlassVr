@@ -1,4 +1,5 @@
-#pyinstaller --noconfirm --windowed --collect-binaries "sdl3dll" --collect-all "sdl3" --collect-binaries "openvr" --collect-all "mediapipe" --collect-all "cv2" --hidden-import "sdl3dll" main.py
+#todo: improve hand tracking: make side detection less aggressive(if only right is enabled then the hand can only be right)
+#pyinstaller --noconfirm --windowed --name="GlassVR" --icon="assets/;Prism.ico" --collect-binaries "sdl3dll" --collect-all "sdl3" --collect-binaries "openvr" --collect-all "mediapipe" --collect-all "cv2" --hidden-import "sdl3dll" main.py
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpinBox, QDoubleSpinBox, QLineEdit, QTabWidget, QGridLayout, QCheckBox, QComboBox, QScrollArea, QGroupBox,QFrame
 
 from PyQt6.QtCore import Qt, QSize, QObject, pyqtSignal, QTimer, QEvent
@@ -74,8 +75,8 @@ def change_label_on_click(text):
             help_label.findChild(QLabel).setText('headset tab! (ignore the "Direct Display Mode" popup)')
         case "Controllers":
             help_label.findChild(QLabel).setText("controllers tab!")
-        case "Tracker":
-            help_label.findChild(QLabel).setText("tracker tab!")
+        case "Trackers":
+            help_label.findChild(QLabel).setText("trackers tab!")
         case "Driver":
             help_label.findChild(QLabel).setText("driver tab!")
         case "Credits":
@@ -1575,7 +1576,6 @@ def enable_device(device=""):
     if should_start_thread:
         with active_threads_lock:
             if device in active_threads:
-                print(f"Thread for device '{device}' is already running. Skipping duplication.")
                 return
             
             active_threads.add(device)
@@ -2455,7 +2455,6 @@ def send_tracker_data(tracker_id):
                 time.sleep(0.001)
                 
         except Exception as e:
-            print(f"Error in tracker {tracker_id} pipe: {e}")
             pass 
 
         finally:
@@ -3055,12 +3054,13 @@ def create_offset_ui(device, style = None):
     playspace_layout = QHBoxLayout(playspace_widget)
 
     reset_method = create_combobox({
-        "text" : "Reset Source", #add reset by serial
+        "text" : "Reset Source",
         "default" : settings.get(f"{device} playspace reset method","Headset"),
-        "items" : ["Headset", "Fixed Position"],
+        "items" : ["Headset", "Fixed Position"],#, "QR"], #add reset by serial and reset by qrcode(ArUco) also add automatic reset after some time or by detecting drift
         "index change" : lambda: settings_core.update_setting(f"{device} playspace reset method", reset_method.findChildren(QComboBox)[0].currentText())
     })
-
+    settings_core.update_setting(f"{device} playspace reset method", reset_method.findChildren(QComboBox)[0].currentText())
+    
     playspace = create_group_horizontal([
         {
             "type" : "doublespinbox",
@@ -3101,6 +3101,7 @@ def create_offset_ui(device, style = None):
     ])
 
     playspace_layout.addWidget(BindingGroupWidget(device, "reset playspace"))
+
     playspace_layout.addWidget(reset_method)
     playspace_layout.addWidget(playspace)
 
@@ -3939,7 +3940,7 @@ def crrot_specific_widget(layout, combo):
             t = create_group_horizontal([{
                     "type" : "button",
                     "enabled" : True,
-                    "text" :"apply recommendet offsets (right)", 
+                    "text" :"apply recommended offsets (right)", 
                     "func"  : lambda: apply_hand_offsets("cr")
                 }])
             layout.addWidget(t)
@@ -4115,7 +4116,7 @@ def clrot_specific_widget(layout, combo):
             t = create_group_horizontal([{
                     "type" : "button",
                     "enabled" : True,
-                    "text" :"apply recommendet offsets (left)", 
+                    "text" :"apply recommended offsets (left)", 
                     "func"  : lambda: apply_hand_offsets("cl")
                 }])
             layout.addWidget(t)
@@ -4813,12 +4814,12 @@ def start_reset_playspace():
 def send_reset_to_phone(device):
     try:
         settings = settings_core.get_settings()
-        print(settings.get(f"{device} playspace reset method", ""))
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         
-        sock.sendto(b"RESET", ("<broadcast>", settings.get(f"{device} port", 9002)))
+        #sock.sendto(b"RESET", ("192.168.50.103", settings.get(f"{device} port", 9001)))
+        sock.sendto(b"RESET", ("<broadcast>", settings.get(f"{device} port", 9001)))
         sock.close()
 
     except Exception as e:
@@ -4830,15 +4831,12 @@ def reset_playspace_on_input():
     while True:
         try:
             settings = settings_core.get_settings()
+            
             devices = ["hmd", "cr", "cl"]
-
-            tracker_keys = [
-                key.replace("_reset playspace", "")
-                for key in settings.keys()
-                if "tracker_reset playspace" in key
-            ]
-            devices.extend(tracker_keys)
-
+            
+            for i in range(settings.get("trackers num",2)):
+                devices.append(f"{i}tracker")
+            
             for n in devices:
                 if n not in device_states:
                     device_states[n] = {"packet_triggered": False, "ui_triggered": False}
@@ -4848,7 +4846,7 @@ def reset_playspace_on_input():
                 
                 if raw_e_packet is not None:
                     packet_reset_requested = raw_e_packet.get("reset", False)
-
+                    
                 packet_fired = False
                 if packet_reset_requested:
                     if not device_states[n]["packet_triggered"]:
@@ -4863,7 +4861,7 @@ def reset_playspace_on_input():
                 ui_reset_requested = False
                 if ui_binding_expr:
                     ui_reset_requested = bool(eval_binding(ui_binding_expr))
-
+                
                 ui_fired = False
                 if ui_reset_requested:
                     if not device_states[n]["ui_triggered"]:
@@ -4874,7 +4872,6 @@ def reset_playspace_on_input():
 
                 if packet_fired:
                     reset_playspace(n)
-
                 elif ui_fired:
                     send_reset_to_phone(n)
                     reset_playspace(n)
@@ -4884,11 +4881,11 @@ def reset_playspace_on_input():
         except Exception as e:
             time.sleep(0.001)
 
-#works but need restarting arcore everytime, need more testing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#need more testing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def reset_playspace(device):
     settings = settings_core.get_settings()
     
-    match settings.get(f"{device} playspace reset method", ""):
+    match settings.get(f"{device} playspace reset method", "Headset"):
         case "Headset":
             ps_x = settings.get(f"{device} playspace x", 0.0)
             ps_y = settings.get(f"{device} playspace y", 0.0)
@@ -4979,6 +4976,50 @@ def reset_playspace(device):
             offset_y = mid_y - raw_p_packet["y"]
             offset_z = mid_z - raw_p_packet["z"]
 
+            settings_core.update_setting(f"{device} offset world yaw", world_offset_yaw)
+
+            settings_core.update_setting(f"{device} offset world x", offset_x)
+            settings_core.update_setting(f"{device} offset world y", offset_y)
+            settings_core.update_setting(f"{device} offset world z", offset_z)
+
+            ui_updater.trigger_ui_update.emit()
+
+        #(unfinished)///////////////////////
+        case "QR":
+            ps_x = settings.get(f"{device} playspace x", 0.0)
+            ps_y = settings.get(f"{device} playspace y", 0.0)
+            ps_z = settings.get(f"{device} playspace z", 0.0)
+
+            raw_p_packet = {"x" : 0.0,"y" : 0.0,"z" : 0.0}#get_latest_packet(device, 'P')
+            raw_r_packet = {"x" : 0.0,"y" : 0.0,"z" : 0.0,"w":0.0}#get_latest_packet(device, 'R')
+
+            if raw_p_packet is None:
+                raw_p_packet = {"x": 0.0, "y": 0.0, "z": 0.0}
+            if raw_r_packet is None:
+                raw_r_packet = {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
+
+            #rotation it should be at///////////////////////
+            w = get_hand_world_transform("cr")["rot w"]
+            x = get_hand_world_transform("cr")["rot x"]
+            y = get_hand_world_transform("cr")["rot y"]
+            z = get_hand_world_transform("cr")["rot z"]
+
+            w_prime = w + x
+            y_prime = y - z
+            raw_yaw = 2.0 * math.atan2(y_prime, w_prime)
+
+            world_offset_yaw = -raw_yaw
+            world_offset_yaw = (world_offset_yaw + math.pi) % (2 * math.pi) - math.pi
+
+            mid_x = ps_x
+            mid_y = ps_y
+            mid_z = ps_z
+
+            #position it should be at///////////////////////
+            offset_x = mid_x - get_hand_world_transform("cr")["pos x"]
+            offset_y = mid_y - get_hand_world_transform("cr")["pos y"]
+            offset_z = mid_z - get_hand_world_transform("cr")["pos z"]
+            
             settings_core.update_setting(f"{device} offset world yaw", world_offset_yaw)
 
             settings_core.update_setting(f"{device} offset world x", offset_x)
@@ -5143,6 +5184,7 @@ def create_tracker_widget(index=0):
                     "steps"  : 1,
                     "func"   : lambda: settings_core.update_setting(f'{index}tracker port', t.findChildren(QSpinBox)[0].value())
                 }])
+            settings_core.update_setting(f'{index}tracker port', t.findChildren(QSpinBox)[0].value())
             tracker_shared_layout[0].addWidget(t)
 
         if p_mode == "named pipe" or r_mode == "named pipe":
@@ -5627,7 +5669,6 @@ def _shared_capture_loop():
             try:
                 mirror = WindowMirror("Headset Window")
             except Exception as e:
-                print(f"[Capture] Waiting for window... ({e})", end="\r", flush=True)
                 time.sleep(2)
 
         while True:
@@ -5637,13 +5678,12 @@ def _shared_capture_loop():
                 frame = mirror.capture_frame()
                 latest_raw_frame = frame
 
-                scale = settings.get("mirror web scale", 100)  #resolution scale here///
+                scale = settings.get("mirror web scale", 100)
                 small = cv2.resize(frame, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
-                ok, enc = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, settings.get("mirror web bitrate", 100)])#bitrate here///
+                ok, enc = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, settings.get("mirror web bitrate", 100)])
                 if ok:
                     latest_encoded_frame = enc.tobytes()
             except Exception as e:
-                print(f"\n[Capture] Lost: {e}")
                 time.sleep(2)
                 break
 
