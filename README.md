@@ -1,4 +1,4 @@
-<div style="display: flex; justify-content: center;">
+<div align="center">
   <img src="https://github.com/DaniXmir/GlassVr/blob/master/media/%3BPrism.png" width="128">
 </div>
 
