@@ -1,4 +1,6 @@
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/%3BPrism.png width="128">
+<div style="display: flex; justify-content: center;">
+  <img src="https://github.com/DaniXmir/GlassVr/blob/master/media/%3BPrism.png" width="128">
+</div>
 
 # GlassVr(name work in progress)
 is a super modular openvr driver that let you emulate vr devices like a headset, controllers and trackers with hardware that you already own! 
