@@ -1,8 +1,4 @@
-<div align="center">
-  <img src="https://github.com/DaniXmir/GlassVr/blob/master/media/%3BPrism.png" width="128">
-</div>
-
-# GlassVr(name work in progress)
+# <img src="https://github.com/DaniXmir/GlassVr/blob/master/media/%3BPrism.png" height="26" style="vertical-align: middle;"> GlassVR
 is a super modular openvr driver that let you emulate vr devices like a headset, controllers and trackers with hardware that you already own! 
 i originally made this driver to create a super light headset using my XR glasses and a base station tracker but since i added a lot more features!
 
