@@ -750,15 +750,16 @@ fun AROverlayUI(activity: MainActivity) {
                     activity.joy_cap = false
                 }
 
-                val rawGripForceActive = activity.grip_force > 0.0
                 val isAnyFingerActive = activity.middle > 0.0 || activity.ring > 0.0 || activity.pinky > 0.0
 
-                if (activity.grip || isAnyFingerActive || rawGripForceActive) {
+                if (activity.grip || isAnyFingerActive) {
                     activity.grip_pull = 1.0
                     activity.grip_cap = true
+                    activity.grip_force = 1.0
                 } else {
                     activity.grip_pull = 0.0
                     activity.grip_cap = false
+                    activity.grip_force = 0.0
                 }
 
                 val buttons = booleanArrayOf(
@@ -800,9 +801,9 @@ fun AROverlayUI(activity: MainActivity) {
                     activity.flexions[12] = 1.0
                     activity.flexions[16] = 1.0
                 } else {
-                    activity.flexions[8]  = if (activity.middle > 0.0 || rawGripForceActive) 1.0 else 0.0
-                    activity.flexions[12] = if (activity.ring > 0.0   || rawGripForceActive) 1.0 else 0.0
-                    activity.flexions[16] = if (activity.pinky > 0.0  || rawGripForceActive) 1.0 else 0.0
+                    activity.flexions[8]  = if (activity.middle > 0.0) 1.0 else 0.0
+                    activity.flexions[12] = if (activity.ring > 0.0) 1.0 else 0.0
+                    activity.flexions[16] = if (activity.pinky > 0.0) 1.0 else 0.0
                 }
 
                 for (f in activity.flexions) skeletalBuffer.putDouble(f)
@@ -1575,8 +1576,8 @@ val presetLayouts = mapOf(
         "b"            to LayoutRegion(0.0f to 0.3f, 0.3f to 0.5f, isToggle = false),
         "a"            to LayoutRegion(0.0f to 0.5f, 0.3f to 0.7f, isToggle = false),
         "system"       to LayoutRegion(0.9f to 0.2f, 1.0f to 0.3f, isToggle = false),
-        "grip(hold)"   to LayoutRegion(0.5f to 0.7f, 1.0f to 1.0f, isToggle = false),
-        "grip(toggle)" to LayoutRegion(0.0f to 0.7f, 0.5f to 1.0f, isToggle = true),
+        "grip(hold)"   to LayoutRegion(0.4f to 0.7f, 0.8f to 1.0f, isToggle = false),
+        "grip(toggle)" to LayoutRegion(0.0f to 0.7f, 0.4f to 1.0f, isToggle = true),
         "trigger"      to LayoutRegion(0.0f to 0.1f, 0.9f to 0.3f, isToggle = false),
         "joystick"     to LayoutRegion(0.5f to 0.3f, 1.0f to 1.0f, isToggle = false),
         "joystick_btn" to LayoutRegion(0.5f to 0.5f, 1.0f to 0.6f, isToggle = false),
