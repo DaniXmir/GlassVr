@@ -182,20 +182,27 @@ default_settings = {
     "cl port" : 9002,
     #"0tracker port" : 9003
 
-    #streaming////////////////////////////////////////
+    #streaming legacy////////////////////////////////////////
     "mirror window" : False,
     "mirror web" : False,
     "mirror web port" : 9999,
     "mirror web bitrate" : 100,
     "mirror web scale" : 1.0,
 
+    #streaming////////////////////////////////////////
+    "display mode" : "extended", #"virtual", #"extended",
+    "encoder" : "H.265", #"H.265", #"H.264", #"AV1", #"HEVC",
+    "client ip" : "127.0.0.1",
+    "bitrate" : 100,
+    "virtual port" : "9990",
+
     #arcore playspace sync/////////////////////////////
     "hmd playspace reset method": "Fixed Position",
-    "hmd playspace y": -0.25,
+    "hmd playspace y": 0.0,
     "cr playspace reset method": "Headset",
-    "cr playspace y" : 0.2,
-    "cr playspace reset method": "Headset",
-    "cl playspace y" : 0.2,
+    "cr playspace z" : 0.25,
+    "cl playspace reset method": "Headset",
+    "cl playspace z" : 0.25,
 }
 
 def get_path():

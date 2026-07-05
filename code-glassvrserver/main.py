@@ -1,4 +1,4 @@
-#todo: improve hand tracking: make side detection less aggressive(if only right is enabled then the hand can only be right)
+#this need some cleanup ;P
 #pyinstaller --noconfirm --windowed --name="GlassVR" --icon="assets/;Prism.ico" --collect-binaries "sdl3dll" --collect-all "sdl3" --collect-binaries "openvr" --collect-all "mediapipe" --collect-all "cv2" --hidden-import "sdl3dll" main.py
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpinBox, QDoubleSpinBox, QLineEdit, QTabWidget, QGridLayout, QCheckBox, QComboBox, QScrollArea, QGroupBox,QFrame
 
@@ -86,7 +86,8 @@ def change_label_on_click(text):
 #window.setWindowTitle("PuffinVR")
 window.setWindowTitle("GlassVR")
 
-window.resize(900, 900)
+# window.resize(900, 900)
+window.resize(1550, 900)
 
 #ui core/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # layout_main.addWidget(create_group_label([{"text" : "a", "alignment" : Qt.AlignmentFlag.AlignCenter},{"text" : "b", "alignment" : Qt.AlignmentFlag.AlignCenter},{"text" : "c", "alignment" : Qt.AlignmentFlag.AlignCenter}]))
@@ -1610,6 +1611,24 @@ def update_hmd_shared():
         t = create_label({"text" : "external named pipe require the ui to be closed"})
         hmd_shared_layout.addWidget(t)
 
+    if p_mode == "xr glasses 6dof" or r_mode == "xr glasses 6dof" or r_mode == "xr glasses":
+        t = BindingGroupWidget("hmd", "reset xr")
+        hmd_shared_layout.addWidget(t)
+
+        y = create_group_horizontal([
+            {
+        "type" : "label",
+        "text" : "only viture xr glasses are supported for now",
+        "alignment" : Qt.AlignmentFlag.AlignCenter,
+        },
+        {
+        "type" : "button",
+        "enabled" : True,
+        "text" :"calibrate on viture site",
+        "func"  : lambda: webbrowser.open("https://www.viture.com/firmware/calibration")
+        }])
+        hmd_shared_layout.addWidget(y)
+
     # if p_mode == "X" or r_mode == "X":
     #     hmd_shared_layout.addWidget(???)
 
@@ -1645,6 +1664,19 @@ def hmdpos_specific_widget(layout, combo):
                     )[-1]
                 })
             layout.addWidget(combo_extra)
+
+        # case "xr glasses 6dof":
+        #     t = create_group_horizontal([{
+        #             "type" : "label",
+        #             "text" : "viture luma ultra 6dof",
+        #             "alignment" : Qt.AlignmentFlag.AlignCenter,
+        #         },{
+        #             "type" : "button",
+        #             "enabled" : True,
+        #             "text" :"calibrate on viture site",
+        #             "func"  : lambda: webbrowser.open("https://www.viture.com/firmware/calibration")
+        #         }])
+        #     layout.addWidget(t)
 
         # case "keyboard":
         #     t = create_group_horizontal([{
@@ -1764,18 +1796,18 @@ def hmdrot_specific_widget(layout, combo):
                 })
             layout.addWidget(combo_extra)
 
-        case "xr glasses":
-            t = create_group_horizontal([{
-                    "type" : "label",
-                    "text" : "only viture glasses are supported for now(for 3dof rotation)",
-                    "alignment" : Qt.AlignmentFlag.AlignCenter,
-                },{
-                    "type" : "button",
-                    "enabled" : True,
-                    "text" :"calibrate on viture site",
-                    "func"  : lambda: webbrowser.open("https://www.viture.com/firmware/calibration")
-                }])
-            layout.addWidget(t)
+        # case "xr glasses":
+        #     t = create_group_horizontal([{
+        #             "type" : "label",
+        #             "text" : "only viture glasses are supported for now",
+        #             "alignment" : Qt.AlignmentFlag.AlignCenter,
+        #         },{
+        #             "type" : "button",
+        #             "enabled" : True,
+        #             "text" :"calibrate on viture site",
+        #             "func"  : lambda: webbrowser.open("https://www.viture.com/firmware/calibration")
+        #         }])
+        #     layout.addWidget(t)
 
         case _:
             t = create_group_horizontal([{
@@ -1795,7 +1827,7 @@ def create_hmd_pos():
             "type" : "combobox",
             "text": "hmd position mode",
             "default": settings.get(f'hmdpos mode', "copy"),
-            "items": ["copy", "offsets", "UDP", "named pipe"],# "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["copy", "offsets", "UDP", "named pipe", "xr glasses 6dof"],# "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "index change": lambda: hmdpos_specific_widget(group_layout, combo.findChild(QComboBox))
         })
     
@@ -1814,7 +1846,7 @@ def create_hmd_rot():
             "type" : "combobox",
             "text": "hmd rotation mode",
             "default": settings.get(f'hmdrot mode', "copy"),
-            "items": ["copy", "offsets", "UDP", "named pipe", "gyro", "xr glasses"],# "mouse"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["copy", "offsets", "UDP", "named pipe", "xr glasses 6dof", "xr glasses", "gyro"],# "mouse"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "index change": lambda: hmdrot_specific_widget(group_layout, combo.findChild(QComboBox))
         })
     
@@ -1874,7 +1906,9 @@ def check_hardware_key_exists(hardware_name):
     
     return hardware_name in settings.values()
 
-def get_new_transform(device="hmd", px=0.0, py=0.0, pz=0.0, rx=0.0, ry=0.0, rz=0.0, rw=0.0):
+def get_new_transform(device="hmd", 
+                      px=0.0, py=0.0, pz=0.0, 
+                      rx=0.0, ry=0.0, rz=0.0, rw=0.0):
     #get the final position of the emulated device with offsets applied,
     #device: from what settings to take offsets
     #other arguments: are what the current pos and rot of the emulated device, example: to copy x from tracker, pass trackers_arr[tracker_pos_idx]['pos x'] to px
@@ -1948,6 +1982,39 @@ def get_new_transform(device="hmd", px=0.0, py=0.0, pz=0.0, rx=0.0, ry=0.0, rz=0
             "rot x" : rx, "rot y" : ry, "rot z" : rz, "rot w" : rw
         }
     
+def offset_transform(
+    px=0.0, py=0.0, pz=0.0, 
+    rx=0.0, ry=0.0, rz=0.0, rw=0.0,
+    lpx=0.0, lpy=0.0, lpz=0.0, lry=0.0, lrp=0.0, lrr=0.0,
+    wpx=0.0, wpy=0.0, wpz=0.0, wry=0.0, wrp=0.0, wrr=0.0):
+    try:
+        device_rotation = R.from_quat([rx, ry, rz, rw])
+        
+        offset_local_vec = np.array([lpx, lpy, lpz])
+        rotated_local_offset = device_rotation.apply(offset_local_vec)
+        
+        pos_x = px + rotated_local_offset[0] + wpx
+        pos_y = py + rotated_local_offset[1] + wpy
+        pos_z = pz + rotated_local_offset[2] + wpz
+        
+        offset_local_rotation = R.from_euler('ZYX', [lrr, lry, lrp], degrees=False)
+        offset_world_rotation = R.from_euler('ZYX', [wrr, wry, wrp], degrees=False)
+        
+        final_rotation = offset_world_rotation * device_rotation * offset_local_rotation
+        quat_final = final_rotation.as_quat()
+        
+        return {
+            "pos x": pos_x, "pos y": pos_y, "pos z": pos_z,
+            "rot x": quat_final[0], "rot y": quat_final[1], 
+            "rot z": quat_final[2], "rot w": quat_final[3]
+        }
+
+    except Exception:
+        return {
+            "pos x": px, "pos y": py, "pos z": pz,
+            "rot x": rx, "rot y": ry, "rot z": rz, "rot w": rw
+        }
+
 #//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def euler_to_quat(pitch, roll, yaw):
@@ -2098,9 +2165,20 @@ def get_hand_world_transform(device):
             hand_data[f'{hand_prefix} rot w']
         ])
 
-        offset_yaw   = settings.get(f'{device} offset world yaw',   0.0)
-        offset_pitch = settings.get(f'{device} offset world pitch', 0.0)
-        offset_roll  = settings.get(f'{device} offset world roll',  0.0)
+        #hardcoded offsets
+        if hand_prefix == "r":
+            offset_yaw   = 1.660 + settings.get(f'{device} offset world yaw',   0.0)
+            offset_pitch = -0.680 + settings.get(f'{device} offset world pitch', 0.0)
+            offset_roll  = 0.670 + settings.get(f'{device} offset world roll',  0.0)
+        else:
+            offset_yaw   = -1.660 + settings.get(f'{device} offset world yaw',   0.0)
+            offset_pitch = 0.680 + settings.get(f'{device} offset world pitch', 0.0)
+            offset_roll  = 0.670 + settings.get(f'{device} offset world roll',  0.0)
+
+        # offset_yaw   = settings.get(f'{device} offset world yaw',   0.0)
+        # offset_pitch = settings.get(f'{device} offset world pitch', 0.0)
+        # offset_roll  = settings.get(f'{device} offset world roll',  0.0)
+
         offset_rot   = R.from_euler('ZYX', [offset_yaw, offset_pitch, offset_roll], degrees=False)
 
         world_rot  = hmd_rot * hand_rot_local * offset_rot
@@ -2692,6 +2770,7 @@ side_threshold = 1
 last_known_x = {"l": 0.1, "r": 0.9}
 
 def camera_loop():
+    #todo: improve hand tracking: make side detection less aggressive(if only right is enabled then the hand can only be right)
     global camera_running, last_known_x
 
     try:
@@ -3105,6 +3184,15 @@ def create_offset_ui(device, style = None):
     playspace_layout.addWidget(reset_method)
     playspace_layout.addWidget(playspace)
 
+    # resets_widget = QWidget()
+    # resets_layout = QHBoxLayout(resets_widget)
+
+    # pos_bindable = BindingGroupWidget(device, "reset position")
+    # rot_bindable = BindingGroupWidget(device, "reset rotation")
+
+    # resets_layout.addWidget(pos_bindable)
+    # resets_layout.addWidget(rot_bindable)
+
     hover = ""
     match device:
         case "hmd":
@@ -3123,6 +3211,7 @@ def create_offset_ui(device, style = None):
     world_group = set_group("World", [world],"h",style, text = "this moves a device world position and rotation")
     local_group = set_group("Local", [local],"h",style, text = "imagin that your source position or rotation is the parent and your emulated device is the child connected to them, if the parent changes its rotation the child will change both its position and rotation")
     playspace_group = set_group("Play Space", [playspace_widget],"h",style, text = hover)
+    # resets_group = set_group("Resets", [resets_widget],"h",style, text = hover)
 
     final_widget = set_group(group_name, [world_group, local_group, playspace_group],"v",style)
     
@@ -3257,7 +3346,7 @@ def create_streaming():
     return streaming
 
 streaming_block = create_streaming()
-layout_main.addWidget(set_group("Streaming", [streaming_block], 
+layout_main.addWidget(set_group("Mirroring", [streaming_block], 
                                 text = "(experimental: slow please avoid!!!) mirror to window: pops out the 'headset window' (alt+enter to fullscreen) mirror to url: streams the 'headset window' to a web page(lower bitrate/res = faster streaming), you can also use Sunshine + moonlight-web-stream for faster performance"))
 #streaming/////////////////////////////////////////////////////////////////////////////////////////////////////////////\
 offsets_hmd = create_offset_ui("hmd")
@@ -3703,7 +3792,7 @@ scroll_controllers = QScrollArea()
 scroll_controllers.setWidgetResizable(True)
 scroll_controllers.setWidget(tab_controllers)
 
-scroll_controllers.setMinimumWidth(1800)
+#scroll_controllers.setMinimumWidth(1800)
 
 check_cl = create_checkbox(
     {
@@ -3766,6 +3855,10 @@ def update_cr_shared():
         t = create_label({"text" : "external named pipe require the ui to be closed"})
         cr_shared_layout.addWidget(t)
 
+    if p_mode == "hand tracking xr" or r_mode == "hand tracking xr":
+        t = create_label({"text" : "(hand tracking xr coming soon!)"})
+        cr_shared_layout.addWidget(t)
+
 def update_cl_shared():
     settings = settings_core.get_settings()
     p_mode = settings.get('clpos mode', 'copy')
@@ -3806,6 +3899,11 @@ def update_cl_shared():
     if p_mode == "named pipe" or r_mode == "named pipe":
         t = create_label({"text" : "external named pipe require the ui to be closed"})
         cl_shared_layout.addWidget(t)
+
+    if p_mode == "hand tracking xr" or r_mode == "hand tracking xr":
+        t = create_label({"text" : "(hand tracking xr coming soon!)"})
+        cl_shared_layout.addWidget(t)
+
 
 def crpos_specific_widget(layout, combo):
     settings_core.update_setting(f'crpos mode', combo.currentText()) 
@@ -3936,14 +4034,14 @@ def crrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-        case "hand tracking":
-            t = create_group_horizontal([{
-                    "type" : "button",
-                    "enabled" : True,
-                    "text" :"apply recommended offsets (right)", 
-                    "func"  : lambda: apply_hand_offsets("cr")
-                }])
-            layout.addWidget(t)
+        # case "hand tracking":
+            # t = create_group_horizontal([{
+            #         "type" : "button",
+            #         "enabled" : True,
+            #         "text" :"apply recommended offsets (right)", 
+            #         "func"  : lambda: apply_hand_offsets("cr")
+            #     }])
+            # layout.addWidget(t)
 
         case "gyro":
             combo_extra = create_combobox({
@@ -4112,14 +4210,14 @@ def clrot_specific_widget(layout, combo):
                 }])
             layout.addWidget(t)
 
-        case "hand tracking":
-            t = create_group_horizontal([{
-                    "type" : "button",
-                    "enabled" : True,
-                    "text" :"apply recommended offsets (left)", 
-                    "func"  : lambda: apply_hand_offsets("cl")
-                }])
-            layout.addWidget(t)
+        # case "hand tracking":
+            # t = create_group_horizontal([{
+            #         "type" : "button",
+            #         "enabled" : True,
+            #         "text" :"apply recommended offsets (left)", 
+            #         "func"  : lambda: apply_hand_offsets("cl")
+            #     }])
+            # layout.addWidget(t)
 
         case "marker":
             t = create_group_horizontal([{
@@ -4224,7 +4322,7 @@ def create_crpos_widget():
             "type" : "combobox",
             "text": "right position mode",
             "default": settings.get(f'crpos mode', "copy"),
-            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking", "hand tracking xr"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "index change": lambda: crpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -4241,7 +4339,7 @@ def create_crrot_widget():
             "type" : "combobox",
             "text": "right rotation mode",
             "default": settings.get(f'crrot mode', "copy"),
-            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro",#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking", "hand tracking xr", "gyro"],# "hand+gyro", "marker", "marker+gyro",#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "index change": lambda: crrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -4258,7 +4356,7 @@ def create_clpos_widget():
             "type" : "combobox",
             "text": "left position mode",
             "default": settings.get(f'clpos mode', "copy"),
-            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking", "hand tracking xr"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "index change": lambda: clpos_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -4275,7 +4373,7 @@ def create_clrot_widget():
             "type" : "combobox",
             "text": "left rotation mode",
             "default": settings.get(f'clrot mode', "copy"),
-            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking", "gyro"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
+            "items": ["copy", "offsets", "UDP", "named pipe", "hand tracking", "hand tracking xr", "gyro"],# "hand+gyro", "marker", "marker+gyro"],#, "keyboard"],# add later////////////////////////////////////////////////////////////////////////////////////////
             "index change": lambda: clrot_specific_widget(layout_extra, combo_extra.findChild(QComboBox))
         })
     
@@ -4287,30 +4385,30 @@ layout_controllers.addWidget(set_group("Right Modes", [create_cr_widget()], text
 layout_controllers.addWidget(set_group("Left Modes", [create_cl_widget()], text = "left controller position and rotation modes"))
 #controllers modes v2////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-def apply_hand_offsets(device):
-    if device == "cr":
-        spinboxes = offsets_cr.findChildren(QDoubleSpinBox)
+# def apply_hand_offsets(device):
+#     if device == "cr":
+#         spinboxes = offsets_cr.findChildren(QDoubleSpinBox)
 
-        settings_core.update_setting(f"{device} offset world yaw", 1.660)
-        spinboxes[3].setValue(1.660)
+#         settings_core.update_setting(f"{device} offset world yaw", 1.660)
+#         spinboxes[3].setValue(1.660)
 
-        settings_core.update_setting(f"{device} offset world pitch", -0.680)
-        spinboxes[4].setValue(-0.680)
+#         settings_core.update_setting(f"{device} offset world pitch", -0.680)
+#         spinboxes[4].setValue(-0.680)
 
-        settings_core.update_setting(f"{device} offset world roll", 0.670)
-        spinboxes[5].setValue(0.670)
+#         settings_core.update_setting(f"{device} offset world roll", 0.670)
+#         spinboxes[5].setValue(0.670)
 
-    else:
-        spinboxes = offsets_cl.findChildren(QDoubleSpinBox)
+#     else:
+#         spinboxes = offsets_cl.findChildren(QDoubleSpinBox)
 
-        settings_core.update_setting(f"{device} offset world yaw", -1.660)
-        spinboxes[3].setValue(1.660)
+#         settings_core.update_setting(f"{device} offset world yaw", -1.660)
+#         spinboxes[3].setValue(1.660)
 
-        settings_core.update_setting(f"{device} offset world pitch", 0.680)
-        spinboxes[4].setValue(-0.680)
+#         settings_core.update_setting(f"{device} offset world pitch", 0.680)
+#         spinboxes[4].setValue(-0.680)
 
-        settings_core.update_setting(f"{device} offset world roll", 0.670)
-        spinboxes[5].setValue(0.670)
+#         settings_core.update_setting(f"{device} offset world roll", 0.670)
+#         spinboxes[5].setValue(0.670)
 
 #mapping v2/////////////////////////////////////////////////////////////////////
 
@@ -4881,7 +4979,7 @@ def reset_playspace_on_input():
         except Exception as e:
             time.sleep(0.001)
 
-#need more testing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#need more testing (udp flavored)!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def reset_playspace(device):
     settings = settings_core.get_settings()
     
@@ -5483,7 +5581,7 @@ def bad_apple():
     speed = settings_core.get_settings().get("bad apple speed", 10.0) #speed(higher == slower)
     # 1 == normal(best but steamvr will crash if rot mode is enabled)
     # 10 == stable(looks ok)
-    # 40 == good for ui(so youtube lol)
+    # 40 == very slow but good for ui(will take like 2 hours if not more)
     
     global BAD_APPLE_STATE
     video_path = os.path.join(os.getcwd(), "assets", "Bad Apple.mp4")
@@ -5606,7 +5704,7 @@ def thank_you():
 
 #dark mode/////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#streaming//////////////////////////////////////////////////////////////////////////////////////////////////////
+#mirroring//////////////////////////////////////////////////////////////////////////////////////////////////////
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
 except Exception:
@@ -5841,7 +5939,88 @@ def mirror_web():
             ).start()
 
         time.sleep(1)
-#streaming//////////////////////////////////////////////////////////////////////////////////////////////////////
+#mirroring//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#resets to 0, maybe add later//////////////////////////////////////////////////////////////////////////////////////////////////////
+# def start_resets_pos_rot():
+#     thread = threading.Thread(target=resets_pos_rot, daemon=True)
+#     thread.start()
+
+#merge this with playspace (method "to zero")
+# def resets_pos_rot():
+#     while True:
+#         try:
+#             settings = settings_core.get_settings()
+
+#             if eval_binding(settings.get(f"hmd_reset position")):
+#                 hmd_dict = list(trackers_dict.values())[0]
+
+#                 hmd_x = hmd_dict.get('pos x', 0.0)
+#                 hmd_y = hmd_dict.get('pos y', 0.0)
+#                 hmd_z = hmd_dict.get('pos z', 0.0)
+
+#                 offset_x = -hmd_x
+#                 offset_y = -hmd_y
+#                 offset_z = -hmd_z
+
+#                 settings_core.update_setting("hmd offset world x", offset_x)
+#                 settings_core.update_setting("hmd offset world y", offset_y)
+#                 settings_core.update_setting("hmd offset world z", offset_z)
+
+#             if eval_binding(settings.get(f"hmd_reset rotation")):
+#                 hmd_yaw = 0.0
+#                 if 'rotation matrix' in hmd_dict:
+#                     mat = hmd_dict['rotation matrix']
+#                     hmd_yaw = math.atan2(mat[0][2], mat[0][0])
+
+#                 world_offset_yaw = -hmd_yaw
+#                 world_offset_yaw = (world_offset_yaw + math.pi) % (2 * math.pi) - math.pi
+
+#                 settings_core.update_setting("hmd offset world yaw", world_offset_yaw)
+
+#             time.sleep(0.001)
+#         except:
+#             time.sleep(0.001)
+#resets to 0, maybe add later//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#reset xr//////////////////////////////////////////////////////////////////////////////////////////////////////
+def start_reset_xr():
+    thread = threading.Thread(target=reset_xr, daemon=True)
+    thread.start()
+
+def reset_xr():
+    pipe_name = r'\\.\pipe\GlassVR_HMD_Extra'
+    pipe_handle = None
+
+    while True:
+        try:
+            if pipe_handle is None:
+                try:
+                    pipe_handle = create_pipe(pipe_name)
+                    win32pipe.ConnectNamedPipe(pipe_handle, None)
+                except Exception :
+                    time.sleep(0.5)
+                    continue
+
+            settings = settings_core.get_settings()
+            is_pressed = bool(eval_binding(settings.get("hmd_reset xr")))
+            
+            data = struct.pack('?', is_pressed)
+
+            try:
+                win32file.WriteFile(pipe_handle, data)
+            except pywintypes.error as e:
+                if e.winerror in [109, 232]: 
+                    win32pipe.DisconnectNamedPipe(pipe_handle)
+                    win32file.CloseHandle(pipe_handle)
+                    pipe_handle = None
+
+            time.sleep(0.01) 
+            
+        except Exception as e:
+            print(e)
+            time.sleep(0.01)
+#reset xr//////////////////////////////////////////////////////////////////////////////////////////////////////
 
 if __name__ == '__main__':
     if settings_core.get_settings()['hand tracking']:
@@ -5855,7 +6034,8 @@ if __name__ == '__main__':
     start_update_vrlabel()
 
     start_reset_gyro()
-
+    # start_resets_pos_rot()
+    start_reset_xr()
     start_reset_playspace()
 
     start_udp_thread()
