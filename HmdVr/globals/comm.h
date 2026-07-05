@@ -34,6 +34,9 @@ public:
     PacketSkeletal GetUdpSkeletal() { std::lock_guard<std::mutex> lock(m_mutex); return m_udpSkeletal; }
     PacketSkeletal GetPipeSkeletal() { std::lock_guard<std::mutex> lock(m_mutex); return m_pipeSkeletal; }
 
+    PacketExtra GetUdpExtra() { std::lock_guard<std::mutex> lock(m_mutex); return m_udpExtra; }
+    PacketExtra GetPipeExtra() { std::lock_guard<std::mutex> lock(m_mutex); return m_pipeExtra; }
+
 private:
     void UdpThreadLoop(SOCKET sock);
     void PipeThreadLoop(std::string pipeName);

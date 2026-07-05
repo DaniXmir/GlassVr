@@ -266,7 +266,7 @@ vr::DriverPose_t CSampleControllerDriver::GetPose()
     pipe_pos = m_comm.GetPipePos();
     pipe_rot = m_comm.GetPipeRot();
     //connections
-
+    
     //pos here///////////////////////////////////////////////////////
     if (posmode == "copy") {
         std::string targetSerial = GetStringFromSettingsByKey(device + "pos copy serial");
@@ -505,10 +505,10 @@ std::string CSampleControllerDriver::GetSerialNumber() const
 {
     switch (right) {
     case false:
-        return "ConLeftSerial";
+        return "GlassVRConLeft";
     case true:
-        return "ConRightSerial";
+        return "GlassVRConRight";
     default:
-        return "ConSerial";
+        return "GlassVRCon";
     }
 }

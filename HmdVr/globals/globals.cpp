@@ -108,3 +108,37 @@ Transform GetNewTransform(const std::string& device, float px, float py, float p
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////
+Transform OffsetTransform(
+    float px, float py, float pz, float rx, float ry, float rz, float rw,
+    float lpx, float lpy, float lpz, float lry, float lrp, float lrr,
+    float wpx, float wpy, float wpz, float wry, float wrp, float wrr
+) {
+    try {
+        float device_quat[4] = { rx, ry, rz, rw };
+        float q_local_off[4], q_world_off[4];
+
+        EulerToQuat(lrr, lry, lrp, q_local_off);
+        EulerToQuat(wrr, wry, wrp, q_world_off);
+
+        float offset_local[3] = { lpx, lpy, lpz };
+        float rotated_local[3];
+        RotateVector(device_quat, offset_local, rotated_local);
+
+        float final_px = px + rotated_local[0] + wpx;
+        float final_py = py + rotated_local[1] + wpy;
+        float final_pz = pz + rotated_local[2] + wpz;
+
+        float temp_q[4], final_q[4];
+        MultiplyQuat(q_world_off, device_quat, temp_q);
+        MultiplyQuat(temp_q, q_local_off, final_q);
+
+        return {
+            final_px, final_py, final_pz,
+            final_q[0], final_q[1], final_q[2], final_q[3]
+        };
+    }
+    catch (...) {
+        return { px, py, pz, rx, ry, rz, rw };
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////

@@ -1,4 +1,5 @@
 ////thanks https://github.com/r57zone/OpenVR-driver-for-DIY
+//OutputDebugStringA(";P"); //this prints to DebugView log(change capture to Global Win32) very cool!
 //m to open legacy hmd monitor
 
 #include "main.h"
@@ -106,3 +107,5 @@ void CServerDriver_Sample::RunFrame()
         pTracker->RunFrame();
     }
 }
+
+//;P

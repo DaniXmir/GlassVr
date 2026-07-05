@@ -12,8 +12,26 @@ public:
     ~Viture();
 
     bool is_connected() const;
+
+    bool is_carina() const;
+
     void get_imu_data(float euler_out[3], float quat_out[4], float gyro_out[3]);
+
+    bool get_6dof_pose(float quat_out[4], float pos_out[3], bool* stable_out = nullptr);
+
     void recenter();
+
+    void recenter_6dof();
+
+    void reset_origin_carina();
+
+    void recenter_3dof();
+
+    bool m_3dof_recentered = false;
+    float m_3dof_inv_quat[4] = { 1.f, 0.f, 0.f, 0.f };
+    float m_raw_quat[4] = { 1.f, 0.f, 0.f, 0.f };
+    float m_3dof_quat[4] = { 1.f, 0.f, 0.f, 0.f };
+    float m_3dof_ref_inv_quat[4] = { 1.f, 0.f, 0.f, 0.f };
 
 private:
     void monitor_thread_func();
@@ -44,10 +62,20 @@ private:
     static Viture* s_instance;
     static void static_imu_pose_callback(float* data, uint64_t ts);
     static void static_imu_raw_callback(float* data, uint64_t ts, uint64_t vsync);
-    
+
     alignas(16) float m_euler_atomic[3];
 
     std::atomic<bool> m_first_sample{ true };
+
+    std::mutex         m_6dof_mutex;
+    float              m_carina_quat[4] = { 0, 0, 0, 1 };
+    float              m_carina_pos[3] = { 0, 0, 0 };
+    int                m_carina_status = 1;
+    bool               m_carina_fresh = false;
+
+    float              m_ref_inv_quat[4] = { 0, 0, 0, 1 };
+    float              m_ref_pos[3] = { 0, 0, 0 };
+    bool               m_6dof_recentered = false;
 };
 
 #endif

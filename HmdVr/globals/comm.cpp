@@ -64,8 +64,16 @@ void CommManager::StopAll() {
     }
     m_sockets.clear();
 
+    // Unblock any thread currently stuck in a synchronous ReadFile()
+    // on a named pipe — just flipping m_bIsRunning doesn't wake it up.
     for (auto& t : m_threads) {
-        if (t.joinable()) t.join();
+        if (t.joinable()) {
+            CancelSynchronousIo(t.native_handle());
+        }
+    }
+
+    for (auto& t : m_threads) {
+        if (t.joinable()) t.detach();
     }
     m_threads.clear();
 }
@@ -132,33 +140,80 @@ void CommManager::PipeThreadLoop(std::string pipeName) {
             continue;
         }
 
+        //    char buffer[1024];
+        //    DWORD bytesRead;
+
+        //    while (m_bIsRunning) {
+        //        if (ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, NULL) && bytesRead > 0) {
+        //            std::lock_guard<std::mutex> lock(m_mutex);
+
+        //            if (pipeName.find("_Pos") != std::string::npos && bytesRead == sizeof(PacketPos)) {
+        //                memcpy(&m_pipePos, buffer, sizeof(PacketPos));
+        //            }
+        //            else if (pipeName.find("_Rot") != std::string::npos && bytesRead == sizeof(PacketRot)) {
+        //                memcpy(&m_pipeRot, buffer, sizeof(PacketRot));
+        //            }
+        //            else if (pipeName.find("_Input") != std::string::npos && bytesRead == sizeof(PacketInputIndex)) {
+        //                memcpy(&m_pipeInput, buffer, sizeof(PacketInputIndex));
+        //            }
+        //            else if (pipeName.find("_Skeletal") != std::string::npos && bytesRead == sizeof(PacketSkeletal)) {
+        //                memcpy(&m_pipeSkeletal, buffer, sizeof(PacketSkeletal));
+        //            }
+        //            else if (pipeName.find("_Extra") != std::string::npos && bytesRead == sizeof(PacketExtra)) {
+        //                memcpy(&m_pipeExtra, buffer, sizeof(PacketExtra));
+        //            }
+        //        }
+        //        else {
+        //            break;
+        //        }
+        //    }
+        //    CloseHandle(hPipe);
+        //}
+
         char buffer[1024];
         DWORD bytesRead;
+        DWORD bytesAvailable = 0;
 
         while (m_bIsRunning) {
-            if (ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, NULL) && bytesRead > 0) {
-                std::lock_guard<std::mutex> lock(m_mutex);
+            // 1. Check if data is available WITHOUT blocking the thread
+            if (PeekNamedPipe(hPipe, NULL, 0, NULL, &bytesAvailable, NULL)) {
 
-                if (pipeName.find("_Pos") != std::string::npos && bytesRead == sizeof(PacketPos)) {
-                    memcpy(&m_pipePos, buffer, sizeof(PacketPos));
+                if (bytesAvailable > 0) {
+                    // 2. Data is ready! ReadFile will now return immediately.
+                    if (ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, NULL) && bytesRead > 0) {
+                        std::lock_guard<std::mutex> lock(m_mutex);
+
+                        if (pipeName.find("_Pos") != std::string::npos && bytesRead == sizeof(PacketPos)) {
+                            memcpy(&m_pipePos, buffer, sizeof(PacketPos));
+                        }
+                        else if (pipeName.find("_Rot") != std::string::npos && bytesRead == sizeof(PacketRot)) {
+                            memcpy(&m_pipeRot, buffer, sizeof(PacketRot));
+                        }
+                        else if (pipeName.find("_Input") != std::string::npos && bytesRead == sizeof(PacketInputIndex)) {
+                            memcpy(&m_pipeInput, buffer, sizeof(PacketInputIndex));
+                        }
+                        else if (pipeName.find("_Skeletal") != std::string::npos && bytesRead == sizeof(PacketSkeletal)) {
+                            memcpy(&m_pipeSkeletal, buffer, sizeof(PacketSkeletal));
+                        }
+                        else if (pipeName.find("_Extra") != std::string::npos && bytesRead == sizeof(PacketExtra)) {
+                            memcpy(&m_pipeExtra, buffer, sizeof(PacketExtra));
+                        }
+                    }
+                    else {
+                        // Read failed even though data was promised; break loop
+                        break;
+                    }
                 }
-                else if (pipeName.find("_Rot") != std::string::npos && bytesRead == sizeof(PacketRot)) {
-                    memcpy(&m_pipeRot, buffer, sizeof(PacketRot));
-                }
-                else if (pipeName.find("_Input") != std::string::npos && bytesRead == sizeof(PacketInputIndex)) {
-                    memcpy(&m_pipeInput, buffer, sizeof(PacketInputIndex));
-                }
-                else if (pipeName.find("_Skeletal") != std::string::npos && bytesRead == sizeof(PacketSkeletal)) {
-                    memcpy(&m_pipeSkeletal, buffer, sizeof(PacketSkeletal));
-                }
-                else if (pipeName.find("_Extra") != std::string::npos && bytesRead == sizeof(PacketExtra)) {
-                    memcpy(&m_pipeExtra, buffer, sizeof(PacketExtra));
+                else {
+                    // 3. No data available. Sleep briefly to prevent 100% CPU usage, 
+                    // then loop back to check m_bIsRunning again.
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
                 }
             }
             else {
+                // Peek failed (usually means the client disconnected or pipe broke)
                 break;
             }
         }
-        CloseHandle(hPipe);
     }
 }
