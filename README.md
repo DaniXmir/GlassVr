@@ -69,7 +69,6 @@ idk
  - bluetooth and serial communication
  - android app: add an option for 3dof only and improve video streaming, also add camera streaming
  - improve hand tracking, currently its very jittery and left right gets confused sometimes
- - add support for viture luma ultra 6dof and viture beast 3dof
  - add warp correction for headset emu, currently the driver expect you to have perfect lenses(flat screen or birdbath optics)
  - rename the project lol
 
