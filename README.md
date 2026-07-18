@@ -62,7 +62,7 @@ you can figure this out i believe in you ;P
 just keep in mind that i used viture sdk so youll need to get the .h files from their site, if you dont care about that feature just press ctrl+f and delete everything with "//viture-"
 
 # Contributing:
-idk
+any help is welcome!
 
 # Roadmap:
  - option to emulate htc vive and oculus touch controllers(with maybe also steam frame controllers?)
