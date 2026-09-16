@@ -11,8 +11,9 @@ also join the discord! https://discord.gg/jyvWdKBpPj
 2. run main.exe
 3. in the Driver tab click "install"
 
-to uninstall, simply click on "uninstall" in the Driver tab
 youll also need to do lots of configuring because of the modular approach of the project
+
+to uninstall, simply click on "uninstall" in the Driver tab
 
 # Some Features:
 headset emulation with xr glasses imu(only viture glasses are supported for now) or a controller gyro like strapping a joycon to a hat for 3dof with static offsets for position
