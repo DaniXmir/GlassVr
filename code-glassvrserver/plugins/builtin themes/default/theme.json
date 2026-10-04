@@ -1,0 +1,34 @@
+{
+    "title" : ";Prism",
+    "author" : "DaniXmir",
+    "description" : "default theme of glassvr featuring a prism breaking a beam of light into a rainbow!\nfun fact the project is named 'GlassVR' because originally i just wanted to play ETS2 with my xr glasses\nthe logo is a prism cuz its the coolest form of glass after all!\nan animated version is also available!",
+
+    "background filtering": "near",
+    "rainbow blocks" : true,
+
+    "groups" : {
+        "invis" : "background-color: rgba(0, 0, 0, 0.0); color: rgba(0, 0, 0, 0.0); border: none; padding: 0px; border-radius: 0px;",
+        "label" : "background-color: rgba(0, 0, 0, 0.0); color: #ffffff; font-weight: bold; border: none; padding: 0px; border-radius: 0px;",
+        
+        "tooltip" : "background-color: rgba(35, 35, 35, 0.9); color: #ffffff; font-weight: bold; border: 1px solid #555555; padding: 4px 8px; border-radius: 4px;",
+
+        "widget" : "background-color: rgba(50, 50, 50, 0.8); color: #ffffff; font-weight: bold; border: 1px solid #777777; padding: 4px 8px; border-radius: 4px;",
+        "widget:hover" : "background-color: #ffffff; color: #000000; font-weight: bold; border: 3px solid #000000; padding: 4px 8px; border-radius: 4px;",
+
+        "group" : "background-color: rgba(25, 25, 25, 0.8); color: #ffffff; font-weight: bold; border: none; padding: 0px; border-radius: 0px;",
+        "group:hover" : "background-color: rgba(255, 173, 236, 0.5); color: #000000; font-weight: bold; border: 3px solid #000000; padding: 4px 8px; border-radius: 4px;",
+        
+        "block_label" : "color: rgba(0, 0, 0, 1.0); font-weight: bold; border: none; padding: 0px; border-radius: 0px;",
+        "block" : "background-color: rgba(100, 100, 100, 0.7); font-weight: bold; border: 1px solid rgba(255, 255, 255, 1.0); padding: 4px 8px; border-radius: 4px;"
+    },
+    "visualizer" : {
+        "hmd" : "#00e5ff",
+        "left" : "#ff3366",
+        "right" : "#33ff66",
+        "base station" : "#ffaa00",
+        "trackers" : "#aa55ff",
+
+        "background" : "#1e1e1e",
+        "grid" : "#ffffff"
+    }
+}

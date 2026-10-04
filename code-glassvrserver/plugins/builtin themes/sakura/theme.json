@@ -1,0 +1,34 @@
+{
+    "title" : "random animated pixel art sakura tree idk",
+    "author" : "image by JpegIsMe",
+    "description" : "lore time! so i typed 'animated pixel art sakura tree' into google and clicked on the first thing i saw, the image was on artstation so i created an account just to ask for permission from the guy if i can use it, next day i see bro deleted his account to avoid replying to me, his account was dead with no new upload for like 3 years, so i tried reaching him on discord but his server was so dead i can guarantee my message is still the last thing there lol, so now this image is basically lost media, not feeling super comfortable using it but i figured he will never contact me so...\nill probably draw my own version later, from what i saw i think he was in a MrBeast vid like ones and the status got to his head cuz saying no is ok but ghosting is evil",
+
+    "background filtering": "near",
+    "rainbow blocks" : false,
+
+    "groups" : {
+        "invis" : "background-color: rgba(0, 0, 0, 0.0); color: rgba(0, 0, 0, 0.0); border: none; padding: 0px; border-radius: 0px;",
+        "label" : "background-color: rgba(0, 0, 0, 0.0); color: #000000; font-weight: bold; border: none; padding: 0px; border-radius: 0px;",
+        
+        "tooltip" : "background-color: rgba(35, 35, 35, 0.9); color: #ffffff; border: 1px solid #555555; padding: 4px 8px; border-radius: 4px;",
+
+        "widget" : "background-color: rgba(255, 173, 236, 0.5); color: #000000; font-weight: bold; border: 3px solid #000000; padding: 4px 8px; border-radius: 4px;",
+        "widget:hover" : "background-color: rgba(255, 205, 245, 0.85); color: #000000; font-weight: bold; border: 3px solid #000000; padding: 4px 8px; border-radius: 4px;",
+
+        "group" : "background-color: rgba(255, 173, 236, 0.5); color: #000000; font-weight: bold; border: 3px solid #000000; padding: 4px 8px; border-radius: 4px;",
+        "group:hover" : "background-color: rgba(255, 173, 236, 0.5); color: #000000; font-weight: bold; border: 3px solid #000000; padding: 4px 8px; border-radius: 4px;",
+        
+        "block_label" : "color: rgba(0, 0, 0, 1.0); font-weight: bold; border: none; padding: 0px; border-radius: 0px;",
+        "block" : "background-color: rgba(255, 205, 245, 0.85); font-weight: bold; border: 1px solid rgba(0, 0, 0, 1.0); padding: 4px 8px; border-radius: 4px;"
+    },
+    "visualizer" : {
+        "hmd" : "#00e5ff",
+        "left" : "#ff3366",
+        "right" : "#33ff66",
+        "base station" : "#ffaa00",
+        "trackers" : "#aa55ff",
+
+        "background" : "#ffb0ed",
+        "grid" : "#000000"
+    }
+}
