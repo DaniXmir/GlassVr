@@ -1,9 +1,0 @@
-{
-	"driver_sample" : {
-		"activateMultipleDrivers" : true,
-		"windowX": 0,
-		"windowY": 0,
-		"windowWidth": 1920,
-		"windowHeight": 1080,
-	},
-}
