@@ -1,0 +1,62 @@
+{
+	"configurations" : 
+	[
+		{
+			"abstractTargets" : [],
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Release-91db1c9fd5d432e78279.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"name" : "Release",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "Project",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "driver_sample::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-driver_sample-Release-b4d3b70f3c5403169f38.json",
+					"name" : "driver_sample",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/DaniXmir/.vs/driver_sample/42c47e56-064d-4f2a-81fd-7aa0e9d43007/out/build/Linux-GCC-Release",
+		"source" : "/home/DaniXmir/.vs/driver_sample/42c47e56-064d-4f2a-81fd-7aa0e9d43007/src/samples/driver_sample"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 9
+	}
+}

@@ -1,0 +1,10 @@
+﻿     Creating library D:\UltimateFolder0\Gallery-Y\projects\GlassVr\code-glassvrdriver\x64\Release\driver_glassvr.lib and object D:\UltimateFolder0\Gallery-Y\projects\GlassVr\code-glassvrdriver\x64\Release\driver_glassvr.exp
+LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
+  Generating code
+  0 of 3797 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  HmdVr.vcxproj -> D:\UltimateFolder0\Gallery-Y\projects\GlassVr\code-glassvrdriver\x64\Release\driver_glassvr.dll
+  'pwsh.exe' is not recognized as an internal or external command,
+  operable program or batch file.
