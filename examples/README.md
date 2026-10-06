@@ -127,5 +127,6 @@ to build on windows clone the repo and run build.ps1 with
     powershell -ExecutionPolicy Bypass -File .\build.ps1
 
 this will build the entire app and every plugin to use, now they can be used with other builds of glassvr
-
 you may need to install some dependencies... to build the app though
+
+also remember to write what version of glassvr your plugin was made for, to save people some headaches!
