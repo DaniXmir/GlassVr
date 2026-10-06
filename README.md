@@ -66,8 +66,23 @@ the python side isnt just a frontend, its used in some modes like hand tracking 
 its sends its data via named pipes, these pipes can also be hijacked if you want to send custom data see examples: https://github.com/DaniXmir/GlassVr/tree/master/examples/python
 
 # Building:
-you can figure this out i believe in you ;P 
+python ui: to build on windows clone the repo and run build.ps1 with
+
+    powershell -ExecutionPolicy Bypass -File .\build.ps1
+
+you may need to install some dependencies...
+
+c++ driver: you can figure this out i believe in you ;P
 just keep in mind that i used viture sdk so youll need to get the .h files from their site, if you dont care about that feature just press ctrl+f and delete everything with "//viture-"
+
+android app: use android studio
+
+# Plugins!
+build your own tracking modules, pages or themes!
+
+(for modules i personally recommend to build your own driver but idk)
+
+see examples: https://github.com/DaniXmir/GlassVr/tree/v2/examples
 
 # Contributing:
 any help is welcome!
