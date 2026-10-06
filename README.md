@@ -1,5 +1,6 @@
 # <img src="https://github.com/DaniXmir/GlassVr/blob/master/media/%3BPrism.png" height="32" style="vertical-align: middle;"> GlassVR
-is a super modular openvr driver that let you emulate vr devices like a headset, controllers and trackers with hardware that you already own! 
+
+aims to be the ultimate steamvr driver for emulating or prototyping vr hardware! glass is a super modular openvr driver that let you emulate vr devices like a headset, controllers and trackers with hardware that you already own or custom! 
 i originally made this driver to create a super light headset using my XR glasses and a base station tracker but since i added a lot more features!
 
 showcase on youtube: https://www.youtube.com/watch?v=LaRQ5dUw4bU
@@ -40,6 +41,12 @@ using old controllers as trackers by copying their position and rotation! this m
 and many more!
 also position and rotation can be emulated independently for each device allowing for lots of combinations!
 
+# Advance Features:
+- 3D visualizer!
+- override tracking of other drivers
+- disable a device steamvr modes, useful for headsets that are tracked with external trackers like vive etc...
+- change a device role, useful if youre using controllers as trackers and you wanna force specific ones to be left/right
+
 # Custom Hardware:
 and if thats not enough for you, you can also send data yourself with UDP or named pipes, 
 with more communication protocols coming soon like bluetooth and serial
@@ -70,8 +77,6 @@ any help is welcome!
  - bluetooth and serial communication
  - android app: add an option for 3dof only and improve video streaming, also add camera streaming
  - improve hand tracking, currently its very jittery and left right gets confused sometimes
- - add warp correction for headset emu, currently the driver expect you to have perfect lenses(flat screen or birdbath optics)
- - rename the project lol
 
 # Troubleshooting
 1. if you'r controllers not showing up, goto C:\Program Files (x86)\Steam\config\steamvr.vrsettings
@@ -91,7 +96,3 @@ and add "activateMultipleDrivers" : true
 
 	dont, you gonna have a bad time!
 	while you could get it working, steam and steamvr REALLY want to be on disk c, you can install the games on disk d no problem but i recommend keeping steam on c
-
-3. name work in progress?
-
-	i cant think of any better names, if you can drop it in the discord server please!!!
