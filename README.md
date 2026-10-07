@@ -1,5 +1,5 @@
 # I THINK YOU'R LOST, THIS ISN'T THE MAIN BRANCH...
-this branch uses like one file with like 6700 lines for the python side, plz ignore lol, 
+this branch uses one file with like 6700 lines for the python side, plz ignore lol, 
 please go to the main branch if you got here accidentally because this one will not be updated
 
 # <img src="https://github.com/DaniXmir/GlassVr/blob/master/media/%3BPrism.png" height="32" style="vertical-align: middle;"> GlassVR
