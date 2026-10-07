@@ -82,9 +82,9 @@ build your own tracking modules, pages or themes!
 
 (for modules i personally recommend to build your own driver but idk)
 
-see examples: https://github.com/DaniXmir/GlassVr/tree/v2/examples
+see examples: https://github.com/DaniXmir/GlassVr/tree/master/examples
 
-<img src=https://github.com/DaniXmir/GlassVr/blob/v2/media/plugins.png width="300">
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/plugins.png width="300">
 
 # Contributing:
 any help is welcome!
