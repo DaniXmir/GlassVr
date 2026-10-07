@@ -84,6 +84,8 @@ build your own tracking modules, pages or themes!
 
 see examples: https://github.com/DaniXmir/GlassVr/tree/v2/examples
 
+<img src=https://github.com/DaniXmir/GlassVr/blob/v2/media/plugins.png width="300">
+
 # Contributing:
 any help is welcome!
 
