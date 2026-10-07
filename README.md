@@ -1,6 +1,6 @@
 # <img src="https://github.com/DaniXmir/GlassVr/blob/master/media/%3BPrism.png" height="32" style="vertical-align: middle;"> GlassVR
 
-aims to be the ultimate steamvr driver for emulating or prototyping vr hardware! glass is a super modular openvr driver that let you emulate vr devices like a headset, controllers and trackers with hardware that you already own or custom! 
+glass is a super modular openvr driver that let you emulate or prototype vr devices like a headset, controllers and trackers with hardware that you already own or custom! 
 i originally made this driver to create a super light headset using my XR glasses and a base station tracker but since i added a lot more features!
 
 showcase on youtube: https://www.youtube.com/watch?v=LaRQ5dUw4bU
