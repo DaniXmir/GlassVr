@@ -90,8 +90,8 @@ group them like this for consistency!
 
 # theme:
 
-<img src=https://github.com/DaniXmir/GlassVr/blob/v2/media/default%20theme.png width="400">
-<img src=https://github.com/DaniXmir/GlassVr/blob/v2/media/void%20theme.png width="400">
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/default%20theme.png width="400">
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/void%20theme.png width="400">
 
 theme file is read by the custom widget from elements.py, it has the following properties
 info:
