@@ -58,6 +58,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -122,26 +123,26 @@ class MainActivity : ComponentActivity() {
 
     @Volatile var PitchOffset = -90.0
 
+    // which controller the driver is emulating ("index", "touch", "vive", "frame"), needs to match "con type" on the pc, else will act weird
+    // it decides which input packet gets sent (idx / itc / ive / ifm)
+    @Volatile var conType = "touch"
+
     @Volatile var a = false
-    @Volatile var a_cap = false
     @Volatile var b = false
-    @Volatile var b_cap = false
     @Volatile var system = false
-    @Volatile var system_cap = false
-    @Volatile var touch_cap = false
-    @Volatile var grip_cap = false
+    @Volatile var select = false
+    @Volatile var bumper = false
+    @Volatile var yUp = false
+    @Volatile var aDown = false
+    @Volatile var xLeft = false
+    @Volatile var bRight = false
     @Volatile var joy_x = 0.0
     @Volatile var joy_y = 0.0
     @Volatile var joy_btn = false
-    @Volatile var joy_cap = false
     @Volatile var touch_x = 0.0
     @Volatile var touch_y = 0.0
     @Volatile var touch_force = 0.0
     @Volatile var trigger = 0.0
-    @Volatile var trigger_btn = false
-    @Volatile var trigger_cap = false
-    @Volatile var grip_pull = 0.0
-    @Volatile var grip_force = 0.0
 
     @Volatile var flexions = DoubleArray(20) { 0.0 }
     @Volatile var splays = DoubleArray(5) { 0.0 }
@@ -331,6 +332,19 @@ fun quatMul(qw: Double, qx: Double, qy: Double, qz: Double, pw: Double, px: Doub
     qw*pw-qx*px-qy*py-qz*pz, qw*px+qx*pw+qy*pz-qz*py, qw*py-qx*pz+qy*pw+qz*px, qw*pz+qx*py-qy*px+qz*pw
 )
 
+const val CLICK_AT = 0.95
+const val CAP_AT = 0.05
+
+private fun ByteBuffer.putTag(tag: String): ByteBuffer = put(tag.toByteArray(Charsets.US_ASCII))
+private fun ByteBuffer.putBools(vararg values: Boolean): ByteBuffer {
+    for (v in values) put(if (v) 1.toByte() else 0.toByte())
+    return this
+}
+private fun ByteBuffer.putDoubles(vararg values: Double): ByteBuffer {
+    for (v in values) putDouble(v)
+    return this
+}
+
 fun buildQrDatabase(session: Session, activity: MainActivity): AugmentedImageDatabase {
     val db = AugmentedImageDatabase(session)
     try {
@@ -382,11 +396,14 @@ fun AROverlayUI(activity: MainActivity) {
     LaunchedEffect(volUpState) { prefs.edit().putString("volUp", volUpState.name).apply(); activity.volUpAction = volUpState }
     LaunchedEffect(volDownState) { prefs.edit().putString("volDown", volDownState.name).apply(); activity.volDownAction = volDownState }
 
-    var ipAddress by remember { mutableStateOf(prefs.getString("ip", null) ?: "192.168.50.83") }
+    var ipAddress by remember { mutableStateOf(prefs.getString("ip", null) ?: "255.255.255.255") }
     LaunchedEffect(ipAddress) { prefs.edit().putString("ip", ipAddress).apply() }
 
     var port by remember { mutableStateOf(prefs.getString("port", null) ?: "9001") }
     LaunchedEffect(port) { prefs.edit().putString("port", port).apply() }
+
+    var conTypeState by remember { mutableStateOf(prefs.getString("con_type", "touch") ?: "touch") }
+    LaunchedEffect(conTypeState) { activity.conType = conTypeState; prefs.edit().putString("con_type", conTypeState).apply() }
 
     var isVertical by remember { mutableStateOf(prefs.getBoolean("vertical", false)) }
     LaunchedEffect(isVertical) { activity.isVertical = isVertical; prefs.edit().putBoolean("vertical", isVertical).apply() }
@@ -416,6 +433,13 @@ fun AROverlayUI(activity: MainActivity) {
             val editor = prefs.edit()
             allButtonIds.forEach { id -> editor.putBoolean("${id}_isDisabled", true) }
             editor.putBoolean("did_first_setup", true)
+            editor.apply()
+            activity.layoutRefreshTrigger++
+        }
+        if (!prefs.getBoolean("did_setup_controller_types", false)) {
+            val editor = prefs.edit()
+            newButtonIds.forEach { id -> if (!prefs.contains("${id}_isDisabled")) editor.putBoolean("${id}_isDisabled", true) }
+            editor.putBoolean("did_setup_controller_types", true)
             editor.apply()
             activity.layoutRefreshTrigger++
         }
@@ -477,12 +501,15 @@ fun AROverlayUI(activity: MainActivity) {
             val socket = DatagramSocket()
             val address = InetAddress.getByName(ipAddress)
             val portInt = port.toIntOrNull() ?: 9001
-            val posBuffer = ByteBuffer.allocate(25).order(ByteOrder.LITTLE_ENDIAN)
-            val rotBuffer = ByteBuffer.allocate(33).order(ByteOrder.LITTLE_ENDIAN)
-            val extraBuffer = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN)
+            val posBuffer = ByteBuffer.allocate(3 + 24).order(ByteOrder.LITTLE_ENDIAN)
+            val rotBuffer = ByteBuffer.allocate(3 + 32).order(ByteOrder.LITTLE_ENDIAN)
+            val extraBuffer = ByteBuffer.allocate(3 + 1).order(ByteOrder.LITTLE_ENDIAN)
             val s = sin(Math.PI / 4); val c = cos(Math.PI / 4)
-            val inputBuffer = ByteBuffer.allocate(77).order(ByteOrder.LITTLE_ENDIAN)
-            val skeletalBuffer = ByteBuffer.allocate(201).order(ByteOrder.LITTLE_ENDIAN)
+            val indexBuffer = ByteBuffer.allocate(3 + 12 + 8 * 8).order(ByteOrder.LITTLE_ENDIAN)   // idx
+            val touchBuffer = ByteBuffer.allocate(3 + 8 + 4 * 8).order(ByteOrder.LITTLE_ENDIAN)    // itc
+            val viveBuffer = ByteBuffer.allocate(3 + 6 + 3 * 8).order(ByteOrder.LITTLE_ENDIAN)     // ive
+            val frameBuffer = ByteBuffer.allocate(3 + 20 + 4 * 8).order(ByteOrder.LITTLE_ENDIAN)   // ifm
+            val skeletalBuffer = ByteBuffer.allocate(3 + 25 * 8).order(ByteOrder.LITTLE_ENDIAN)
 
             while (isStreaming) {
                 val tx = activity.latestTx; val ty = activity.latestTy; val tz = activity.latestTz
@@ -497,40 +524,79 @@ fun AROverlayUI(activity: MainActivity) {
                     qw = finalR[0]; qx = finalR[1]; qy = finalR[2]; qz = finalR[3]
                 }
 
-                extraBuffer.clear(); extraBuffer.put('E'.code.toByte())
+                extraBuffer.clear(); extraBuffer.putTag("ext")
                 val isResetting = activity.resetFramesRemaining > 0
-                extraBuffer.put(if (isResetting) 1.toByte() else 0.toByte())
-                socket.send(DatagramPacket(extraBuffer.array(), extraBuffer.capacity(), address, portInt))
+                extraBuffer.putBools(isResetting)
+                socket.send(DatagramPacket(extraBuffer.array(), extraBuffer.position(), address, portInt))
                 if (activity.resetFramesRemaining > 0) activity.resetFramesRemaining--
 
-                posBuffer.clear(); posBuffer.put('P'.code.toByte())
-                posBuffer.putDouble(tx); posBuffer.putDouble(ty); posBuffer.putDouble(tz)
-                socket.send(DatagramPacket(posBuffer.array(), posBuffer.capacity(), address, portInt))
+                posBuffer.clear(); posBuffer.putTag("pos")
+                posBuffer.putDoubles(tx, ty, tz)
+                socket.send(DatagramPacket(posBuffer.array(), posBuffer.position(), address, portInt))
 
-                rotBuffer.clear(); rotBuffer.put('R'.code.toByte())
-                rotBuffer.putDouble(qw); rotBuffer.putDouble(qx); rotBuffer.putDouble(qy); rotBuffer.putDouble(qz)
-                socket.send(DatagramPacket(rotBuffer.array(), rotBuffer.capacity(), address, portInt))
+                rotBuffer.clear(); rotBuffer.putTag("rot")
+                rotBuffer.putDoubles(qw, qx, qy, qz)
+                socket.send(DatagramPacket(rotBuffer.array(), rotBuffer.position(), address, portInt))
 
-                inputBuffer.clear(); inputBuffer.put('I'.code.toByte())
-                activity.a_cap = activity.a; activity.b_cap = activity.b; activity.system_cap = activity.system
-                if (activity.trigger > 0.1) { activity.trigger_cap = true; activity.trigger_btn = true }
-                else { activity.trigger_cap = false; activity.trigger_btn = false }
-                if (activity.touch_x != 0.0 || activity.touch_y != 0.0 || activity.touch_force > 0.1) activity.touch_cap = true
-                else activity.touch_cap = false
-                if (activity.joy_x != 0.0 || activity.joy_y != 0.0) activity.joy_cap = true else activity.joy_cap = false
+                val trig = activity.trigger
+                val trigBtn = trig >= CLICK_AT
+                val trigCap = trigBtn || trig > CAP_AT
                 val isAnyFingerActive = activity.middle > 0.0 || activity.ring > 0.0 || activity.pinky > 0.0
-                if (activity.grip || isAnyFingerActive) { activity.grip_pull = 1.0; activity.grip_cap = true; activity.grip_force = 1.0 }
-                else { activity.grip_pull = 0.0; activity.grip_cap = false; activity.grip_force = 0.0 }
-                val buttons = booleanArrayOf(activity.a, activity.b, activity.system, activity.joy_btn, activity.trigger_btn,
-                    activity.a_cap, activity.b_cap, activity.system_cap, activity.joy_cap, activity.trigger_cap, activity.touch_cap, activity.grip_cap)
-                for (btn in buttons) inputBuffer.put(if (btn) 1.toByte() else 0.toByte())
-                inputBuffer.putDouble(activity.joy_x); inputBuffer.putDouble(activity.joy_y)
-                inputBuffer.putDouble(activity.touch_x); inputBuffer.putDouble(activity.touch_y)
-                inputBuffer.putDouble(activity.trigger); inputBuffer.putDouble(activity.touch_force)
-                inputBuffer.putDouble(activity.grip_pull); inputBuffer.putDouble(activity.grip_force)
-                socket.send(DatagramPacket(inputBuffer.array(), inputBuffer.position(), address, portInt))
+                val gripOn = activity.grip || isAnyFingerActive
+                val gripVal = if (gripOn) 1.0 else 0.0
+                val joyX = activity.joy_x; val joyY = activity.joy_y
+                val joyBtn = activity.joy_btn
+                val joyCap = joyBtn || abs(joyX) > 0.1 || abs(joyY) > 0.1
+                val a = activity.a; val b = activity.b; val system = activity.system
+                val select = activity.select
 
-                skeletalBuffer.clear(); skeletalBuffer.put('S'.code.toByte())
+                when (activity.conType) {
+                    "touch" -> {
+                        // touch: a_x/b_y are A/B on the right hand and X/Y on the left, no touchpad
+                        touchBuffer.clear(); touchBuffer.putTag("itc")
+                        touchBuffer.putBools(system, a, a, b, b, trigCap, joyBtn, joyCap)
+                        touchBuffer.putDoubles(trig, gripVal, joyX, joyY)
+                        socket.send(DatagramPacket(touchBuffer.array(), touchBuffer.position(), address, portInt))
+                    }
+                    "vive" -> {
+                        // vive: the trackpad is the joystick (touchpad is used if the joystick is idle), grip is click only
+                        val joyActive = joyX != 0.0 || joyY != 0.0
+                        val padX = if (joyActive) joyX else activity.touch_x
+                        val padY = if (joyActive) joyY else activity.touch_y
+                        val padBtn = joyBtn || activity.touch_force > 0.0
+                        val padCap = padBtn || padX != 0.0 || padY != 0.0
+                        viveBuffer.clear(); viveBuffer.putTag("ive")
+                        viveBuffer.putBools(system, gripOn, select, trigBtn, padBtn, padCap)
+                        viveBuffer.putDoubles(trig, padX, padY)
+                        socket.send(DatagramPacket(viveBuffer.array(), viveBuffer.position(), address, portInt))
+                    }
+                    "frame" -> {
+                        // frame: every source has click + touch, touch always follows the click
+                        val yUp = activity.yUp; val aDown = activity.aDown; val xLeft = activity.xLeft; val bRight = activity.bRight
+                        val bumper = activity.bumper
+                        frameBuffer.clear(); frameBuffer.putTag("ifm")
+                        frameBuffer.putBools(
+                            yUp, yUp, aDown, aDown, xLeft, xLeft, bRight, bRight,
+                            select, select, bumper, bumper, system, system,
+                            trigBtn, trigCap, gripOn, gripOn, joyBtn, joyCap
+                        )
+                        frameBuffer.putDoubles(trig, gripVal, joyX, joyY)
+                        socket.send(DatagramPacket(frameBuffer.array(), frameBuffer.position(), address, portInt))
+                    }
+                    else -> {
+                        // index idk
+                        val touchCap = activity.touch_x != 0.0 || activity.touch_y != 0.0 || activity.touch_force > CAP_AT
+                        indexBuffer.clear(); indexBuffer.putTag("idx")
+                        indexBuffer.putBools(
+                            a, b, system, joyBtn, trigBtn,
+                            a, b, system, joyCap, trigCap, touchCap, gripOn
+                        )
+                        indexBuffer.putDoubles(joyX, joyY, activity.touch_x, activity.touch_y, trig, activity.touch_force, gripVal, gripVal)
+                        socket.send(DatagramPacket(indexBuffer.array(), indexBuffer.position(), address, portInt))
+                    }
+                }
+
+                skeletalBuffer.clear(); skeletalBuffer.putTag("skl")
                 val isHandActive = activity.joy_x != 0.0 || activity.joy_y != 0.0 || activity.joy_btn ||
                         activity.touch_x != 0.0 || activity.touch_y != 0.0 || activity.touch_force != 0.0
                 activity.flexions[0] = if (isHandActive) 1.0 else 0.0
@@ -547,14 +613,6 @@ fun AROverlayUI(activity: MainActivity) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // H.264 video stream from the PC driver (headset layout)
-        if (showHeadset && !showBrowser) {
-            HeadsetVideoView(
-                videoPort = videoPort.toIntOrNull() ?: 9990,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
         if (showBrowser) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -562,7 +620,9 @@ fun AROverlayUI(activity: MainActivity) {
                     WebView(ctx).apply {
                         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                         webViewClient = object : WebViewClient() {
-                            override fun onReceivedSslError(view: WebView, handler: android.webkit.SslErrorHandler, error: android.net.http.SslError) { handler.proceed() }
+                            override fun onReceivedSslError(view: WebView, handler: android.webkit.SslErrorHandler, error: android.net.http.SslError) {
+                                handler.proceed()
+                            }
                         }
                         settings.javaScriptEnabled = true; settings.domStorageEnabled = true
                         loadUrl(browserUrl)
@@ -579,13 +639,22 @@ fun AROverlayUI(activity: MainActivity) {
             SuperButton(id = "grip(toggle)", label = "GRIP\nTOGGLE", isActive = activity.grip, onToggle = { activity.grip = it }, defaultX = 250f, defaultY = 100f, prefs = prefs, activity = activity)
             SuperButton(id = "trigger", label = "TRIGGER", isActive = (activity.trigger != 0.0), onToggle = { isActive -> activity.trigger = if (isActive) 1.0 else 0.0 }, defaultX = 250f, defaultY = 100f, prefs = prefs, activity = activity)
             SuperJoystick(id = "joystick", prefs = prefs, activity = activity, onJoyInput = { x, y -> activity.joy_x = x; activity.joy_y = y })
-            SuperButton(id = "joystick_btn", label = "JOY BTN", isActive = activity.joy_btn, onToggle = { activity.joy_btn = it }, defaultX = 50f, defaultY = 100f, prefs = prefs, activity = activity)
+            SuperButton(id = "joystick_btn(hold)", label = "JOY BTN\nHOLD", isActive = activity.joy_btn, onToggle = { activity.joy_btn = it }, defaultX = 50f, defaultY = 100f, prefs = prefs, activity = activity)
+            SuperButton(id = "joystick_btn(toggle)", label = "JOY BTN\nTOGGLE", isActive = activity.joy_btn, onToggle = { activity.joy_btn = it }, defaultX = 150f, defaultY = 100f, prefs = prefs, activity = activity)
             SuperTouchpad(id = "touchpad", prefs = prefs, activity = activity, onTouchInput = { x, y -> activity.touch_x = x; activity.touch_y = y })
             SuperButton(id = "touchpad_btn", label = "TOUCH BTN", isActive = (activity.touch_force != 0.0), onToggle = { isActive -> activity.touch_force = if (isActive) 1.0 else 0.0 }, defaultX = 250f, defaultY = 100f, prefs = prefs, activity = activity)
             SuperButton(id = "reset", label = "RESET", isActive = false, onToggle = { activity.resetSession() }, defaultX = 200f, defaultY = 200f, prefs = prefs, activity = activity)
             SuperButton(id = "pinky", label = "PINKY", isActive = (activity.pinky != 0.0), onToggle = { isActive -> activity.pinky = if (isActive) 1.0 else 0.0 }, defaultX = 250f, defaultY = 100f, prefs = prefs, activity = activity)
             SuperButton(id = "ring", label = "RING", isActive = (activity.ring != 0.0), onToggle = { isActive -> activity.ring = if (isActive) 1.0 else 0.0 }, defaultX = 250f, defaultY = 100f, prefs = prefs, activity = activity)
             SuperButton(id = "middle", label = "MIDDLE", isActive = (activity.middle != 0.0), onToggle = { isActive -> activity.middle = if (isActive) 1.0 else 0.0 }, defaultX = 250f, defaultY = 100f, prefs = prefs, activity = activity)
+
+            SuperButton(id = "select", label = "SELECT", isActive = activity.select, onToggle = { activity.select = it }, defaultX = 50f, defaultY = 200f, prefs = prefs, activity = activity)
+            SuperButton(id = "bumper", label = "BUMPER", isActive = activity.bumper, onToggle = { activity.bumper = it }, defaultX = 150f, defaultY = 200f, prefs = prefs, activity = activity)
+
+            SuperButton(id = "y_up", label = "Y/UP", isActive = activity.yUp, onToggle = { activity.yUp = it }, defaultX = 50f, defaultY = 300f, prefs = prefs, activity = activity)
+            SuperButton(id = "a_down", label = "A/DOWN", isActive = activity.aDown, onToggle = { activity.aDown = it }, defaultX = 150f, defaultY = 300f, prefs = prefs, activity = activity)
+            SuperButton(id = "x_left", label = "X/LEFT", isActive = activity.xLeft, onToggle = { activity.xLeft = it }, defaultX = 250f, defaultY = 300f, prefs = prefs, activity = activity)
+            SuperButton(id = "b_right", label = "B/RIGHT", isActive = activity.bRight, onToggle = { activity.bRight = it }, defaultX = 350f, defaultY = 300f, prefs = prefs, activity = activity)
         }
 
         val uriHandler = LocalUriHandler.current
@@ -634,6 +703,7 @@ fun AROverlayUI(activity: MainActivity) {
                             Checkbox(checked = isStreaming, onCheckedChange = { isStreaming = it }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF43A047), uncheckedColor = Color.Gray))
                             Text(if (isStreaming) "Streaming ON" else "Streaming OFF", color = if (isStreaming) Color(0xFF81C784) else Color.White, fontSize = 13.sp)
                         }
+//                      slop plz ignore-----------------------------
 //                      qr sync test, the idea is for all devices to look at the same qr, click sync and they all know where they are in relation,
 //                      a more modern approach will be with point cloud matching, need more research
 //                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -652,24 +722,30 @@ fun AROverlayUI(activity: MainActivity) {
                             )
                         }
 
+                        Text("Controller Type", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+                        var conTypeDropdownExpanded by remember { mutableStateOf(false) }
+                        ExposedDropdownMenuBox(expanded = conTypeDropdownExpanded, onExpandedChange = { conTypeDropdownExpanded = it }) {
+                            OutlinedTextField(value = conTypeState, onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = conTypeDropdownExpanded) }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF5C6BC0), unfocusedBorderColor = Color.Gray), modifier = Modifier.menuAnchor().fillMaxWidth())
+                            ExposedDropdownMenu(expanded = conTypeDropdownExpanded, onDismissRequest = { conTypeDropdownExpanded = false }, containerColor = Color(0xFF1A1A2E)) {
+                                controllerTypes.forEach { option -> DropdownMenuItem(text = { Text(option, color = Color.White) }, onClick = { conTypeState = option; conTypeDropdownExpanded = false }) }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         PresetLayoutComboBox(
                             prefs = prefs,
                             activity = activity,
                             browserUrl = browserUrl,
                             onOpenBrowser = {
                                 showBrowser = true
-                                showHeadset = false
                                 val editor = prefs.edit()
                                 allButtonIds.forEach { id -> editor.putBoolean("${id}_isDisabled", true) }
                                 editor.apply()
                                 activity.layoutRefreshTrigger++
                             },
                             onCloseBrowser = { showBrowser = false },
-                            onOpenHeadset = {
-                                showHeadset = true
-                                showBrowser = false
-                            },
-                            onCloseHeadset = { showHeadset = false }
+
+                            onSelectConType = { conTypeState = it }
                         )
 
                         val flipDensity = LocalDensity.current
@@ -687,9 +763,6 @@ fun AROverlayUI(activity: MainActivity) {
 
                         Text("Browser URL", color = Color.Gray, fontSize = 11.sp)
                         OutlinedTextField(value = browserUrl, onValueChange = { browserUrl = it }, singleLine = true, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF5C6BC0), unfocusedBorderColor = Color.Gray), modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 10.dp))
-
-                        Text("Video Stream Port", color = Color.Gray, fontSize = 11.sp)
-                        OutlinedTextField(value = videoPort, onValueChange = { if (it.isEmpty() || it.all { c -> c.isDigit() }) videoPort = it }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF5C6BC0), unfocusedBorderColor = Color.Gray), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
 
                         Text("Volume Up Action", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
                         ExposedDropdownMenuBox(expanded = volUpDropdownExpanded, onExpandedChange = { volUpDropdownExpanded = it }) {
@@ -765,39 +838,92 @@ fun Gif() {
     AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(R.drawable.fix_anim).decoderFactory(GifDecoder.Factory()).build(), contentDescription = null, modifier = Modifier.size(200.dp))
 }
 
-data class LayoutRegion(val startPct: Pair<Float, Float>, val endPct: Pair<Float, Float>, val isToggle: Boolean = false)
+// centered = the region only decides where the joystick sits, the circle is centered inside it (used by the vive layout)
+data class LayoutRegion(val startPct: Pair<Float, Float>, val endPct: Pair<Float, Float>, val isToggle: Boolean = false, val centered: Boolean = false)
 
-val allButtonIds = listOf("a", "b", "system", "grip(hold)", "grip(toggle)", "trigger", "joystick", "joystick_btn", "touchpad", "touchpad_btn", "reset", "middle", "ring", "pinky")
+val controllerTypes = listOf("index", "touch", "vive", "frame")
+
+val allButtonIds = listOf("a", "b", "system", "grip(hold)", "grip(toggle)", "trigger", "joystick", "joystick_btn(hold)", "joystick_btn(toggle)", "touchpad", "touchpad_btn", "reset", "middle", "ring", "pinky",
+    "select", "bumper", "y_up", "a_down", "x_left", "b_right")
+
+// ids added with the controller types
+val newButtonIds = listOf("select", "bumper", "y_up", "a_down", "x_left", "b_right")
+
+// these never move between the index / touch / vive / frame layouts, mostly!
+private val REGION_TRIGGER = LayoutRegion(0.0f to 0.1f, 0.9f to 0.3f)
+private val REGION_RESET = LayoutRegion(0.9f to 0.1f, 1.0f to 0.2f)
+private val REGION_SYSTEM = LayoutRegion(0.9f to 0.2f, 1.0f to 0.3f)
+private val REGION_GRIP_HOLD = LayoutRegion(0.4f to 0.7f, 0.8f to 1.0f)
+private val REGION_GRIP_TOGGLE = LayoutRegion(0.0f to 0.7f, 0.4f to 1.0f, isToggle = true)
 
 val presetLayouts = mapOf(
     "none" to mapOf<String, LayoutRegion>(),
-    "headset" to mapOf<String, LayoutRegion>(),  // empty = all buttons hidden; video fills screen
     "compact" to mapOf(
         "a" to LayoutRegion(0.0f to 0.3f, 0.3f to 0.5f), "b" to LayoutRegion(0.0f to 0.5f, 0.3f to 0.7f),
         "system" to LayoutRegion(0.0f to 0.0f, 0.0f to 0.2f), "grip(hold)" to LayoutRegion(0.0f to 0.0f, 0.0f to 0.0f),
         "grip(toggle)" to LayoutRegion(0.0f to 0.0f, 0.0f to 0.0f), "trigger" to LayoutRegion(0.0f to 0.0f, 0.0f to 0.0f),
-        "joystick" to LayoutRegion(0.5f to 0.3f, 1.0f to 1.0f), "joystick_btn" to LayoutRegion(0.0f to 0.0f, 0.0f to 0.0f),
+        "joystick" to LayoutRegion(0.5f to 0.3f, 1.0f to 1.0f),
+        "joystick_btn(toggle)" to LayoutRegion(0.0f to 0.0f, 0.0f to 0.0f, isToggle = true),
+        "joystick_btn(hold)" to LayoutRegion(0.0f to 0.0f, 0.0f to 0.0f),
         "reset" to LayoutRegion(0.0f to 0.0f, 0.0f to 0.0f)
     ),
-    "full" to mapOf(
+    // valve index (was "full"): a/b, joystick + click, touchpad + click
+    "index" to mapOf(
         "b" to LayoutRegion(0.0f to 0.3f, 0.3f to 0.5f), "a" to LayoutRegion(0.0f to 0.5f, 0.3f to 0.7f),
-        "system" to LayoutRegion(0.9f to 0.2f, 1.0f to 0.3f), "grip(hold)" to LayoutRegion(0.4f to 0.7f, 0.8f to 1.0f),
-        "grip(toggle)" to LayoutRegion(0.0f to 0.7f, 0.4f to 1.0f, isToggle = true), "trigger" to LayoutRegion(0.0f to 0.1f, 0.9f to 0.3f),
-        "joystick" to LayoutRegion(0.5f to 0.3f, 1.0f to 1.0f), "joystick_btn" to LayoutRegion(0.5f to 0.5f, 1.0f to 0.6f),
-        "reset" to LayoutRegion(0.9f to 0.1f, 1.0f to 0.2f), "touchpad" to LayoutRegion(0.3f to 0.3f, 0.5f to 0.6f),
+        "system" to REGION_SYSTEM, "grip(hold)" to REGION_GRIP_HOLD,
+        "grip(toggle)" to REGION_GRIP_TOGGLE, "trigger" to REGION_TRIGGER,
+        "joystick" to LayoutRegion(0.5f to 0.3f, 1.0f to 1.0f),
+        "joystick_btn(toggle)" to LayoutRegion(0.5f to 0.5f, 0.75f to 0.6f, isToggle = true),
+        "joystick_btn(hold)" to LayoutRegion(0.75f to 0.5f, 1.0f to 0.6f),
+        "reset" to REGION_RESET, "touchpad" to LayoutRegion(0.3f to 0.3f, 0.5f to 0.6f),
         "touchpad_btn" to LayoutRegion(0.3f to 0.6f, 0.5f to 0.7f)
     ),
-    "skeletal" to mapOf(
-        "a" to LayoutRegion(0.05f to 0.1f, 0.15f to 0.2f), "b" to LayoutRegion(0.2f to 0.1f, 0.3f to 0.2f),
-        "system" to LayoutRegion(0.35f to 0.1f, 0.45f to 0.2f), "joystick" to LayoutRegion(0.7f to 0.5f, 0.9f to 0.7f),
-        "joystick_btn" to LayoutRegion(0.75f to 0.75f, 0.85f to 0.85f), "reset" to LayoutRegion(0.05f to 0.8f, 0.15f to 0.9f),
-        "middle" to LayoutRegion(0.7f to 0.1f, 0.8f to 0.2f), "ring" to LayoutRegion(0.8f to 0.1f, 0.9f to 0.2f),
-        "pinky" to LayoutRegion(0.9f to 0.1f, 1.0f to 0.2f)
+    // oculus / meta touch: the index layout without the touchpad
+    "touch" to mapOf(
+        "b" to LayoutRegion(0.0f to 0.3f, 0.5f to 0.5f),
+        "a" to LayoutRegion(0.0f to 0.5f, 0.5f to 0.7f),
+        "system" to REGION_SYSTEM, "grip(hold)" to REGION_GRIP_HOLD,
+        "grip(toggle)" to REGION_GRIP_TOGGLE, "trigger" to REGION_TRIGGER,
+        "joystick" to LayoutRegion(0.5f to 0.3f, 1.0f to 1.0f),
+        "joystick_btn(toggle)" to LayoutRegion(0.5f to 0.5f, 0.75f to 0.6f, isToggle = true),
+        "joystick_btn(hold)" to LayoutRegion(0.75f to 0.5f, 1.0f to 0.6f),
+        "reset" to REGION_RESET
     ),
-    "clean" to mapOf(
-        "a" to LayoutRegion(0.05f to 0.1f, 0.15f to 0.2f), "b" to LayoutRegion(0.2f to 0.1f, 0.3f to 0.2f),
-        "system" to LayoutRegion(0.35f to 0.1f, 0.45f to 0.2f), "joystick" to LayoutRegion(0.7f to 0.5f, 0.9f to 0.7f),
-        "joystick_btn" to LayoutRegion(0.75f to 0.75f, 0.85f to 0.85f), "reset" to LayoutRegion(0.05f to 0.8f, 0.15f to 0.9f)
+    "touch(skeletal)" to mapOf(
+        "a" to LayoutRegion(0.4f to 0.53f, 0.5f to 0.76f),
+        "b" to LayoutRegion(0.4f to 0.3f, 0.5f to 0.53f),
+        "middle" to LayoutRegion(0.0f to 0.3f, 0.4f to 0.53f),
+        "ring" to LayoutRegion(0.0f to 0.53f, 0.4f to 0.76f),
+        "pinky" to LayoutRegion(0.0f to 0.76f, 0.4f to 1.0f),
+        "grip(toggle)" to LayoutRegion(0.4f to 0.76f, 0.8f to 1.0f, isToggle = true),
+        "joystick" to LayoutRegion(0.5f to 0.3f, 1.0f to 1.0f),
+        "joystick_btn(toggle)" to LayoutRegion(0.5f to 0.5f, 0.75f to 0.6f, isToggle = true),
+        "joystick_btn(hold)" to LayoutRegion(0.75f to 0.5f, 1.0f to 0.6f),
+        "trigger" to REGION_TRIGGER,
+        "system" to REGION_SYSTEM,
+        "reset" to REGION_RESET
+    ),
+    "vive" to mapOf(
+        "system" to REGION_SYSTEM, "grip(hold)" to REGION_GRIP_HOLD,
+        "grip(toggle)" to REGION_GRIP_TOGGLE, "trigger" to REGION_TRIGGER,
+        "select" to LayoutRegion(0.3f to 0.3f, 0.7f to 0.4f),
+        "joystick" to LayoutRegion(0.2f to 0.35f, 0.8f to 0.75f, centered = true),
+        "joystick_btn(toggle)" to LayoutRegion(0.0f to 0.3f, 0.2f to 0.5f, isToggle = true), // toggle not working???
+        "joystick_btn(hold)" to LayoutRegion(0.0f to 0.5f, 0.2f to 0.7f),
+        "reset" to REGION_RESET
+    ),
+    "frame" to mapOf(
+        "y_up" to LayoutRegion(0.125f to 0.4f, 0.375f to 0.5f),
+        "x_left" to LayoutRegion(0.0f to 0.5f, 0.25f to 0.6f),
+        "b_right" to LayoutRegion(0.25f to 0.5f, 0.5f to 0.6f),
+        "a_down" to LayoutRegion(0.125f to 0.6f, 0.375f to 0.7f),
+        "select" to LayoutRegion(0.8f to 0.7f, 1.0f to 0.8f), "bumper" to LayoutRegion(0.0f to 0.3f, 1.0f to 0.4f),
+        "system" to REGION_SYSTEM, "grip(hold)" to REGION_GRIP_HOLD,
+        "grip(toggle)" to REGION_GRIP_TOGGLE, "trigger" to REGION_TRIGGER,
+        "joystick" to LayoutRegion(0.5f to 0.4f, 1.0f to 1.0f),
+        "joystick_btn(toggle)" to LayoutRegion(0.5f to 0.61f, 0.75f to 0.7f, isToggle = true),
+        "joystick_btn(hold)" to LayoutRegion(0.75f to 0.61f, 1.0f to 0.7f),
+        "reset" to REGION_RESET
     )
 )
 
@@ -823,14 +949,11 @@ fun PresetLayoutComboBox(
     browserUrl: String = "",
     onOpenBrowser: () -> Unit = {},
     onCloseBrowser: () -> Unit = {},
-    onOpenHeadset: () -> Unit = {},
-    onCloseHeadset: () -> Unit = {},
+    onSelectConType: (String) -> Unit = {},
     mirror: Boolean = false
 ) {
     val configuration = LocalConfiguration.current
-    //val options = listOf("pass", "full", "headset", "browser", "none")
-    //headset is for wireless steaming, disabled for now cuz slow
-    val options = listOf("pass", "full", "browser", "none")
+    val options = listOf("pass") + controllerTypes + listOf("touch(skeletal)", "browser", "none")
     var expanded by remember { mutableStateOf(false) }
     var selectedOption by remember { mutableStateOf("pass") }
     val density = LocalDensity.current
@@ -847,13 +970,12 @@ fun PresetLayoutComboBox(
                     DropdownMenuItem(text = { Text(option) }, onClick = {
                         selectedOption = option; expanded = false
 
-                        when (option) {
-                            "browser" -> onOpenBrowser()
-                            "headset" -> onOpenHeadset()
-                            else -> { onCloseBrowser(); onCloseHeadset() }
-                        }
+                        if (option == "browser") onOpenBrowser() else onCloseBrowser()
 
-                        if (option != "browser" && option != "headset" && option != "pass") {
+                        // index / touch / vive / frame layouts are tied to a controller type
+                        if (option in controllerTypes) onSelectConType(option)
+
+                        if (option != "browser" && option != "none" && option != "pass") {
                             val activeRegions = presetLayouts[option] ?: emptyMap()
                             val editor = prefs.edit()
                             allButtonIds.forEach { id ->
@@ -864,11 +986,17 @@ fun PresetLayoutComboBox(
                                     val endX = region.endPct.first; val endY = region.endPct.second
                                     val width = (endX - startX).coerceAtLeast(0f) * screenWidthPx
                                     val height = (endY - startY).coerceAtLeast(0f) * screenHeightPx
-                                    val x = if (mirror) screenWidthPx - (endX * screenWidthPx) else startX * screenWidthPx
-                                    editor.putFloat("${id}_x", x); editor.putFloat("${id}_y", startY * screenHeightPx)
+                                    var x = if (mirror) screenWidthPx - (endX * screenWidthPx) else startX * screenWidthPx
+                                    var y = startY * screenHeightPx
+                                    if (region.centered) {
+                                        val side = minOf(width, height)
+                                        x += (width - side) / 2f
+                                        y += (height - side) / 2f
+                                    }
+                                    editor.putFloat("${id}_x", x); editor.putFloat("${id}_y", y)
                                     editor.putFloat("${id}_width", with(density) { width.toDp().value })
                                     editor.putFloat("${id}_height", with(density) { height.toDp().value })
-                                    if (id != "joystick" && id != "joystick_btn" && id != "touchpad" && id != "touchpad_btn")
+                                    if (id != "joystick" && id != "joystick_btn(hold)" && id != "joystick_btn(toggle)" && id != "touchpad" && id != "touchpad_btn")
                                         editor.putBoolean("${id}_isToggle", region.isToggle)
                                     if (id == "joystick") editor.putFloat("${id}_size", minOf(with(density) { width.toDp().value }, with(density) { height.toDp().value }))
                                 }
@@ -876,8 +1004,7 @@ fun PresetLayoutComboBox(
                             editor.apply(); activity.layoutRefreshTrigger++
                         }
 
-                        // "headset" still runs the disable-all logic so buttons clear
-                        if (option == "headset") {
+                        if (option == "none") {
                             val editor = prefs.edit()
                             allButtonIds.forEach { id -> editor.putBoolean("${id}_isDisabled", true) }
                             editor.apply(); activity.layoutRefreshTrigger++
@@ -969,4 +1096,5 @@ fun SuperTouchpad(id: String, prefs: android.content.SharedPreferences, activity
     }
 }
 
+// will clean up if ill make an iphone version!
 //;P

@@ -135,6 +135,14 @@
     <ClInclude Include="..\..\ref\Video_Codec_Interface_13.1.15\Interface\cuviddec.h" />
     <ClInclude Include="..\..\ref\Video_Codec_Interface_13.1.15\Interface\nvcuvid.h" />
     <ClInclude Include="..\..\ref\Video_Codec_Interface_13.1.15\Interface\nvEncodeAPI.h" />
+    <ClInclude Include="devices\controllerbase.h" />
+    <ClInclude Include="devices\controllerdata.h" />
+    <ClInclude Include="devices\controllerinput.h" />
+    <ClInclude Include="devices\controllerregistry.h" />
+    <ClInclude Include="devices\controllerslot.h" />
+    <ClInclude Include="devices\framecontroller.h" />
+    <ClInclude Include="devices\touchcontroller.h" />
+    <ClInclude Include="devices\vivecontroller.h" />
     <ClInclude Include="headers\MinHooK\MinHook.h" />
     <ClInclude Include="headers\NvEncoder\nvEncodeAPI.h" />
     <ClInclude Include="headers\NvEncoder\NvEncoder.h" />
@@ -158,6 +166,8 @@
     <ClInclude Include="hooks\driverhooks.h" />
     <ClInclude Include="hooks\hooking.h" />
     <ClInclude Include="hooks\hookoverrides.h" />
+    <ClInclude Include="devices\skeletaloverride.h" />
+    <ClInclude Include="hooks\inputoverride.h" />
     <ClInclude Include="misc\basics.h" />
     <ClInclude Include="devices\hmd.h" />
     <ClInclude Include="globals\main.h" />
@@ -186,12 +196,22 @@
     <None Include="x64\viture x64\opencv_world4100.dll" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="devices\controllerbase.cpp" />
+    <ClCompile Include="devices\controllerdata.cpp" />
+    <ClCompile Include="devices\controllerregistry.cpp" />
+    <ClCompile Include="devices\controllerslot.cpp" />
+    <ClCompile Include="devices\framecontroller.cpp" />
+    <ClCompile Include="devices\touchcontroller.cpp" />
+    <ClCompile Include="devices\vivecontroller.cpp" />
     <ClCompile Include="headers\NvEncoder\NvEncoder.cpp" />
     <ClCompile Include="headers\NvEncoder\NvEncoderD3D11.cpp" />
     <ClCompile Include="headers\NvEncoder\NvEncoderD3D9.cpp" />
     <ClCompile Include="hooks\driverhooks.cpp" />
+    <ClCompile Include="devices\hookcommon.h" />
     <ClCompile Include="hooks\hooking.cpp" />
     <ClCompile Include="hooks\hookoverrides.cpp" />
+    <ClCompile Include="hooks\inputoverride.cpp" />
+    <ClCompile Include="hooks\skeletaloverride.cpp" />
     <ClCompile Include="misc\basics.cpp" />
     <ClCompile Include="globals\comm.cpp" />
     <ClCompile Include="devices\indexcontroller.cpp" />

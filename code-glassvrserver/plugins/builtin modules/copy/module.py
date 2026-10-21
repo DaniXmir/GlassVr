@@ -26,13 +26,14 @@ rw = 0.0
 
 #this combo box "pre show" populates with every devies's serial steamvr finds when clicked
 def pos_mode():
+    d = device
     combo_extra = el.combobox({
         "text": "Copy Serial",
-        "default": se.get_settings().get(f"{device}pos copy serial", ""),
-        "items": list(set([se.get_settings().get(f"{device}pos copy serial", "")] + list(svr.get_trackers_dict()))),
-        "index change": lambda: se.update_setting(f"{device}pos copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+        "default": se.get_settings().get(f"{d}pos copy serial", ""),
+        "items": list(set([se.get_settings().get(f"{d}pos copy serial", "")] + list(svr.get_trackers_dict()))),
+        "index change": lambda: se.update_setting(f"{d}pos copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
         "pre show": lambda cb: (
-            saved := se.get_settings().get(f"{device}pos copy serial", ""),
+            saved := se.get_settings().get(f"{d}pos copy serial", ""),
             val := cb.currentText(), 
             cb.clear(), 
             cb.addItems(list({saved, *svr.get_trackers_dict()}) if saved else list(svr.get_trackers_dict())), 
@@ -45,13 +46,14 @@ def pos_mode():
 
 #same
 def rot_mode():
+    d = device
     combo_extra = el.combobox({
         "text": "Copy Serial",
-        "default": se.get_settings().get(f"{device}rot copy serial", ""),
-        "items": list(set([se.get_settings().get(f"{device}rot copy serial", "")] + list(svr.get_trackers_dict()))),
-        "index change": lambda: se.update_setting(f"{device}rot copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
+        "default": se.get_settings().get(f"{d}rot copy serial", ""),
+        "items": list(set([se.get_settings().get(f"{d}rot copy serial", "")] + list(svr.get_trackers_dict()))),
+        "index change": lambda: se.update_setting(f"{d}rot copy serial", combo_extra.findChildren(QComboBox)[0].currentText()),
         "pre show": lambda cb: (
-            saved := se.get_settings().get(f"{device}rot copy serial", ""),
+            saved := se.get_settings().get(f"{d}rot copy serial", ""),
             val := cb.currentText(), 
             cb.clear(), 
             cb.addItems(list({saved, *svr.get_trackers_dict()}) if saved else list(svr.get_trackers_dict())), 

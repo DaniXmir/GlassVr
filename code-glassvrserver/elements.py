@@ -32,7 +32,14 @@ import steamvr as svr
 
 import playspace as ps
 
-APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+def _app_root():
+    if getattr(sys, "frozen", False):
+        # PyInstaller: _MEIPASS (onefile temp dir, or _internal in onedir)
+        return getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+APP_ROOT = _app_root()
+EXE_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else APP_ROOT
 
 IMAGE_EXT_PRIORITY = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif", "ico"]
 
@@ -82,7 +89,11 @@ def resolve_asset_path(path):
     if os.path.isabs(path):
         bases = [path]
     else:
-        bases = [os.path.join(APP_ROOT, path), os.path.abspath(path)]
+        bases = [
+            os.path.join(APP_ROOT, path),
+            os.path.join(EXE_DIR, path),  # assets folder next to the exe
+            os.path.abspath(path),
+        ]
 
     for base in bases:
         if os.path.isfile(base):
@@ -671,6 +682,9 @@ def image(data=None):
                 pixmap = pixmap.scaled(target_w, target_h, aspect_mode, transform_mode)
             img_label.setPixmap(pixmap)
 
+    if path and not resolved_path:
+        print(f"[image] not found: {path} | tried: {APP_ROOT}, {EXE_DIR}")
+
     attach_data_tooltip(data, img_label)
 
     group_layout.addWidget(img_label)
@@ -1034,7 +1048,6 @@ def combobox(data=None):
     group_layout.addWidget(combo)
     return group_widget
 
-
 def modes(device="hmd", data=None):
     if data is None:
         data = {"group": "widget"}
@@ -1067,7 +1080,11 @@ def modes(device="hmd", data=None):
             if id(module) in seen_ids:
                 continue
             seen_ids.add(id(module))
-            both_layout.addWidget(module.both_mode())
+            both_layout.addWidget(group({
+                "text": getattr(module, "title", module.__name__),
+                "box": "v",
+                "arr": [module.both_mode()]
+            }))
 
     def on_pos_module_change(module):
         active_module_by_slot["pos"] = module
@@ -1106,8 +1123,13 @@ def modes_sub(device, type_name, data=None, on_module_change=None):
     mode_titles = list(modules_by_title.keys())
 
     current_value = settings.get(f"{device}{type_name} mode", "")
-    if current_value not in modules_by_title and mode_titles:
-        current_value = mode_titles[0]
+    if not current_value or current_value not in modules_by_title:
+        if "copy" in modules_by_title:
+            current_value = "copy"
+            se.update_setting(f"{device}{type_name} mode", "copy")
+        elif mode_titles:
+            current_value = mode_titles[0]
+            se.update_setting(f"{device}{type_name} mode", current_value)
 
     content_area = QWidget()
     content_layout = QVBoxLayout(content_area)
@@ -1131,10 +1153,18 @@ def modes_sub(device, type_name, data=None, on_module_change=None):
         module.device = device
         module.mode = type_name
 
+        widget = None
         if type_name == "pos" and hasattr(module, "pos_mode"):
-            content_layout.addWidget(module.pos_mode())
+            widget = module.pos_mode()
         elif type_name == "rot" and hasattr(module, "rot_mode"):
-            content_layout.addWidget(module.rot_mode())
+            widget = module.rot_mode()
+
+        if widget is not None:
+            content_layout.addWidget(group({
+                "text": selected_title,
+                "box": "v",
+                "arr": [widget]
+            }))
 
     def on_index_change():
         selected = combo.findChildren(QComboBox)[0].currentText()
@@ -1154,7 +1184,6 @@ def modes_sub(device, type_name, data=None, on_module_change=None):
 
     refresh_content(current_value)
     return group_widget
-
 
 def theme_selector(data=None):
     if data is None:
@@ -1309,6 +1338,32 @@ def multitype(data=None):
 
 _hook_block_counter = 0
 
+# order matches the driver (PacketSkeletal / skeletaloverride.cpp), keys are "<finger> curl override" / "<finger> splay override"
+FINGER_NAMES = ["thumb", "index", "middle", "ring", "pinky"]
+SKELETAL_SOURCES = ["pass", "cl", "cr"]
+
+INPUT_CONTROLS = [
+    ("trigger",  ["click", "touch", "value"],                  "trigger"),
+    ("grip",     ["click", "touch", "value", "force"],         "grip"),
+    ("joystick", ["click", "touch", "x", "y"],                 "joystick"),
+    ("trackpad", ["click", "touch", "x", "y", "force"],        "trackpad"),
+    ("a",        ["click", "touch"],                           "a  (Touch: A / X)"),
+    ("b",        ["click", "touch"],                           "b  (Touch: B / Y)"),
+    ("y_up",     ["click", "touch"],                           "y_up  (Frame: dpad up / Y)"),
+    ("a_down",   ["click", "touch"],                           "a_down  (Frame: dpad down / A)"),
+    ("x_left",   ["click", "touch"],                           "x_left  (Frame: dpad left / X)"),
+    ("b_right",  ["click", "touch"],                           "b_right  (Frame: dpad right / B)"),
+    ("select",   ["click", "touch"],                           "select  (menu / view)"),
+    ("bumper",   ["click", "touch"],                           "bumper"),
+    ("system",   ["click", "touch"],                           "system"),
+]
+
+def input_override_key(control, channel):
+    return f"input {control} {channel} override"
+
+def input_override_keys():
+    return [input_override_key(c, ch) for c, channels, _ in INPUT_CONTROLS for ch in channels]
+
 
 def hook(data=None):
     if data is None:
@@ -1441,17 +1496,131 @@ def hook(data=None):
     row_widget.setProperty("group", cg)
     row_widget._entry = entry
 
+    def _override_checkbox(text, key, tooltip):
+        w = checkbox({
+            "text": text,
+            "default": bool(entry.get(key, False)),
+            "group": cg,
+            "tooltip": tooltip,
+            "func": lambda: (
+                entry.update({key: w.findChild(QCheckBox).isChecked()}),
+                _notify_change(),
+            ),
+        })
+        return w
+
+    def _source_combobox(key, text, tooltip, rows):
+        def _sync_rows():
+            enabled = bool(entry.get(key, ""))
+            for r in rows:
+                r.setEnabled(enabled)
+
+        def _saved():
+            raw = entry.get(key, "")
+            return raw if raw in SKELETAL_SOURCES else NONE_LABEL
+
+        w = combobox({
+            "text": text,
+            "items": SKELETAL_SOURCES,
+            "default": _saved(),
+            "group": cg,
+            "tooltip": tooltip,
+            "index change": lambda: (
+                entry.update({
+                    key: "" if w.findChild(QComboBox).currentText() == NONE_LABEL
+                    else w.findChild(QComboBox).currentText()
+                }),
+                _sync_rows(),
+                _notify_change(),
+            ),
+        })
+        _sync_rows()
+        return w
+
+    finger_rows = []
+    for finger in FINGER_NAMES:
+        finger_rows.append(multitype({
+            "box": "h",
+            "group": cg,
+            "arr": [
+                label({"text": finger}),
+                _override_checkbox("curl", f"{finger} curl override",
+                                   f"take {finger} curl from the source hand, "
+                                   "a half that is not ticked stays neutral on a ticked finger"),
+                _override_checkbox("splay", f"{finger} splay override",
+                                   f"take {finger} splay from the source hand, "
+                                   "a half that is not ticked stays neutral on a ticked finger"),
+            ],
+        }))
+
+    skeletal_source_widget = _source_combobox(
+        "skeletal override", "skeletal override",
+        "'pass' leaves the device's hand skeleton alone. 'cl'/'cr' use the skeletal data sent for the "
+        "left/right GlassVR controller (same pipe/UDP as the controller itself, that controller does NOT "
+        "have to be enabled). Only the fingers ticked below are replaced, everything else keeps coming "
+        "from the device's own driver.",
+        finger_rows)
+
+    skeletal_group = group({
+        "text": "skeletal overrides",
+        "box": "v",
+        "arr": [skeletal_source_widget] + finger_rows,
+    })
+
+    ring_pinky_grip_checkbox = checkbox({
+        "text": "ring and pinky affect grip",
+        "default": bool(entry.get("ring and pinky affect grip", False)),
+        "group": cg,
+        "tooltip": "If enabled, the grip value will be the maximum of the device's own grip, ring curl, and pinky curl, "
+                   "measured from the final hand skeleton SteamVR receives (after skeletal overrides). "
+                   "Grip touch activates if a finger curl > 0.05, grip click if > 0.95. Never lowers the original grip. "
+                   "Works without an input override source.",
+        "func": lambda: (
+            entry.update({"ring and pinky affect grip": ring_pinky_grip_checkbox.findChild(QCheckBox).isChecked()}),
+            _notify_change(),
+        ),
+    })
+
+    input_rows = []
+    for control, channels, text in INPUT_CONTROLS:
+        input_rows.append(multitype({
+            "box": "h",
+            "group": cg,
+            "arr": [label({"text": text})] + [
+                _override_checkbox(ch, input_override_key(control, ch),
+                                   f"take {control} {ch} from the source hand. only applied when the device "
+                                   "really has this input and the source controller type has an equal one")
+                for ch in channels
+            ],
+        }))
+
+    input_source_widget = _source_combobox(
+        "input override", "input override",
+        "'pass' leaves the device's inputs alone. 'cl'/'cr' use the input data sent for the left/right "
+        "GlassVR controller (its controller does NOT have to be enabled), in the format of the global "
+        "controller type. The controllers do not have to match: a channel is only replaced when both the "
+        "device and the source have it (index a -> touch a, or x on a left touch; vive trackpad -> index "
+        "trackpad). Nothing is ever added to the device, anything without a match is left alone.",
+        input_rows)
+
+    input_group = group({
+        "text": "input overrides",
+        "box": "v",
+        "arr": [input_source_widget] + input_rows,
+    })
+
     row_g = group({
         "text": " ",
         "box": "v",
         "group": "block",
         "arr": [
-            row_widget
+            row_widget,
+            skeletal_group,
+            ring_pinky_grip_checkbox,
+            input_group,
         ]
     })
-
-    # block index drives the rainbow hue; pass data["index"] for stable colors,
-    # otherwise hooks get consecutive hues in creation order
+    
     global _hook_block_counter
     block_index = data.get("index")
     if block_index is None:
@@ -1657,6 +1826,18 @@ def offsets(device):
 
     return final_widget
 
+_SDL_BIND_TAIL = re.compile(r"(btn_\d+|hat_\d+_\d+|axis_\d+_-?\d+(?:\.\d+)?)$")
+
+def bind_display_text(bind):
+    if isinstance(bind, str) and bind.startswith("SDL_"):
+        m = _SDL_BIND_TAIL.search(bind)
+        if m:
+            return m.group(1)
+        parts = bind.split("_", 2)
+        if len(parts) == 3:
+            return parts[2]
+    return bind
+
 class SingleBindButton(QPushButton):
     def __init__(self, mapping_name, current_bind, callback, parent=None):
         super().__init__("", parent)
@@ -1669,7 +1850,9 @@ class SingleBindButton(QPushButton):
         self.clicked.connect(self.start_binding)
 
     def refresh_display(self):
-        self.setText(f"{self.mapping_name}: {self.current_bind}")
+        self.setText(f"{self.mapping_name}: {bind_display_text(self.current_bind)}")
+        full = self.current_bind if isinstance(self.current_bind, str) and self.current_bind.startswith("SDL_") else ""
+        self.setToolTip(full)
 
     def start_binding(self):
         if ch.current_binding_btn and ch.current_binding_btn != self:
@@ -1856,7 +2039,12 @@ def comm_sub(device, type_name, data=None, on_module_change=None):
         data = {"group": "widget"}
 
     cg = data.get("group", "widget")
-    
+
+    group_widget = QWidget()
+    group_widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+    group_layout = QHBoxLayout(group_widget)
+    group_layout.setContentsMargins(0, 0, 0, 0)
+
     settings = se.get_settings()
     all_modules_by_title = mode_registry.discover_modes()
 
@@ -1871,9 +2059,13 @@ def comm_sub(device, type_name, data=None, on_module_change=None):
     if current_value not in mode_titles:
         current_value = mode_titles[0]
 
+    content_area = QWidget()
+    content_layout = QVBoxLayout(content_area)
+    content_layout.setContentsMargins(0, 0, 0, 0)
     active_module = {"current": None}
 
     def refresh_content(selected_title):
+        clear_layout(content_layout)
         module = modules_by_title.get(selected_title)
 
         if active_module["current"] is not module:
@@ -1883,12 +2075,19 @@ def comm_sub(device, type_name, data=None, on_module_change=None):
                 mode_manager.acquire(module, device, type_name)
             active_module["current"] = module
 
-        if callable(on_module_change):
-            on_module_change(module)
-
         if module is not None:
             module.device = device
             module.mode = type_name
+
+        if callable(on_module_change):
+            on_module_change(module)
+
+        if module is None:
+            return
+
+        hook_name = f"{type_name}_mode"
+        if hasattr(module, hook_name):
+            content_layout.addWidget(getattr(module, hook_name)())
 
     def on_index_change():
         combo_box = combo.findChild(QComboBox)
@@ -1905,8 +2104,11 @@ def comm_sub(device, type_name, data=None, on_module_change=None):
         "group": cg,
     })
 
+    group_layout.addWidget(combo)
+    group_layout.addWidget(content_area)
+
     refresh_content(current_value)
-    return combo
+    return group_widget
 
 def comm(device, data=None):
     if data is None:
@@ -1917,8 +2119,34 @@ def comm(device, data=None):
     group_layout = QVBoxLayout(group_widget)
     group_layout.setContentsMargins(0, 0, 0, 0)
 
-    group_layout.addWidget(comm_sub(device, "input", data))
-    group_layout.addWidget(comm_sub(device, "skeletal", data))
+    both_container = QWidget()
+    both_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+    both_layout = QVBoxLayout(both_container)
+    both_layout.setContentsMargins(0, 0, 0, 0)
+
+    active_module_by_slot = {"input": None, "skeletal": None}
+
+    def refresh_both():
+        clear_layout(both_layout)
+
+        seen_ids = set()
+        for module in active_module_by_slot.values():
+            if module is None or not hasattr(module, "both_mode"):
+                continue
+            if id(module) in seen_ids:
+                continue
+            seen_ids.add(id(module))
+            both_layout.addWidget(module.both_mode())
+
+    def slot_listener(slot):
+        def on_change(module):
+            active_module_by_slot[slot] = module
+            refresh_both()
+        return on_change
+
+    group_layout.addWidget(comm_sub(device, "input", data, on_module_change=slot_listener("input")))
+    group_layout.addWidget(comm_sub(device, "skeletal", data, on_module_change=slot_listener("skeletal")))
+    group_layout.addWidget(both_container)
 
     return group_widget
 

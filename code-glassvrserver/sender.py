@@ -1,7 +1,6 @@
 #this file sends the data to the driver via named pipes, 
 #each module has its own pipe for each devices, so like if pos = wasd and rot = gyro these are 2 pipes for that device
 #these pipes can be disabled via (f"{device} disable pipe {slot}", False) and setting mode to "app (named pipe)", this allows the ui to be kept open with external pipes
-
 #controllers also have 2 additional pipes for input and skeletal
 
 import time
@@ -15,28 +14,68 @@ import pywintypes
 import settings as settings_core
 import mode_registry
 import mode_manager
-import controller_handler as sdl
 
 POS_PACKER = struct.Struct('<3d')
 ROT_PACKER = struct.Struct('<4d')
-INPUT_PACKER = struct.Struct('<12?8d')
+INDEX_INPUT_PACKER = struct.Struct('<12?8d')
+FRAME_INPUT_PACKER = struct.Struct('<20?4d')
+VIVE_INPUT_PACKER = struct.Struct('<6?3d')
+TOUCH_INPUT_PACKER = struct.Struct('<8?4d')
 SKELETAL_PACKER = struct.Struct('<25d')
+EXTRA_PACKER = struct.Struct('<?')
 
-PIPE_HMD_POS = r'\\.\pipe\GlassVR_HMD_Pos'
-PIPE_HMD_ROT = r'\\.\pipe\GlassVR_HMD_Rot'
-PIPE_CONTROLLER_BASE = r'\\.\pipe\GlassVR_CONTROLLER_{side}_{type}'
+PIPE_HMD_BASE = r'\\.\pipe\GlassVR_HMD_{tag}'
+PIPE_TRACKER_BASE = r'\\.\pipe\GlassVR_TRACKER_{tracker_id}_{tag}'
+PIPE_CONTROLLER_BASE = r'\\.\pipe\GlassVR_CONTROLLER_{side}_{tag}'
 
-#TODO: update to support oculus and sf
-DEFAULT_INPUT = {
-    "a": False, "b": False, "system": False,
-    "joy_btn": False, "trigger_btn": False,
-    "a_cap": False, "b_cap": False, "system_cap": False,
-    "joy_cap": False, "trigger_cap": False,
-    "touch_cap": False, "grip_cap": False,
-    "joy_x": 0.0, "joy_y": 0.0,
-    "touch_x": 0.0, "touch_y": 0.0,
-    "trigger": 0.0, "touch_force": 0.0,
-    "grip_pull": 0.0, "grip_force": 0.0,
+DEFAULT_MOD_INPUT = {
+    "index": {
+        "a": False, "b": False, "system": False,
+        "joy_btn": False, "trigger_btn": False,
+        "a_cap": False, "b_cap": False, "system_cap": False,
+        "joy_cap": False, "trigger_cap": False,
+        "touch_cap": False, "grip_cap": False,
+        "joy_x": 0.0, "joy_y": 0.0,
+        "touch_x": 0.0, "touch_y": 0.0,
+        "trigger": 0.0, "touch_force": 0.0,
+        "grip_pull": 0.0, "grip_force": 0.0,
+    },
+    "frame": {
+        "y_up": False, "y_up_cap": False,
+        "a_down": False, "a_down_cap": False,
+        "x_left": False, "x_left_cap": False,
+        "b_right": False, "b_right_cap": False,
+        "select": False, "select_cap": False,
+        "bumper": False, "bumper_cap": False,
+        "system": False, "system_cap": False,
+        "trigger_btn": False, "trigger_cap": False,
+        "grip_btn": False, "grip_cap": False,
+        "joy_btn": False, "joy_cap": False,
+        "trigger": 0.0, "grip": 0.0,
+        "joy_x": 0.0, "joy_y": 0.0,
+    },
+    "vive": {
+        "system": False,
+        "grip_btn": False,
+        "select": False,
+        "trigger_btn": False,
+        "touch_btn": False,
+        "touch_cap": False,
+        "trigger": 0.0,
+        "touch_x": 0.0,
+        "touch_y": 0.0,
+    },
+    "touch": {
+        "system": False,
+        "a_x": False, "a_x_cap": False,
+        "b_y": False, "b_y_cap": False,
+        "trigger_cap": False,
+        "joy_btn": False, "joy_cap": False,
+        "trigger": 0.0,
+        "grip": 0.0,
+        "joy_x": 0.0,
+        "joy_y": 0.0,
+    }
 }
 
 DEFAULT_SKELETAL = {
@@ -113,21 +152,21 @@ def get_transform(device):
 def get_module_input(device):
     module = _get_slot_module(device, "input")
     if module is None:
-        return copy.deepcopy(DEFAULT_INPUT)
+        return copy.deepcopy(DEFAULT_MOD_INPUT)
 
     entry = _find_transform_entry(module, device)
     if entry is not None and "input" in entry and isinstance(entry["input"], dict):
-        res = copy.deepcopy(DEFAULT_INPUT)
+        res = copy.deepcopy(DEFAULT_MOD_INPUT)
         res.update(entry["input"])
         return res
 
     mod_input = getattr(module, "input", None)
     if isinstance(mod_input, dict):
-        res = copy.deepcopy(DEFAULT_INPUT)
+        res = copy.deepcopy(DEFAULT_MOD_INPUT)
         res.update(mod_input)
         return res
 
-    return copy.deepcopy(DEFAULT_INPUT)
+    return copy.deepcopy(DEFAULT_MOD_INPUT)
 
 def get_module_skeletal(device):
     module = _get_slot_module(device, "skeletal")
@@ -156,6 +195,38 @@ def is_device_enabled(device, se):
     if tracker_index is not None:
         return tracker_index < int(se.get("trackers num", 0))
     return False
+
+HOOK_FINGERS = ("thumb", "index", "middle", "ring", "pinky")
+
+def _hook_hand_slots(se):
+    need = {}
+    entries = se.get("hook overrides", [])
+    if not isinstance(entries, list):
+        return need
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+
+        skeletal = entry.get("skeletal override", "")
+        if skeletal in ("cl", "cr") and any(
+                entry.get(f"{f} curl override") or entry.get(f"{f} splay override") for f in HOOK_FINGERS):
+            need.setdefault(skeletal, set()).add("skeletal")
+
+        source = entry.get("input override", "")
+        if source in ("cl", "cr") and any(
+                v is True for k, v in entry.items() if k.startswith("input ") and k.endswith(" override")):
+            need.setdefault(source, set()).add("input")
+    return need
+
+def _hook_slots(device, se):
+    return tuple(sorted(_hook_hand_slots(se).get(device, ())))
+
+def _desired_device_slots(se):
+    desired = {dev: ("pos", "rot", "input", "skeletal") for dev in _enabled_devices(se)}
+    for hand, slots in _hook_hand_slots(se).items():
+        desired.setdefault(hand, tuple(sorted(slots)))
+    return desired
 
 def _tracker_device_key(tracker_id):
     return f"{tracker_id}tracker"
@@ -200,8 +271,6 @@ def device_scanner():
 
     while True:
         se = settings_core.get_settings()
-        enabled_devices = _enabled_devices(se)
-
         trackers_num = max(0, int(se.get("trackers num", 0)))
         for i in range(trackers_num):
             if i not in spawned_trackers:
@@ -216,8 +285,8 @@ def device_scanner():
         desired_slots = {}
         desired_modules = {}
 
-        for dev in enabled_devices:
-            for slot in ("pos", "rot", "input", "skeletal"):
+        for dev, slots in _desired_device_slots(se).items():
+            for slot in slots:
                 title = _get_mode_setting(se, dev, slot)
                 if not title:
                     continue
@@ -237,8 +306,18 @@ def pipe_disabled(device, slot, se):
         return False
     return bool(se.get(f"{device} disable pipe {slot}", False))
 
-def pipe_wanted(device, slot, se):
-    return is_device_enabled(device, se) and not pipe_disabled(device, slot, se)
+TAG_TO_SLOT = {
+    "pos": "pos",
+    "rot": "rot",
+    "idx": "input", "ifm": "input", "ive": "input", "itc": "input",
+    "skl": "skeletal",
+}
+
+def pipe_wanted(device, tag, se):
+    slot = TAG_TO_SLOT.get(tag, tag)
+    if not is_device_enabled(device, se) and slot not in _hook_slots(device, se):
+        return False
+    return not pipe_disabled(device, slot, se)
 
 class Pipe:
     def __init__(self, name):
@@ -298,9 +377,9 @@ def _run_device(device, pipes, build_buffers):
             se = settings_core.get_settings()
 
             wanted = set()
-            for slot, pipe in pipes.items():
-                if pipe_wanted(device, slot, se):
-                    wanted.add(slot)
+            for tag, pipe in pipes.items():
+                if pipe_wanted(device, tag, se):
+                    wanted.add(tag)
                 else:
                     pipe.close()
 
@@ -309,8 +388,9 @@ def _run_device(device, pipes, build_buffers):
                 continue
 
             buffers = build_buffers(se)
-            for slot in wanted:
-                pipes[slot].write(buffers[slot])
+            for tag in wanted:
+                if tag in buffers and buffers[tag]:
+                    pipes[tag].write(buffers[tag])
 
             time.sleep(0.001)
 
@@ -325,144 +405,140 @@ def _pos_rot_builder(device):
         return {
             "pos": POS_PACKER.pack(float(pos_x), float(pos_y), float(pos_z)),
             "rot": ROT_PACKER.pack(float(rot_w), float(rot_x), float(rot_y), float(rot_z)),
+            "ext": EXTRA_PACKER.pack(False),
         }
     return build
 
 def send_hmd_data():
-    pipes = {"pos": Pipe(PIPE_HMD_POS), "rot": Pipe(PIPE_HMD_ROT)}
+    pipes = {
+        "pos": Pipe(PIPE_HMD_BASE.format(tag="pos")),
+        "rot": Pipe(PIPE_HMD_BASE.format(tag="rot")),
+        "ext": Pipe(PIPE_HMD_BASE.format(tag="ext")),
+    }
     _run_device("hmd", pipes, _pos_rot_builder("hmd"))
-
 
 def _controller_buffers(device_name, se):
     (pos_x, pos_y, pos_z), (rot_w, rot_x, rot_y, rot_z) = get_transform(device_name)
 
     mod_input = get_module_input(device_name)
     mod_skeletal = get_module_skeletal(device_name)
-
     prefix = device_name
+    con_type = se.get("con type", "touch")
 
-    sdl_trigger   = sdl.eval_binding(se.get(f"{prefix}_trigger", ""))
-    sdl_a         = sdl.eval_binding(se.get(f"{prefix}_a", "")) > 0.5
-    sdl_b         = sdl.eval_binding(se.get(f"{prefix}_b", "")) > 0.5
-    sdl_system    = sdl.eval_binding(se.get(f"{prefix}_menu", "")) > 0.5
-    touch_mod     = sdl.eval_binding(se.get(f"{prefix}_touch mod", "")) > 0.5
+    idx_data = mod_input.get("index", {})
+    frm_data = mod_input.get("frame", {})
+    viv_data = mod_input.get("vive", {})
+    tch_data = mod_input.get("touch", {})
 
-    joy_x   = sdl.eval_binding(se.get(f"{prefix}_joy right", "")) - sdl.eval_binding(se.get(f"{prefix}_joy left", ""))
-    joy_y   = sdl.eval_binding(se.get(f"{prefix}_joy up", "")) - sdl.eval_binding(se.get(f"{prefix}_joy down", ""))
-    joy_btn = sdl.eval_binding(se.get(f"{prefix}_joy click", "")) > 0.5
-
-    touch_x = sdl.eval_binding(se.get(f"{prefix}_touch right", "")) - sdl.eval_binding(se.get(f"{prefix}_touch left", ""))
-    touch_y = sdl.eval_binding(se.get(f"{prefix}_touch up", "")) - sdl.eval_binding(se.get(f"{prefix}_touch down", ""))
-
-    touch_force = sdl.eval_binding(se.get(f"{prefix}_touch click", ""))
-
-    raw_input = sdl.eval_binding(se.get(f"{prefix}_grip", ""))
-    grip_pull = min(1.0, raw_input * 2.0)
-    grip_force = max(0.0, (raw_input - 0.5) / 0.5)
-
-    if touch_mod:
-        touch_x = joy_x
-        touch_y = joy_y
-        touch_force = max(sdl.eval_binding(se.get(f"{prefix}_touch click", "")), joy_btn)
-        joy_x = joy_y = 0.0
-        joy_btn = False
-
-    a       = bool(mod_input.get("a", False)) or sdl_a
-    b       = bool(mod_input.get("b", False)) or sdl_b
-    system  = bool(mod_input.get("system", False)) or sdl_system
-    joy_btn = bool(mod_input.get("joy_btn", False)) or joy_btn
-
-    trigger     = max(sdl_trigger, float(mod_input.get("trigger", 0.0)))
-    grip_pull   = max(grip_pull, float(mod_input.get("grip_pull", 0.0)))
-    grip_force  = max(grip_force, float(mod_input.get("grip_force", 0.0)))
-    touch_force = max(touch_force, float(mod_input.get("touch_force", 0.0)))
-
-    if abs(mod_input.get("joy_x", 0.0)) > abs(joy_x):
-        joy_x = float(mod_input.get("joy_x", 0.0))
-    if abs(mod_input.get("joy_y", 0.0)) > abs(joy_y):
-        joy_y = float(mod_input.get("joy_y", 0.0))
-    if abs(mod_input.get("touch_x", 0.0)) > abs(touch_x):
-        touch_x = float(mod_input.get("touch_x", 0.0))
-    if abs(mod_input.get("touch_y", 0.0)) > abs(touch_y):
-        touch_y = float(mod_input.get("touch_y", 0.0))
-
-    trigger_btn = (trigger > 0.99) or bool(mod_input.get("trigger_btn", False))
-
-    a_cap      = a or bool(mod_input.get("a_cap", False))
-    b_cap      = b or bool(mod_input.get("b_cap", False))
-    system_cap = system or bool(mod_input.get("system_cap", False))
-
-    trigger_cap = (trigger > 0.01) or bool(mod_input.get("trigger_cap", False))
-    grip_cap    = (grip_pull > 0.01) or bool(mod_input.get("grip_cap", False))
-
-    joy_cap   = joy_btn or abs(joy_x) > 0.1 or abs(joy_y) > 0.1 or bool(mod_input.get("joy_cap", False))
-    touch_cap = (touch_force > 0.01) or abs(touch_x) > 0.1 or abs(touch_y) > 0.1 or bool(mod_input.get("touch_cap", False))
-
-    fingers = ["thumb", "index", "middle", "ring", "pinky"]
     ov_flexion = mod_skeletal.get("l flexion" if prefix == "cl" else "r flexion", [0.0] * 20)
-
-    if se.get("curl", True):
-        flexion = list(ov_flexion)
-        for i, finger in enumerate(fingers):
-            val = sdl.eval_binding(se.get(f"{prefix}_{finger}", ""))
-            flexion[i * 4] = max(flexion[i * 4], val)
-
-        if se.get("index=trigger", False):
-            if trigger < flexion[4]:
-                trigger = -1 + (flexion[4] * 3)
-
-        if se.get("other=grip", False):
-            highest = max(flexion[8], flexion[12], flexion[16])
-            if grip_pull < highest - 0.7:
-                grip_pull = highest - 0.7
-    else:
-        flexion = [0.0] * 20
-        for i, finger in enumerate(fingers):
-            val = sdl.eval_binding(se.get(f"{prefix}_{finger}", ""))
-            flexion[i * 4] = max(ov_flexion[i * 4], val)
-
-    if se.get("splay", True):
-        splays_5 = list(mod_skeletal.get("l splay" if prefix == "cl" else "r splay", [0.0] * 5))
-    else:
-        splays_5 = [0.0] * 5
+    flexion = list(ov_flexion)
+    splays_5 = list(mod_skeletal.get("l splay" if prefix == "cl" else "r splay", [0.0] * 5))
 
     buf_pos = POS_PACKER.pack(float(pos_x), float(pos_y), float(pos_z))
     buf_rot = ROT_PACKER.pack(float(rot_w), float(rot_x), float(rot_y), float(rot_z))
-    buf_input = INPUT_PACKER.pack(
-        bool(a), bool(b), bool(system),
-        bool(joy_btn), bool(trigger_btn),
-        bool(a_cap), bool(b_cap), bool(system_cap),
-        bool(joy_cap), bool(trigger_cap),
-        bool(touch_cap), bool(grip_cap),
-        float(joy_x), float(joy_y),
-        float(touch_x), float(touch_y),
-        float(trigger),
-        float(touch_force),
-        float(grip_pull),
-        float(grip_force),
-    )
-    buf_skeletal = SKELETAL_PACKER.pack(
+
+    # Match PacketInputIndex exactly: 12 bools, 8 doubles
+    buf_idx = INDEX_INPUT_PACKER.pack(
+        bool(idx_data.get("a", False)), 
+        bool(idx_data.get("b", False)), 
+        bool(idx_data.get("system", False)),
+        bool(idx_data.get("joy_btn", False)), 
+        bool(idx_data.get("trigger_btn", False)),
+        bool(idx_data.get("a_cap", False)), 
+        bool(idx_data.get("b_cap", False)), 
+        bool(idx_data.get("system_cap", False)),
+        bool(idx_data.get("joy_cap", False)), 
+        bool(idx_data.get("trigger_cap", False)),
+        bool(idx_data.get("touch_cap", False)), 
+        bool(idx_data.get("grip_cap", False)),
+        float(idx_data.get("joy_x", 0.0)), 
+        float(idx_data.get("joy_y", 0.0)),
+        float(idx_data.get("touch_x", 0.0)), 
+        float(idx_data.get("touch_y", 0.0)),
+        float(idx_data.get("trigger", 0.0)),
+        float(idx_data.get("touch_force", 0.0)),
+        float(idx_data.get("grip_pull", 0.0)),
+        float(idx_data.get("grip_force", 0.0)),
+    ) if con_type == "index" else b''
+
+    # Match PacketInputFrame exactly: 20 bools, 4 doubles
+    buf_ifm = FRAME_INPUT_PACKER.pack(
+        bool(frm_data.get("y_up", False)), bool(frm_data.get("y_up_cap", False)),
+        bool(frm_data.get("a_down", False)), bool(frm_data.get("a_down_cap", False)),
+        bool(frm_data.get("x_left", False)), bool(frm_data.get("x_left_cap", False)),
+        bool(frm_data.get("b_right", False)), bool(frm_data.get("b_right_cap", False)),
+        bool(frm_data.get("select", False)), bool(frm_data.get("select_cap", False)),
+        bool(frm_data.get("bumper", False)), bool(frm_data.get("bumper_cap", False)),
+        bool(frm_data.get("system", False)), bool(frm_data.get("system_cap", False)),
+        bool(frm_data.get("trigger_btn", False)), bool(frm_data.get("trigger_cap", False)),
+        bool(frm_data.get("grip_btn", False)), bool(frm_data.get("grip_cap", False)),
+        bool(frm_data.get("joy_btn", False)), bool(frm_data.get("joy_cap", False)),
+        float(frm_data.get("trigger", 0.0)), float(frm_data.get("grip", 0.0)),
+        float(frm_data.get("joy_x", 0.0)), float(frm_data.get("joy_y", 0.0))
+    ) if con_type == "frame" else b''
+
+    # Match PacketInputVive exactly: 6 bools, 3 doubles
+    buf_ive = VIVE_INPUT_PACKER.pack(
+        bool(viv_data.get("system", False)), 
+        bool(viv_data.get("grip_btn", False)),
+        bool(viv_data.get("select", False)), 
+        bool(viv_data.get("trigger_btn", False)),
+        bool(viv_data.get("touch_btn", False)), 
+        bool(viv_data.get("touch_cap", False)),
+        float(viv_data.get("trigger", 0.0)), 
+        float(viv_data.get("touch_x", 0.0)), 
+        float(viv_data.get("touch_y", 0.0))
+    ) if con_type == "vive" else b''
+
+    # Match PacketInputTouch exactly: 8 bools, 4 doubles
+    buf_itc = TOUCH_INPUT_PACKER.pack(
+        bool(tch_data.get("system", False)), 
+        bool(tch_data.get("a_x", False)), 
+        bool(tch_data.get("a_x_cap", False)),
+        bool(tch_data.get("b_y", False)), 
+        bool(tch_data.get("b_y_cap", False)), 
+        bool(tch_data.get("trigger_cap", False)),
+        bool(tch_data.get("joy_btn", False)), 
+        bool(tch_data.get("joy_cap", False)),
+        float(tch_data.get("trigger", 0.0)), 
+        float(tch_data.get("grip", 0.0)),
+        float(tch_data.get("joy_x", 0.0)), 
+        float(tch_data.get("joy_y", 0.0))
+    ) if con_type == "touch" else b''
+
+    buf_skl = SKELETAL_PACKER.pack(
         *[float(f) for f in flexion],
         *[float(s) for s in splays_5],
     )
 
-    return {"pos": buf_pos, "rot": buf_rot, "input": buf_input, "skeletal": buf_skeletal}
+    buf_ext = EXTRA_PACKER.pack(False)
+
+    return {
+        "pos": buf_pos,
+        "rot": buf_rot,
+        "idx": buf_idx,
+        "ifm": buf_ifm,
+        "ive": buf_ive,
+        "itc": buf_itc,
+        "skl": buf_skl,
+        "ext": buf_ext,
+    }
 
 def send_controller_data(is_right):
     device_name = "cr" if is_right else "cl"
     side = "RIGHT" if is_right else "LEFT"
 
     pipes = {
-        slot: Pipe(PIPE_CONTROLLER_BASE.format(side=side, type=slot.capitalize()))
-        for slot in ("pos", "rot", "input", "skeletal")
+        tag: Pipe(PIPE_CONTROLLER_BASE.format(side=side, tag=tag))
+        for tag in ("pos", "rot", "idx", "ifm", "ive", "itc", "skl", "ext")
     }
     _run_device(device_name, pipes, lambda se: _controller_buffers(device_name, se))
 
 def send_tracker_data(tracker_id):
     device_key = _tracker_device_key(tracker_id)
     pipes = {
-        "pos": Pipe(rf'\\.\pipe\GlassVR_TRACKER_{tracker_id}_Pos'),
-        "rot": Pipe(rf'\\.\pipe\GlassVR_TRACKER_{tracker_id}_Rot'),
+        "pos": Pipe(PIPE_TRACKER_BASE.format(tracker_id=tracker_id, tag="pos")),
+        "rot": Pipe(PIPE_TRACKER_BASE.format(tracker_id=tracker_id, tag="rot")),
     }
     _run_device(device_key, pipes, _pos_rot_builder(device_key))
 

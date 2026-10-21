@@ -1091,12 +1091,9 @@ static int GetTrackerIndexBySerial(const std::string& targetSerial) {
     return -1;
 }
 
-vr::DriverPose_t CSampleDeviceDriver::GetPose()
-{
+vr::DriverPose_t CSampleDeviceDriver::GetPose() {
     UpdateTrackers();
-
     std::string device = "hmd";
-
     vr::DriverPose_t pose = { 0 };
     pose.poseIsValid = true;
     pose.result = vr::TrackingResult_Running_OK;
@@ -1107,97 +1104,72 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
     std::string posmode = GetStringFromSettingsByKey(device + "pos mode");
     std::string rotmode = GetStringFromSettingsByKey(device + "rot mode");
 
+    // Auto-swap serial connections if settings changed
+    if (posmode == "serial" || posmode == "bluetooth") m_comm.CheckAndUpdateSerialPort(device, "pos");
+    if (rotmode == "serial" || rotmode == "bluetooth") m_comm.CheckAndUpdateSerialPort(device, "rot");
+
     vr::TrackedDevicePose_t rawPoses[vr::k_unMaxTrackedDeviceCount];
     vr::VRServerDriverHost()->GetRawTrackedDevicePoses(0, rawPoses, vr::k_unMaxTrackedDeviceCount);
 
-    //connections
     udp_pos = m_comm.GetUdpPos();
     udp_rot = m_comm.GetUdpRot();
-
     pipe_pos = m_comm.GetPipePos();
     pipe_rot = m_comm.GetPipeRot();
-    //connections
 
     float raw_px = 0.0f, raw_py = 0.0f, raw_pz = 0.0f;
     float raw_rx = 0.0f, raw_ry = 0.0f, raw_rz = 0.0f, raw_rw = 1.0f;
 
-    //pos here///////////////////////////////////////////////////////
+    // POS LOGIC
     if (posmode == "copy") {
         std::string targetSerial = GetStringFromSettingsByKey(device + "pos copy serial");
         int tracker_pos_idx = GetTrackerIndexBySerial(targetSerial);
-
-        if (tracker_pos_idx >= 0 && tracker_pos_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_pos_idx].bPoseIsValid)
-        {
+        if (tracker_pos_idx >= 0 && tracker_pos_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_pos_idx].bPoseIsValid) {
             auto& m = rawPoses[tracker_pos_idx].mDeviceToAbsoluteTracking;
-
-            raw_px = m.m[0][3];
-            raw_py = m.m[1][3];
-            raw_pz = m.m[2][3];
-
+            raw_px = m.m[0][3]; raw_py = m.m[1][3]; raw_pz = m.m[2][3];
             pose.vecVelocity[0] = rawPoses[tracker_pos_idx].vVelocity.v[0];
             pose.vecVelocity[1] = rawPoses[tracker_pos_idx].vVelocity.v[1];
             pose.vecVelocity[2] = rawPoses[tracker_pos_idx].vVelocity.v[2];
         }
     }
-    else if (posmode == "offsets") {
+    else if (posmode == "serial" || posmode == "bluetooth") {
+        PacketPos p = m_comm.GetSerialPos();
+        raw_px = (float)p.x; raw_py = (float)p.y; raw_pz = (float)p.z;
     }
-
-    //viture-6dof
     else if (posmode == "xr glasses") {
         if (m_pVitureDevice && m_pVitureDevice->is_carina()) {
             float quat[4], pos[3];
             bool stable = false;
             if (m_pVitureDevice->get_6dof_pose(quat, pos, &stable) && stable) {
-                raw_px = pos[0];
-                raw_py = pos[1];
-                raw_pz = pos[2];
+                raw_px = pos[0]; raw_py = pos[1]; raw_pz = pos[2];
             }
         }
     }
-    //viture-6dof
-
     else if (posmode == "UDP") {
-        raw_px = udp_pos.x;
-        raw_py = udp_pos.y;
-        raw_pz = udp_pos.z;
-    }
-    else if (posmode == "test") {
-        //test will fail and do nothing!
+        raw_px = udp_pos.x; raw_py = udp_pos.y; raw_pz = udp_pos.z;
     }
     else {
-        //else get data from pipe!
-        raw_px = pipe_pos.x;
-        raw_py = pipe_pos.y;
-        raw_pz = pipe_pos.z;
+        raw_px = pipe_pos.x; raw_py = pipe_pos.y; raw_pz = pipe_pos.z;
     }
 
-    //rot here///////////////////////////////////////////////////////
+    // ROT LOGIC
     if (rotmode == "copy") {
         std::string targetRotSerial = GetStringFromSettingsByKey(device + "rot copy serial");
         int tracker_rot_idx = GetTrackerIndexBySerial(targetRotSerial);
-
-        if (tracker_rot_idx >= 0 && tracker_rot_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_rot_idx].bPoseIsValid)
-        {
+        if (tracker_rot_idx >= 0 && tracker_rot_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_rot_idx].bPoseIsValid) {
             auto& m = rawPoses[tracker_rot_idx].mDeviceToAbsoluteTracking;
             vr::HmdQuaternion_t device_rotation = GetRotationFromMatrix(m);
-
-            raw_rx = (float)device_rotation.x;
-            raw_ry = (float)device_rotation.y;
-            raw_rz = (float)device_rotation.z;
-            raw_rw = (float)device_rotation.w;
-
+            raw_rx = (float)device_rotation.x; raw_ry = (float)device_rotation.y;
+            raw_rz = (float)device_rotation.z; raw_rw = (float)device_rotation.w;
             pose.vecAngularVelocity[0] = rawPoses[tracker_rot_idx].vAngularVelocity.v[0];
             pose.vecAngularVelocity[1] = rawPoses[tracker_rot_idx].vAngularVelocity.v[1];
             pose.vecAngularVelocity[2] = rawPoses[tracker_rot_idx].vAngularVelocity.v[2];
         }
-        // else: raw rot stays identity
     }
-    else if (rotmode == "offsets") {
+    else if (rotmode == "serial" || rotmode == "bluetooth") {
+        PacketRot r = m_comm.GetSerialRot();
+        raw_rx = (float)r.x; raw_ry = (float)r.y; raw_rz = (float)r.z; raw_rw = (float)r.w;
     }
-
-    //viture-
     else if (rotmode == "xr glasses") {
-        //6dof(viture ultra only)
         if (GetBoolFromSettingsByKey("xr 3dof") == false) {
             if (m_pVitureDevice && m_pVitureDevice->is_carina()) {
                 float quat[4], pos[3];
@@ -1205,99 +1177,56 @@ vr::DriverPose_t CSampleDeviceDriver::GetPose()
                 if (m_pVitureDevice->get_6dof_pose(quat, pos, &stable)) {
                     pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
                     pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
-
                     vr::HmdQuaternion_t device_rotation;
-                    device_rotation.w = quat[0];
-                    device_rotation.x = quat[1];
-                    device_rotation.y = quat[2];
-                    device_rotation.z = quat[3];
-
+                    device_rotation.w = quat[0]; device_rotation.x = quat[1];
+                    device_rotation.y = quat[2]; device_rotation.z = quat[3];
                     vr::HmdQuaternion_t mounting_correction = EulerToQuatZYX(0.0f, 0.0f, 0.240f);
                     vr::HmdQuaternion_t corrected_rotation = QuatMul(device_rotation, mounting_correction);
-
-                    raw_rx = (float)corrected_rotation.x;
-                    raw_ry = (float)corrected_rotation.y;
-                    raw_rz = (float)corrected_rotation.z;
-                    raw_rw = (float)corrected_rotation.w;
-
+                    raw_rx = (float)corrected_rotation.x; raw_ry = (float)corrected_rotation.y;
+                    raw_rz = (float)corrected_rotation.z; raw_rw = (float)corrected_rotation.w;
                     pose.poseIsValid = stable;
-                    if (!stable) {
-                        pose.result = vr::TrackingResult_Fallback_RotationOnly;
-                    }
+                    if (!stable) pose.result = vr::TrackingResult_Fallback_RotationOnly;
                 }
             }
         }
         else {
-            //3dof
             if (m_pVitureDevice && m_pVitureDevice->is_connected()) {
-
                 float euler[3], quat[4], gyro[3];
                 m_pVitureDevice->get_imu_data(euler, quat, gyro);
-
                 pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
                 pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
-
                 vr::HmdQuaternion_t device_rotation;
                 if (m_pVitureDevice->is_carina()) {
-                    device_rotation.w = quat[0];
-                    device_rotation.x = quat[1];
-                    device_rotation.y = quat[2];
-                    device_rotation.z = quat[3];
-
-                    pose.vecAngularVelocity[0] = 0;
-                    pose.vecAngularVelocity[1] = 0;
-                    pose.vecAngularVelocity[2] = 0;
+                    device_rotation.w = quat[0]; device_rotation.x = quat[1];
+                    device_rotation.y = quat[2]; device_rotation.z = quat[3];
+                    pose.vecAngularVelocity[0] = 0; pose.vecAngularVelocity[1] = 0; pose.vecAngularVelocity[2] = 0;
                 }
                 else {
-                    device_rotation.x = quat[1];
-                    device_rotation.y = -quat[0];
-                    device_rotation.z = -quat[2];
-                    device_rotation.w = quat[3];
-
-                    pose.vecAngularVelocity[0] = gyro[1];
-                    pose.vecAngularVelocity[1] = -gyro[0];
-                    pose.vecAngularVelocity[2] = -gyro[2];
+                    device_rotation.x = quat[1]; device_rotation.y = -quat[0];
+                    device_rotation.z = -quat[2]; device_rotation.w = quat[3];
+                    pose.vecAngularVelocity[0] = gyro[1]; pose.vecAngularVelocity[1] = -gyro[0]; pose.vecAngularVelocity[2] = -gyro[2];
                 }
-
-                raw_rx = (float)device_rotation.x;
-                raw_ry = (float)device_rotation.y;
-                raw_rz = (float)device_rotation.z;
-                raw_rw = (float)device_rotation.w;
+                raw_rx = (float)device_rotation.x; raw_ry = (float)device_rotation.y;
+                raw_rz = (float)device_rotation.z; raw_rw = (float)device_rotation.w;
             }
         }
     }
-    //viture-
-
     else if (rotmode == "UDP") {
-        raw_rx = udp_rot.x;
-        raw_ry = udp_rot.y;
-        raw_rz = udp_rot.z;
-        raw_rw = udp_rot.w;
-    }
-    else if (rotmode == "test") {
-        //get from remote!
+        raw_rx = udp_rot.x; raw_ry = udp_rot.y; raw_rz = udp_rot.z; raw_rw = udp_rot.w;
     }
     else {
-        //else get data from pipe!
-        raw_rx = pipe_rot.x;
-        raw_ry = pipe_rot.y;
-        raw_rz = pipe_rot.z;
-        raw_rw = pipe_rot.w;
+        raw_rx = pipe_rot.x; raw_ry = pipe_rot.y; raw_rz = pipe_rot.z; raw_rw = pipe_rot.w;
     }
 
     Transform FinalTransform = GetNewTransform(device, raw_px, raw_py, raw_pz, raw_rx, raw_ry, raw_rz, raw_rw);
-
     pose.vecPosition[0] = FinalTransform.pos_x;
     pose.vecPosition[1] = FinalTransform.pos_y;
     pose.vecPosition[2] = FinalTransform.pos_z;
-
     pose.qRotation.w = FinalTransform.rot_w;
     pose.qRotation.x = FinalTransform.rot_x;
     pose.qRotation.y = FinalTransform.rot_y;
     pose.qRotation.z = FinalTransform.rot_z;
-
     pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");
-
     return pose;
 }
 

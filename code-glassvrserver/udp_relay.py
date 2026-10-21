@@ -23,17 +23,17 @@ def parse_packet(prefix: str, raw_data: bytes):
 
     try:
         match prefix:
-            case 'P':
+            case 'pos':
                 if len(raw_data) >= 24:
                     x, y, z = struct.unpack('3d', raw_data[:24])
                     return {"x": x, "y": y, "z": z}
 
-            case 'R':
+            case 'rot':
                 if len(raw_data) >= 32:
                     w, x, y, z = struct.unpack('4d', raw_data[:32])
                     return {"w": w, "x": x, "y": y, "z": z}
 
-            case 'I':
+            case 'idx' | 'itc' | 'ive' | 'ifm':
                 if len(raw_data) >= 76:
                     unpacked = struct.unpack('12?8d', raw_data[:76])
                     return {
@@ -45,7 +45,7 @@ def parse_packet(prefix: str, raw_data: bytes):
                         "force": unpacked[17:20]
                     }
 
-            case 'S':
+            case 'skl':
                 if len(raw_data) >= 200:
                     unpacked = struct.unpack('25d', raw_data[:200])
                     return {
@@ -53,7 +53,7 @@ def parse_packet(prefix: str, raw_data: bytes):
                         "splays": unpacked[20:]
                     }
 
-            case 'E':
+            case 'ext':
                 if len(raw_data) >= 1:
                     reset_flag, = struct.unpack('?', raw_data[:1])
                     return {"reset": reset_flag}
@@ -104,8 +104,8 @@ def pipe_listener_worker(device: str):
                 if avail > 0:
                     _, data = win32file.ReadFile(handle, 1024)
                     if data:
-                        prefix = data[0:1].decode('ascii', errors='ignore')
-                        payload = data[1:]
+                        prefix = data[0:3].decode('ascii', errors='ignore')
+                        payload = data[3:]
                         parsed = parse_packet(prefix, payload)
 
                         with _packets_lock:

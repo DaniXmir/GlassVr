@@ -7,7 +7,7 @@ from PyQt6.QtGui import QPixmap, QIcon, QKeySequence, QColor, QPalette, QMovie
 import elements as el
 
 title = "Themes"
-priority = 998
+priority = 997
 
 def tab() -> QWidget:
     tab_main = QWidget()

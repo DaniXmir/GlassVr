@@ -20,6 +20,12 @@ def _tracker_device_key(n):
 def _build_tracker_widget(n):
     device = _tracker_device_key(n)
 
+    settings = se.get_settings()
+    for t in ["pos", "rot"]:
+        key = f"{device}{t} mode"
+        if not settings.get(key):
+            se.update_setting(key, "copy")
+
     modes_widget = el.modes(device)
     offsets_widget = el.offsets(device)
 

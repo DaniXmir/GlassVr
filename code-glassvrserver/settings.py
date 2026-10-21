@@ -13,6 +13,7 @@ import os
 
 #you dont need to change this, update_setting will add it if its not already in the json
 default_settings = {
+    "description" : "default",
     #old paths
     # "vrsettings path": "C:/Program Files (x86)/Steam/config",
     # "drivers path" : "C:/Program Files (x86)/Steam/steamapps/common/SteamVR/drivers",
@@ -21,6 +22,8 @@ default_settings = {
     "steam path": "C:/Program Files (x86)/Steam",
     "steamvr path" : "C:/Program Files (x86)/Steam/steamapps/common/SteamVR",
 
+    "con type" : "touch",
+
     "resolution x" : 1920,
     "resolution y" : 1080,
     "refresh rate" : 120,
@@ -28,7 +31,7 @@ default_settings = {
     "fullscreen" : False,
 
     "stereoscopic" : False,
-    
+
     #fov///////////////////////////////////////////////
     "fov" : 90.0,
     "convergence" : 0.0,

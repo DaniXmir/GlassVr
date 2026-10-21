@@ -180,6 +180,7 @@ def tab() -> QWidget:
         "arr": [
             {
                 "type": "doublespinbox",
+                "group": "widget",
                 "text": "tilt angle",
                 "min": -999999999,
                 "max": 999999999,
@@ -189,6 +190,7 @@ def tab() -> QWidget:
             },
             {
                 "type": "doublespinbox",
+                "group": "widget",
                 "text": "canted angle",
                 "min": -999999999,
                 "max": 999999999,

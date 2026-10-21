@@ -1,8 +1,11 @@
+//TODO: FIX THREADS NOT STOPPING AFTER SHUTDOWN!
+
 ////thanks https://github.com/r57zone/OpenVR-driver-for-DIY
 //OutputDebugStringA(";P"); //this prints to DebugView log(change capture to Global Win32) very cool!
 //m to open legacy hmd monitor
 
 #include "main.h"
+#include "controllerdata.h"
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -13,8 +16,6 @@
 using namespace vr;
 
 bool enable_hmd = GetBoolFromSettingsByKey("enable hmd");
-bool enable_left = GetBoolFromSettingsByKey("enable cl");
-bool enable_right = GetBoolFromSettingsByKey("enable cr");
 
 EVRInitError CServerDriver_Sample::Init(vr::IVRDriverContext* pDriverContext)
 {
@@ -24,8 +25,6 @@ EVRInitError CServerDriver_Sample::Init(vr::IVRDriverContext* pDriverContext)
     glassvr::hooks::overrides::Start();
 
     enable_hmd = GetBoolFromSettingsByKey("enable hmd");
-    enable_left = GetBoolFromSettingsByKey("enable cl");
-    enable_right = GetBoolFromSettingsByKey("enable cr");
 
     if (enable_hmd) {
         m_pNullHmdLatest = new CSampleDeviceDriver();
@@ -36,25 +35,9 @@ EVRInitError CServerDriver_Sample::Init(vr::IVRDriverContext* pDriverContext)
         );
     }
 
-    if (enable_left) {
-        m_pController = new CSampleControllerDriver();
-        m_pController->SetControllerIndex(false);
-        vr::VRServerDriverHost()->TrackedDeviceAdded(
-            m_pController->GetSerialNumber().c_str(),
-            vr::TrackedDeviceClass_Controller,
-            m_pController
-        );
-    }
-
-    if (enable_right) {
-        m_pController2 = new CSampleControllerDriver();
-        m_pController2->SetControllerIndex(true);
-        vr::VRServerDriverHost()->TrackedDeviceAdded(
-            m_pController2->GetSerialNumber().c_str(),
-            vr::TrackedDeviceClass_Controller,
-            m_pController2
-        );
-    }
+    // creates the controller type selected by "con type" for every enabled hand
+    m_slotLeft.Sync();
+    m_slotRight.Sync();
 
     int trackerCount = (std::max)(0, GetIntFromSettingsByKey("trackers num"));
 
@@ -81,14 +64,10 @@ void CServerDriver_Sample::Cleanup()
         delete m_pNullHmdLatest;
         m_pNullHmdLatest = NULL;
     }
-    if (m_pController) {
-        delete m_pController;
-        m_pController = NULL;
-    }
-    if (m_pController2) {
-        delete m_pController2;
-        m_pController2 = NULL;
-    }
+
+    m_slotLeft.Shutdown();
+    m_slotRight.Shutdown();
+    ControllerDataHub::Shutdown(); // after the controllers are gone
 
     for (auto pTracker : m_vecTrackers) {
         delete pTracker;
@@ -108,27 +87,9 @@ void CServerDriver_Sample::RunFrame()
         );
     }
 
-    if (!enable_left && GetBoolFromSettingsByKey("enable cl")) {
-        enable_left = true;
-        m_pController = new CSampleControllerDriver();
-        m_pController->SetControllerIndex(false);
-        vr::VRServerDriverHost()->TrackedDeviceAdded(
-            m_pController->GetSerialNumber().c_str(),
-            vr::TrackedDeviceClass_Controller,
-            m_pController
-        );
-    }
-
-    if (!enable_right && GetBoolFromSettingsByKey("enable cr")) {
-        enable_right = true;
-        m_pController2 = new CSampleControllerDriver();
-        m_pController2->SetControllerIndex(true);
-        vr::VRServerDriverHost()->TrackedDeviceAdded(
-            m_pController2->GetSerialNumber().c_str(),
-            vr::TrackedDeviceClass_Controller,
-            m_pController2
-        );
-    }
+    // "enable cl/cr" scanning + "con type" swapping
+    m_slotLeft.Sync();
+    m_slotRight.Sync();
 
     int wantedTrackers = (std::max)(0, GetIntFromSettingsByKey("trackers num"));
     while ((int)m_vecTrackers.size() < wantedTrackers) {
@@ -147,13 +108,8 @@ void CServerDriver_Sample::RunFrame()
         m_pNullHmdLatest->RunFrame();
     }
 
-    if (m_pController) {
-        m_pController->RunFrame();
-    }
-
-    if (m_pController2) {
-        m_pController2->RunFrame();
-    }
+    m_slotLeft.RunFrame();
+    m_slotRight.RunFrame();
 
     for (auto pTracker : m_vecTrackers) {
         pTracker->RunFrame();

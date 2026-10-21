@@ -147,38 +147,31 @@ static int GetTrackerIndexBySerial(const std::string& targetSerial) {
     return -1;
 }
 
-vr::DriverPose_t CSampleTracker::GetPose()
-{
+vr::DriverPose_t CSampleTracker::GetPose() {
     UpdateTrackers();
-
     g_selectedIndex = GetIntFromSettingsByKey(std::to_string(m_nTrackerIndex) + "tracker index");
     std::string device = std::to_string(m_nTrackerIndex) + "tracker";
-
     vr::DriverPose_t pose = { 0 };
-
     pose.poseIsValid = true;
     pose.result = vr::TrackingResult_Running_OK;
-    //pose.deviceIsConnected = true;
     pose.qWorldFromDriverRotation = HmdQuaternion_Init(1, 0, 0, 0);
     pose.qDriverFromHeadRotation = HmdQuaternion_Init(1, 0, 0, 0);
 
     std::string posmode = GetStringFromSettingsByKey(device + "pos mode");
     std::string rotmode = GetStringFromSettingsByKey(device + "rot mode");
 
+    if (posmode == "serial" || posmode == "bluetooth") m_comm.CheckAndUpdateSerialPort(device, "pos");
+    if (rotmode == "serial" || rotmode == "bluetooth") m_comm.CheckAndUpdateSerialPort(device, "rot");
+
     vr::TrackedDevicePose_t rawPoses[vr::k_unMaxTrackedDeviceCount];
     vr::VRServerDriverHost()->GetRawTrackedDevicePoses(0, rawPoses, vr::k_unMaxTrackedDeviceCount);
 
-    //connections
     udp_pos = m_comm.GetUdpPos();
     udp_rot = m_comm.GetUdpRot();
-
     pipe_pos = m_comm.GetPipePos();
     pipe_rot = m_comm.GetPipeRot();
-    //connections
 
     bool trackerEnabled = (m_nTrackerIndex < GetIntFromSettingsByKey("trackers num"));
-
-    //enable state (trackers num) + bad apple///////////////////////////
     if (rotmode == "bad apple") {
         pose.deviceIsConnected = trackerEnabled && (pipe_rot.x != 0.0);
     }
@@ -189,93 +182,64 @@ vr::DriverPose_t CSampleTracker::GetPose()
     float raw_px = 0.0f, raw_py = 0.0f, raw_pz = 0.0f;
     float raw_rx = 0.0f, raw_ry = 0.0f, raw_rz = 0.0f, raw_rw = 1.0f;
 
-    //pos here///////////////////////////////////////////////////////
     if (posmode == "copy") {
         std::string targetSerial = GetStringFromSettingsByKey(device + "pos copy serial");
         int tracker_pos_idx = GetTrackerIndexBySerial(targetSerial);
-
-        if (tracker_pos_idx >= 0 && tracker_pos_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_pos_idx].bPoseIsValid)
-        {
+        if (tracker_pos_idx >= 0 && tracker_pos_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_pos_idx].bPoseIsValid) {
             auto& m = rawPoses[tracker_pos_idx].mDeviceToAbsoluteTracking;
-
-            raw_px = m.m[0][3];
-            raw_py = m.m[1][3];
-            raw_pz = m.m[2][3];
-
+            raw_px = m.m[0][3]; raw_py = m.m[1][3]; raw_pz = m.m[2][3];
             pose.vecVelocity[0] = rawPoses[tracker_pos_idx].vVelocity.v[0];
             pose.vecVelocity[1] = rawPoses[tracker_pos_idx].vVelocity.v[1];
             pose.vecVelocity[2] = rawPoses[tracker_pos_idx].vVelocity.v[2];
         }
     }
-    else if (posmode == "offsets") {
-    }
-    else if (posmode == "test") {
-        //
+    else if (posmode == "serial" || posmode == "bluetooth") {
+        PacketPos p = m_comm.GetSerialPos();
+        raw_px = (float)p.x; raw_py = (float)p.y; raw_pz = (float)p.z;
     }
     else if (posmode == "UDP") {
-        raw_px = udp_pos.x;
-        raw_py = udp_pos.y;
-        raw_pz = udp_pos.z;
+        raw_px = udp_pos.x; raw_py = udp_pos.y; raw_pz = udp_pos.z;
     }
     else {
-        raw_px = pipe_pos.x;
-        raw_py = pipe_pos.y;
-        raw_pz = pipe_pos.z;
+        raw_px = pipe_pos.x; raw_py = pipe_pos.y; raw_pz = pipe_pos.z;
     }
 
-    //rot here///////////////////////////////////////////////////////
     if (rotmode == "copy") {
         std::string targetRotSerial = GetStringFromSettingsByKey(device + "rot copy serial");
         int tracker_rot_idx = GetTrackerIndexBySerial(targetRotSerial);
-
-        if (tracker_rot_idx >= 0 && tracker_rot_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_rot_idx].bPoseIsValid)
-        {
+        if (tracker_rot_idx >= 0 && tracker_rot_idx < vr::k_unMaxTrackedDeviceCount && rawPoses[tracker_rot_idx].bPoseIsValid) {
             auto& m = rawPoses[tracker_rot_idx].mDeviceToAbsoluteTracking;
             vr::HmdQuaternion_t device_rotation = GetRotationFromMatrix(m);
-
-            raw_rx = (float)device_rotation.x;
-            raw_ry = (float)device_rotation.y;
-            raw_rz = (float)device_rotation.z;
-            raw_rw = (float)device_rotation.w;
-
+            raw_rx = (float)device_rotation.x; raw_ry = (float)device_rotation.y;
+            raw_rz = (float)device_rotation.z; raw_rw = (float)device_rotation.w;
             pose.vecAngularVelocity[0] = rawPoses[tracker_rot_idx].vAngularVelocity.v[0];
             pose.vecAngularVelocity[1] = rawPoses[tracker_rot_idx].vAngularVelocity.v[1];
             pose.vecAngularVelocity[2] = rawPoses[tracker_rot_idx].vAngularVelocity.v[2];
         }
     }
-    else if (rotmode == "offsets") {
-    }
-    else if (rotmode == "test") {
-        //
+    else if (rotmode == "serial" || rotmode == "bluetooth") {
+        PacketRot r = m_comm.GetSerialRot();
+        raw_rx = (float)r.x; raw_ry = (float)r.y; raw_rz = (float)r.z; raw_rw = (float)r.w;
     }
     else if (rotmode == "UDP") {
-        raw_rx = udp_rot.x;
-        raw_ry = udp_rot.y;
-        raw_rz = udp_rot.z;
-        raw_rw = udp_rot.w;
+        raw_rx = udp_rot.x; raw_ry = udp_rot.y; raw_rz = udp_rot.z; raw_rw = udp_rot.w;
     }
     else {
-        raw_rx = pipe_rot.x;
-        raw_ry = pipe_rot.y;
-        raw_rz = pipe_rot.z;
-        raw_rw = pipe_rot.w;
+        raw_rx = pipe_rot.x; raw_ry = pipe_rot.y; raw_rz = pipe_rot.z; raw_rw = pipe_rot.w;
     }
 
     Transform FinalTransform = GetNewTransform(device, raw_px, raw_py, raw_pz, raw_rx, raw_ry, raw_rz, raw_rw);
-
     pose.vecPosition[0] = FinalTransform.pos_x;
     pose.vecPosition[1] = FinalTransform.pos_y;
     pose.vecPosition[2] = FinalTransform.pos_z;
-
     pose.qRotation.w = FinalTransform.rot_w;
     pose.qRotation.x = FinalTransform.rot_x;
     pose.qRotation.y = FinalTransform.rot_y;
     pose.qRotation.z = FinalTransform.rot_z;
-
     pose.poseTimeOffset = GetFloatFromSettingsByKey("prediction time");
-
     return pose;
 }
+
 //pose here/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void CSampleTracker::RunFrame()

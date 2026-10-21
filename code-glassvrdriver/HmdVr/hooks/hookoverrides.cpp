@@ -1,6 +1,8 @@
 #include "hookoverrides.h"
 #include "driverhooks.h"
 #include "hooking.h"
+#include "skeletaloverride.h"
+#include "inputoverride.h"
 
 #include "settings.h"
 
@@ -31,6 +33,9 @@ namespace glassvr {
                 bool                      hasRole = false;
                 vr::ETrackedControllerRole role = vr::TrackedControllerRole_Invalid;
 
+                SkeletalOverride          skeletal;
+                InputOverride             input;
+
                 bool operator==(const DeviceOverride& o) const
                 {
                     return serial == o.serial
@@ -38,21 +43,59 @@ namespace glassvr {
                         && modelVisible == o.modelVisible
                         && trackingSource == o.trackingSource
                         && hasRole == o.hasRole
-                        && (!hasRole || role == o.role);
+                        && (!hasRole || role == o.role)
+                        && skeletal == o.skeletal
+                        && input == o.input;
                 }
                 bool operator!=(const DeviceOverride& o) const { return !(*this == o); }
             };
 
+            static std::string ToLower(std::string s)
+            {
+                for (char& c : s) c = (char)tolower((unsigned char)c);
+                return s;
+            }
+
             static bool ParseRole(const std::string& text, vr::ETrackedControllerRole& outRole)
             {
-                std::string v = text;
-                for (char& c : v) c = (char)tolower((unsigned char)c);
+                const std::string v = ToLower(text);
 
                 if (v.empty() || v == "pass")   return false;
                 if (v == "left") { outRole = vr::TrackedControllerRole_LeftHand;  return true; }
                 if (v == "right") { outRole = vr::TrackedControllerRole_RightHand; return true; }
                 if (v == "optout") { outRole = vr::TrackedControllerRole_OptOut;    return true; }
                 return false;
+            }
+
+            static SkeletalOverride ParseSkeletal(const SettingsDict& dict)
+            {
+                SkeletalOverride s;
+
+                const std::string source = ToLower(DictGetString(dict, "skeletal override", ""));
+                if (source == "cl" || source == "cr") s.source = source;
+
+                for (int i = 0; i < kFingerCount; i++) {
+                    const std::string finger = kFingerNames[i];
+                    s.fingers[i].curl = DictGetBool(dict, finger + " curl override", false);
+                    s.fingers[i].splay = DictGetBool(dict, finger + " splay override", false);
+                }
+                return s;
+            }
+
+            static InputOverride ParseInput(const SettingsDict& dict)
+            {
+                InputOverride in;
+
+                const std::string source = ToLower(DictGetString(dict, "input override", ""));
+                if (source == "cl" || source == "cr") in.source = source;
+
+                for (int control = 0; control < kInputControlCount; control++)
+                    for (int channel = 0; channel < kInputChannelCount; channel++)
+                        if (InputChannelValid(control, channel))
+                            in.enabled[InputSlot(control, channel)] = DictGetBool(dict, InputOverrideKey(control, channel), false);
+
+                in.ringPinkyGrip = DictGetBool(dict, "ring and pinky affect grip", false);
+                return in;
             }
 
             static DeviceOverride ParseOverride(const SettingsDict& dict)
@@ -63,6 +106,8 @@ namespace glassvr {
                 o.modelVisible = DictGetBool(dict, "model visible", true);
                 o.trackingSource = DictGetString(dict, "override tracking serial", "");
                 o.hasRole = ParseRole(DictGetString(dict, "override role", "pass"), o.role);
+                o.skeletal = ParseSkeletal(dict);
+                o.input = ParseInput(dict);
                 return o;
             }
 
@@ -83,6 +128,16 @@ namespace glassvr {
                 else
                     hooks::ClearSerialRole(o.serial);
 
+                if (o.skeletal.active())
+                    hooks::SetSkeletalOverride(o.serial, o.skeletal);
+                else
+                    hooks::ClearSkeletalOverride(o.serial);
+
+                if (o.input.active())
+                    hooks::SetInputOverride(o.serial, o.input);
+                else
+                    hooks::ClearInputOverride(o.serial);
+
                 HookLog("[overrides] '%s' disable=%d model=%d track<-'%s' role=%s",
                     o.serial.c_str(), (int)o.disable, (int)o.modelVisible,
                     o.trackingSource.c_str(), o.hasRole ? std::to_string((int)o.role).c_str() : "pass");
@@ -96,6 +151,8 @@ namespace glassvr {
                 hooks::ClearPoseSource(serial);
                 hooks::ClearSerialPositionOffset(serial);
                 hooks::ClearSerialRole(serial);
+                hooks::ClearSkeletalOverride(serial);
+                hooks::ClearInputOverride(serial);
 
                 HookLog("[overrides] '%s' reverted", serial.c_str());
             }
@@ -141,6 +198,8 @@ namespace glassvr {
                 }
 
                 hooks::TickPropertyRules();
+                hooks::TickSkeletalOverrides();
+                hooks::TickInputOverrides();
             }
 
             static void PollLoop(int intervalMs)

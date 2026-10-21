@@ -1,7 +1,6 @@
 #polls sdl values to move the selected device
 
 #movement doesnt calculates offsets keep them 0!
-#TODO: add controller support for camera
 
 import time
 import math
@@ -157,7 +156,7 @@ def loop(data):
             if settings.get(f"{device}rot use mouse", True):
                 dx, dy = mouse_dx, mouse_dy
             else:
-                dx, dy = 0.0, 0.0   # still polled above so the delta doesn't pile up
+                dx, dy = 0.0, 0.0
 
             sensitivity = settings.get(f"{device}rot mouse sensitivity", 0.050)
 

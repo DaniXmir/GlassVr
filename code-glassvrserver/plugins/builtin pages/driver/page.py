@@ -13,7 +13,7 @@ import elements as el
 import settings as se
 
 title = "Driver"
-priority = 40
+priority = 998
 
 def get_steam_path() -> str:
     return str(se.get_settings().get('steam path', r'C:\Program Files (x86)\Steam')).strip().strip('"').strip()
@@ -47,10 +47,6 @@ def restart_app():
         app.quit()
     else:
         sys.exit(0)
- 
-def reset_config_and_restart():
-    se.reset_settings()
-    restart_app()
 
 def is_steamvr_valid() -> bool:
     vr_p = get_steamvr_path()
@@ -387,17 +383,10 @@ def tab() -> QWidget:
         "tooltip" : "if you get any errors plz read them carefully!"
     })
 
-    reset_cfg_btn = el.button({
-        "text": "reset config",
-        "enabled": True,
-        "func": lambda: reset_config_and_restart()
-    })
-
     config_group = el.group({
         "text": "Config",
         "box": "v",
         "arr": [
-            reset_cfg_btn,
             config_row1,
             config_row2
         ],

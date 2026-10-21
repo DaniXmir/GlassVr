@@ -1,3 +1,12 @@
 .vs/
 *.ipch
 *.pch
+viture_camera_provider.h
+viture_device.h
+viture_device_carina.h
+viture_glasses_provider.h
+viture_macros_public.h
+viture_protocol_public.h
+viture_result.h
+viture_stat_reporter.h
+viture_version.h

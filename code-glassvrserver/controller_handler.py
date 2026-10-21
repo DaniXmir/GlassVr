@@ -287,12 +287,6 @@ class ControllerManager:
     IDLE_MOVEMENT_ABORT_MULTIPLIER = 3.0
     STICK_ACTIVITY_EPSILON = 1e-4
 
-    # se.get_settings() hits disk (open + json.load) on every call. The
-    # hardware poller runs at ~1kHz and the gyro handler fires at the
-    # sensor's native rate, so calling it unthrottled from either was
-    # adding real input latency. Settings (deadzone, sensitivity,
-    # calibration, etc.) don't need sub-100ms freshness, so both read
-    # through this cache instead of hitting disk every tick.
     SETTINGS_CACHE_TTL = 0.1
 
     def __init__(self):
@@ -743,21 +737,24 @@ class ControllerManager:
                 signals.binding_captured.emit(f"SDL_{c_id}_{key}_{direction}")
                 return
 
-    def eval_binding(self, bind_data: Any) -> float:
+    def _eval_raw(self, bind_data: Any) -> Optional[float]:
+        """Value of a binding, or None if nothing has been received for it yet
+        (unbound, controller not connected, or the controller hasn't reported that
+        button/axis/hat since it connected). None is not the same as 0.0: it is what
+        lets an inverted binding stay at 0 instead of flipping to 1 on boot."""
         if isinstance(bind_data, dict):
             buttons = bind_data.get("buttons", [])
             invert = bind_data.get("invert", False)
 
-            max_val = 0.0
-            for btn_string in buttons:
-                val = self.eval_binding(btn_string)
-                if val > max_val:
-                    max_val = val
+            received = [v for v in (self._eval_raw(b) for b in buttons) if v is not None]
+            if not received:
+                return None
 
+            max_val = max(received)
             return 1.0 - max_val if invert else max_val
 
         if not bind_data or bind_data == "[Unbound]":
-            return 0.0
+            return None
 
         if bind_data.startswith("Key_") or bind_data.startswith("Mouse_"):
             vk = get_vk_code(bind_data)
@@ -773,28 +770,38 @@ class ControllerManager:
                     c_dict = self.controllers_dict.get(c_id)
 
                 if c_dict is None:
-                    return 0.0
+                    return None
 
                 if "axis" in remainder:
                     r = remainder.split("_")
                     key_name = "_".join(r[:-1])
                     target_dir = float(r[-1])
-                    current = float(c_dict.get(key_name, 0.0))
+                    if key_name not in c_dict:
+                        return None
+                    current = float(c_dict[key_name])
                     return max(0.0, current * target_dir)
 
                 if "hat" in remainder:
                     r = remainder.split("_")
                     key_name = "_".join(r[:-1])
                     target_bit = int(r[-1])
-                    current = int(c_dict.get(key_name, 0))
+                    if key_name not in c_dict:
+                        return None
+                    current = int(c_dict[key_name])
                     return 1.0 if (current & target_bit) else 0.0
 
-                val = c_dict.get(remainder, 0.0)
+                if remainder not in c_dict:
+                    return None
+                val = c_dict[remainder]
                 return 1.0 if (val is True or val > 0.5) else 0.0
             except Exception:
-                return 0.0
+                return None
 
-        return 0.0
+        return None
+
+    def eval_binding(self, bind_data: Any) -> float:
+        val = self._eval_raw(bind_data)
+        return 0.0 if val is None else val
 
 input_manager = ControllerManager()
 input_manager.start()

@@ -4,17 +4,22 @@ import os
 import sys
 import time
 import traceback
-
-#TODO: update when adding oculus/sf compatibility
-_DEVICE_SERIAL_MAP = {
-    "hmd": "GlassVRHmd",
-    "cr": "GlassVRConRight",
-    "cl": "GlassVRConLeft",
-}
+import steamvr as svr
 
 def device_to_serial(device=""):
-    if device in _DEVICE_SERIAL_MAP:
-        return _DEVICE_SERIAL_MAP[device]
+    device_lower = device.lower()
+
+    if device_lower == "hmd":
+        return "GlassVRHmd"
+
+    if device_lower in ("cl", "cr"):
+        trackers = svr.get_trackers_dict()
+        for data in trackers.values():
+            role = data.get("role", "")
+            if device_lower == "cl" and role == "LeftHand":
+                return data.get("serial", "")
+            if device_lower == "cr" and role == "RightHand":
+                return data.get("serial", "")
 
     if device.endswith("tracker"):
         index_part = device[:-len("tracker")]

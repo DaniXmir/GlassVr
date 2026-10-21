@@ -36,9 +36,10 @@ def reset_playspace(device: str):
             trackers = svr.get_trackers_dict()
             hmd_dict = list(trackers.values())[0] if trackers else {}
 
-            raw_p_packet = get_latest_packet(device, 'P') or {"x": ps_x, "y": 0.0, "z": ps_z}
-            raw_r_packet = get_latest_packet(device, 'R') or {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
-
+            # Updated from 'P' / 'R' to 'pos' / 'rot'
+            raw_p_packet = get_latest_packet(device, 'pos') or {"x": ps_x, "y": 0.0, "z": ps_z}
+            raw_r_packet = get_latest_packet(device, 'rot') or {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
+            
             hmd_x = hmd_dict.get('pos x', 0.0) if hmd_dict else 0.0
             hmd_y = hmd_dict.get('pos y', 0.0) if hmd_dict else 0.0
             hmd_z = hmd_dict.get('pos z', 0.0) if hmd_dict else 0.0
@@ -85,8 +86,9 @@ def reset_playspace(device: str):
             ps_y = settings.get(f"{device} playspace y", 0.0)
             ps_z = settings.get(f"{device} playspace z", 0.0)
 
-            raw_p_packet = get_latest_packet(device, 'P') or {"x": 0.0, "y": 0.0, "z": 0.0}
-            raw_r_packet = get_latest_packet(device, 'R') or {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
+            # Updated from 'P' / 'R' to 'pos' / 'rot'
+            raw_p_packet = get_latest_packet(device, 'pos') or {"x": 0.0, "y": 0.0, "z": 0.0}
+            raw_r_packet = get_latest_packet(device, 'rot') or {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
 
             w = raw_r_packet["w"]
             x = raw_r_packet["x"]
@@ -166,7 +168,8 @@ def reset_playspace_on_input():
                 if n not in device_states:
                     device_states[n] = {"packet_triggered": False, "ui_triggered": False}
 
-                raw_e_packet = get_latest_packet(n, 'E')
+                # Updated from 'E' to 'ext'
+                raw_e_packet = get_latest_packet(n, 'ext')
                 packet_reset_requested = raw_e_packet.get("reset", False) if raw_e_packet else False
 
                 packet_fired = False

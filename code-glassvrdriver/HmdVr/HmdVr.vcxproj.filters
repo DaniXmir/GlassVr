@@ -135,6 +135,36 @@
     <ClInclude Include="hooks\hookoverrides.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="devices\controllerbase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\controllerdata.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\controllerinput.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\controllerregistry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\controllerslot.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\framecontroller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\touchcontroller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\vivecontroller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devices\skeletaloverride.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hooks\inputoverride.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="misc\default.vrsettings" />
@@ -204,6 +234,36 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="hooks\hookoverrides.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\controllerbase.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\controllerdata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\controllerregistry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\controllerslot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\framecontroller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\touchcontroller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\vivecontroller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hooks\skeletaloverride.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devices\hookcommon.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hooks\inputoverride.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

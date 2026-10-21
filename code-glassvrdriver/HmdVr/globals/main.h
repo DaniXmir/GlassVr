@@ -2,8 +2,9 @@
 #define CSERVERDRIVER_SAMPLE_H
 
 #include <openvr_driver.h>
+#include <vector>
 #include "hmd.h"
-#include "indexcontroller.h"
+#include "controllerslot.h"
 #include "tracker.h"
 
 #include "settings.h"
@@ -24,8 +25,9 @@ public:
 
 private:
     CSampleDeviceDriver* m_pNullHmdLatest = nullptr;
-    CSampleControllerDriver* m_pController = nullptr;
-    CSampleControllerDriver* m_pController2 = nullptr;
+
+    ControllerSlot m_slotLeft{ false };
+    ControllerSlot m_slotRight{ true };
 
     std::vector<CSampleTracker*> m_vecTrackers;
 

@@ -2,6 +2,7 @@
 #define COMM_H
 
 #include "packets.h"
+#include "settings.h"
 #include <winsock2.h>
 #include <mutex>
 #include <thread>
@@ -17,52 +18,60 @@ public:
     ~CommManager();
 
     bool AddUDP(int port);
-
     void AddPipe(const std::string& pipeName);
-
     void StopAll();
 
-    PacketPos GetUdpPos() { std::lock_guard<std::mutex> l(m_mutex); return m_udpPos; }
-    PacketRot GetUdpRot() { std::lock_guard<std::mutex> l(m_mutex); return m_udpRot; }
+    void CheckAndUpdateSerialPort(const std::string& devicePrefix, const std::string& mode);
 
-    PacketPos GetPipePos() { std::lock_guard<std::mutex> l(m_mutex); return m_pipePos; }
-    PacketRot GetPipeRot() { std::lock_guard<std::mutex> l(m_mutex); return m_pipeRot; }
+#define COMM_GETTERS(Type, Name, Field) \
+    Type GetUdp##Name()  { std::lock_guard<std::mutex> l(m_mutex); return m_udp.Field; } \
+    Type GetPipe##Name() { std::lock_guard<std::mutex> l(m_mutex); return m_pipe.Field; } \
+    Type GetSerial##Name() { std::lock_guard<std::mutex> l(m_mutex); return m_serial.Field; }
 
-    PacketInputIndex GetUdpInput() { std::lock_guard<std::mutex> lock(m_mutex); return m_udpInput; }
-    PacketInputIndex GetPipeInput() { std::lock_guard<std::mutex> lock(m_mutex); return m_pipeInput; }
-
-    PacketSkeletal GetUdpSkeletal() { std::lock_guard<std::mutex> lock(m_mutex); return m_udpSkeletal; }
-    PacketSkeletal GetPipeSkeletal() { std::lock_guard<std::mutex> lock(m_mutex); return m_pipeSkeletal; }
-
-    PacketExtra GetUdpExtra() { std::lock_guard<std::mutex> lock(m_mutex); return m_udpExtra; }
-    PacketExtra GetPipeExtra() { std::lock_guard<std::mutex> lock(m_mutex); return m_pipeExtra; }
+    COMM_GETTERS(PacketPos, Pos, pos)
+        COMM_GETTERS(PacketRot, Rot, rot)
+        COMM_GETTERS(PacketInputIndex, Input, idx)
+        COMM_GETTERS(PacketInputFrame, InputFrame, ifm)
+        COMM_GETTERS(PacketInputVive, InputVive, ive)
+        COMM_GETTERS(PacketInputTouch, InputTouch, itc)
+        COMM_GETTERS(PacketSkeletal, Skeletal, skl)
+        COMM_GETTERS(PacketExtra, Extra, ext)
+#undef COMM_GETTERS
 
 private:
+    struct Store {
+        PacketPos        pos{ 0, 0, 0 };
+        PacketRot        rot{ 1, 0, 0, 0 };
+        PacketInputIndex idx{};
+        PacketInputFrame ifm{};
+        PacketInputVive  ive{};
+        PacketInputTouch itc{};
+        PacketSkeletal   skl{};
+        PacketExtra      ext{};
+
+        bool Apply(const char* tag, const void* data, size_t len);
+        bool ApplyText(const char* line);
+    };
+
     void UdpThreadLoop(SOCKET sock);
     void PipeThreadLoop(std::string pipeName);
+    void SerialThreadLoop(std::string portName);
+    void RestartSerialThread(const std::string& portName);
 
     std::map<SOCKET, HANDLE> m_pipeHandles;
-
     std::mutex m_mutex;
     std::atomic<bool> m_bIsRunning;
 
     std::vector<std::thread> m_threads;
     std::vector<SOCKET> m_sockets;
 
-    PacketPos m_udpPos = { 0, 0, 0 };
-    PacketRot m_udpRot = { 1, 0, 0, 0 };
+    Store m_udp;
+    Store m_pipe;
+    Store m_serial;
 
-    PacketPos m_pipePos = { 0, 0, 0 };
-    PacketRot m_pipeRot = { 1, 0, 0, 0 };
-
-    PacketInputIndex m_udpInput = { 0 };
-    PacketInputIndex m_pipeInput = { 0 };
-
-    PacketSkeletal m_udpSkeletal = { 0 };
-    PacketSkeletal m_pipeSkeletal = { 0 };
-
-    PacketExtra m_udpExtra = { 0 };
-    PacketExtra m_pipeExtra = { 0 };
+    std::string m_currentSerialPort;
+    std::thread m_serialThread;
+    std::atomic<bool> m_serialRunning{ false };
 };
 
 #endif
