@@ -90,8 +90,6 @@ see examples: https://github.com/DaniXmir/GlassVr/tree/master/examples
 any help is welcome!
 
 # TODO:
- - option to emulate htc vive and oculus touch controllers(with maybe also steam frame controllers?)
- - bluetooth and serial communication
  - android app: add an option for 3dof only and improve video streaming, also add camera streaming
  - improve hand tracking, currently its very jittery and left right gets confused sometimes
 
