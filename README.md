@@ -50,7 +50,7 @@ also position and rotation can be emulated independently for each device allowin
 
 # Custom Hardware:
 
-<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/q3%fingers.gif width="600">
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/q3%20fingers.gif width="600">
 
 arduino/esp32 firmware: https://github.com/DaniXmir/GlassVr/tree/master/arduino
 and if thats not enough for you, you can also send data yourself with UDP or named pipes, 
