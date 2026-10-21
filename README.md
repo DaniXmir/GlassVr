@@ -46,6 +46,7 @@ also position and rotation can be emulated independently for each device allowin
 - override tracking of other drivers
 - disable a device model, useful for headsets that are tracked with external trackers like vive etc...
 - change a device role, useful if youre using controllers as trackers and you wanna force specific ones to be left/right
+- override other controllers input and skeletal
 
 # Custom Hardware:
 and if thats not enough for you, you can also send data yourself with UDP or named pipes, 
