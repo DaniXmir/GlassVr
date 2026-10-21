@@ -44,7 +44,7 @@ also position and rotation can be emulated independently for each device allowin
 # Advance Features:
 - 3D visualizer!
 - override tracking of other drivers
-- disable a device steamvr modes, useful for headsets that are tracked with external trackers like vive etc...
+- disable a device model, useful for headsets that are tracked with external trackers like vive etc...
 - change a device role, useful if youre using controllers as trackers and you wanna force specific ones to be left/right
 
 # Custom Hardware:
