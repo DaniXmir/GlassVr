@@ -66,7 +66,7 @@ arduino/esp32 firmware: https://github.com/DaniXmir/GlassVr/tree/master/arduino
 # The Boring Technical Staff...
 the driver is composed of 2 parts(3 with the android app), python "server"/ui side and C++ driver side, 
 the python side isnt just a frontend, its used in some modes like hand tracking or controller input emulation with SDL3, 
-its sends its data via named pipes, these pipes can also be hijacked if you want to send custom data see examples: https://github.com/DaniXmir/GlassVr/tree/master/examples/python
+its sends its data via named pipes, these pipes can also be hijacked if you want to send custom data see examples: https://github.com/DaniXmir/GlassVr/tree/master/examples
 
 # Building:
 python ui: to build on windows clone the repo and run build.ps1 with
