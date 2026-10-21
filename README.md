@@ -49,6 +49,9 @@ also position and rotation can be emulated independently for each device allowin
 - override other controllers input and skeletal
 
 # Custom Hardware:
+
+<img src=https://github.com/DaniXmir/GlassVr/blob/master/media/q3%fingers.gif width="600">
+
 arduino/esp32 firmware: https://github.com/DaniXmir/GlassVr/tree/master/arduino
 and if thats not enough for you, you can also send data yourself with UDP or named pipes, 
 with more communication protocols coming soon like bluetooth and serial
