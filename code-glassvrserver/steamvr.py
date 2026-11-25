@@ -8,6 +8,7 @@ import threading
 import numpy as np
 import openvr as vr
 from scipy.spatial.transform import Rotation as R
+from math_utils import rot_matrix_to_yxz_euler
 
 trackers_dict = {}
 trackers_arr = []
@@ -59,8 +60,10 @@ def _run_vr_session():
         PROP_SERIAL = vr.Prop_SerialNumber_String
         PROP_MODEL = vr.Prop_ControllerType_String
         PROP_RENDER = vr.Prop_RenderModelName_String
+        ticks = 0
 
-        while is_process_running("vrserver.exe"):
+        while ticks % 100 != 0 or is_process_running("vrserver.exe"):
+            ticks += 1
             try:
                 poses = vr_system.getDeviceToAbsoluteTrackingPose(2, 0.0, vr.k_unMaxTrackedDeviceCount)
                 
@@ -114,14 +117,14 @@ def _run_vr_session():
                             m = pose.mDeviceToAbsoluteTracking
                             
                             pos_x, pos_y, pos_z = float(m[0][3]), float(m[1][3]), float(m[2][3])
-                            
+
                             rotation_matrix = np.array([
                                 [m[0][0], m[0][1], m[0][2]],
                                 [m[1][0], m[1][1], m[1][2]],
                                 [m[2][0], m[2][1], m[2][2]]
                             ])
 
-                            yaw, pitch, roll = R.from_matrix(rotation_matrix).as_euler('yxz', degrees=True)
+                            yaw, pitch, roll = rot_matrix_to_yxz_euler(rotation_matrix)
 
                             device_data.update({
                                 "pos x": pos_x,

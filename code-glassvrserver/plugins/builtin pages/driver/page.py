@@ -175,6 +175,9 @@ def tab() -> QWidget:
         except Exception:
             pass
 
+    def reload_config():
+        se.load_settings()
+
     def open_steamvr_settings():
         try:
             os.startfile(get_vrsettings_file())
@@ -195,6 +198,12 @@ def tab() -> QWidget:
                 "text": "open config",
                 "enabled": True,
                 "func": open_config_folder
+            },
+            {
+                "type": "button",
+                "text": "reload config",
+                "enabled": True,
+                "func": reload_config
             },
             {
                 "type": "label",
