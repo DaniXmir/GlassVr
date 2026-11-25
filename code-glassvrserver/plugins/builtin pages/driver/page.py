@@ -203,7 +203,7 @@ def tab() -> QWidget:
                 "type": "button",
                 "text": "reload config",
                 "enabled": True,
-                "func": open_config_folder
+                "func": reload_config
             },
             {
                 "type": "label",
