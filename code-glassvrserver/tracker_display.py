@@ -169,9 +169,8 @@ class TrackerDisplay(QScrollArea):
                     px, py, pz = data['pos x'], data['pos y'], data['pos z']
                     w['pos'].setText(f"(X:{px:+.4f}  Y:{py:+.4f}  Z:{pz:+.4f})")
 
-                if "rotation matrix" in data:
-                    m = data['rotation matrix']
-                    yaw, pitch, roll = R.from_matrix(m).as_euler('yxz', degrees=True)
+                if "yaw" in data and "pitch" in data and "roll" in data:
+                    yaw, pitch, roll = data["yaw"], data["pitch"], data["roll"]
                     w['rot'].setText(f"(Yaw:{yaw:+.1f}°  Pitch:{pitch:+.1f}°  Roll:{roll:+.1f}°)")
                 continue
 
@@ -208,8 +207,8 @@ class TrackerDisplay(QScrollArea):
                 px, py, pz = data['pos x'], data['pos y'], data['pos z']
                 pos_label.setText(f"(X:{px:+.4f}  Y:{py:+.4f}  Z:{pz:+.4f})")
 
-            if "rotation matrix" in data:
-                yaw, pitch, roll = R.from_matrix(data['rotation matrix']).as_euler('yxz', degrees=True)
+            if "yaw" in data and "pitch" in data and "roll" in data:
+                yaw, pitch, roll = data["yaw"], data["pitch"], data["roll"]
                 rot_label.setText(f"(Yaw:{yaw:+.1f}°  Pitch:{pitch:+.1f}°  Roll:{roll:+.1f}°)")
 
             serial_btn = QPushButton(f"Serial: {serial}")

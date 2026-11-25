@@ -227,6 +227,8 @@ default_settings = {
 
     "hook overrides" : []
 }
+current_settings = default_settings.copy()
+settings_loaded = False
 
 def get_path():
     appdata_path = os.getenv('APPDATA')
@@ -243,49 +245,48 @@ def get_path():
 
 file_path = get_path()
 
-def reset_settings():
-    with open(file_path, 'w') as f:
-        json.dump(default_settings, f, indent=4)
+def write_settings():
+    try:
+        with open(file_path, 'w') as f:
+            json.dump(current_settings, f, indent=4)
+    except OSError:
+        pass
 
-last_good_settings = None
+def reset_settings():
+    global current_settings
+    with open(file_path, 'w') as f:
+        current_settings = default_settings.copy()
+        json.dump(current_settings, f, indent=4)
+
+def load_settings():
+    with open(file_path, 'r') as f:
+        file_settings = json.load(f)
+        current_settings.update(file_settings)
+        if current_settings != file_settings:
+            write_settings()
 
 def get_settings():
     #this returns the whole dict and not one individual setting
-    global last_good_settings
+    global settings_loaded
     try:
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
-                current_settings = json.load(f)
-        else:
-            current_settings = {}
-
-        merged_settings = default_settings.copy()
-        merged_settings.update(current_settings)
-
-        if merged_settings != current_settings:
-            try:
-                with open(file_path, 'w') as f:
-                    json.dump(merged_settings, f, indent=4)
-            except OSError:
-                pass
-
-        last_good_settings = merged_settings
-        return merged_settings
+        if not settings_loaded:
+            if os.path.exists(file_path):
+                load_settings()
+            else:
+                write_settings()
+        settings_loaded = True
+        return current_settings
 
     except (json.JSONDecodeError, OSError):
-        return last_good_settings if last_good_settings is not None else default_settings.copy()
+        settings_loaded = True
+        return current_settings
 
 def update_setting(key, new_value):
     settings = get_settings()
 
     settings[key] = new_value
     
-    try:
-        with open(file_path, 'w') as f:
-            json.dump(settings, f, indent=4)
-
-    except Exception as e:
-        pass
+    write_settings()
 
 def update_nested(dict_name, new_data):
     #example: update_nested("a4-53-85-4a-e7-18", {"index_x": 2, "invert_x": True})
@@ -297,8 +298,4 @@ def update_nested(dict_name, new_data):
 
     settings[dict_name].update(new_data)
 
-    try:
-        with open(file_path, 'w') as f:
-            json.dump(settings, f, indent=4)
-    except Exception as e:
-        pass
+    write_settings()

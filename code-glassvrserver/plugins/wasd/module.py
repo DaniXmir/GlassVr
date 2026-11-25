@@ -189,8 +189,8 @@ def loop(data):
 
             rot_matrix = tracker_data.get("rotation matrix", None)
 
-            if rot_matrix is not None:
-                yaw, pitch, roll = R.from_matrix(rot_matrix).as_euler('yxz', degrees=True)
+            if rot_matrix is not None and "yaw" in tracker_data:
+                yaw = tracker_data["yaw"]
                 _current_yaw = float(yaw)
 
                 yaw_rad = math.radians(_current_yaw)
